@@ -13,6 +13,7 @@ using System.Windows.Media;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace SyslogAgent.Config
 {
@@ -185,25 +186,30 @@ namespace SyslogAgent.Config
         public IValidatedStringView DebugLogFilename => new ValidatedTextBox(debugLogFilename);
         public IValidatedStringView TailFilename => new ValidatedTextBox(txtTailFilename);
         public IValidatedStringView TailProgramName => new ValidatedTextBox(txtTailProgramName);
-        public string Message { set { messageText.Text = value; } }
+        public string Message { set { txtBlockStatusBarLeft.Text = value; } }
         public string LogzillaFileVersion { set { tbkLogzillaVersion.Text = "LogZilla Syslog Agent version " + value; } }
 
         public string Status
         {
-            set { serviceText.Dispatcher.BeginInvoke(new Action(() => { serviceText.Text = value; })); }
+            set { txtBlockStatusBarRight.Dispatcher.BeginInvoke(new Action(() => { txtBlockStatusBarRight.Text = value; })); }
+        }
+
+        public string MessageBlock
+        {
+            set { txtBlockStatusBarLeft.Dispatcher.BeginInvoke(new Action(() => { txtBlockStatusBarLeft.Text = value; })); }
         }
 
 
         public void SetFailureMessage(string message)
         {
-            messageText.Text = message;
-            messageText.Foreground = new SolidColorBrush(Color.FromRgb(255, 0, 0));
+            txtBlockStatusBarLeft.Text = message;
+            txtBlockStatusBarLeft.Foreground = new SolidColorBrush(Color.FromRgb(255, 0, 0));
         }
 
         public void SetSuccessMessage(string message)
         {
-            messageText.Text = message;
-            messageText.Foreground = SystemColors.ControlTextBrush;
+            txtBlockStatusBarLeft.Text = message;
+            txtBlockStatusBarLeft.Foreground = SystemColors.ControlTextBrush;
         }
 
         void ImportButton_OnClick(object sender, RoutedEventArgs e)
@@ -216,10 +222,24 @@ namespace SyslogAgent.Config
             presenter.Export();
         }
 
-        void SaveButton_OnClick(object sender, RoutedEventArgs e)
+        void SaveButton_OnClick( object sender, RoutedEventArgs e )
         {
-            presenter.Save();
+            // Set the cursor to wait
+            Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+            saveButton.IsEnabled = false;
+
+            try
+            {
+                presenter.Save();
+            }
+            finally
+            {
+                // Reset the cursor to the default arrow cursor
+                Mouse.OverrideCursor = null;
+                saveButton.IsEnabled = true;
+            }
         }
+
 
         void RestartButton_OnClick(object sender, RoutedEventArgs e)
         {

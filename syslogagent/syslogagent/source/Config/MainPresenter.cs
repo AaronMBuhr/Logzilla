@@ -290,7 +290,9 @@ namespace SyslogAgent.Config
             var validationFunctions = new List<Func<string>>
             {
                  () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
+                 () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, true, "Primary host"),
                  () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
+                 () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
                  () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter"),
                  () => ValidateFilename(view.DebugLogFilename, "Invalid debug log filename"),
@@ -350,6 +352,14 @@ namespace SyslogAgent.Config
                     || Regex.Match(host.Content, regex_valid_host).Success;
             }
             return isValid ? null : failureMsg;
+        }
+
+        static string ValidateHostConnectivity(IValidatedStringView host, IValidatedOptionView useTls, bool required, string failureMsg)
+        {
+            if (!required && host.Content.Trim() == "")
+                return null;
+            string errMsg = Communications.TestTcpConnection(host.Content, useTls.IsSelected);
+            return $"{failureMsg} {errMsg}";
         }
 
         static string ValidateEventIds(IValidatedStringView eventIds, string failureMsg)
