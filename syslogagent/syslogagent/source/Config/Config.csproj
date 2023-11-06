@@ -105,7 +105,6 @@
     <Compile Include="IValidatedOptionView.cs" />
     <Compile Include="IValidatedStringView.cs" />
     <Compile Include="ValidatedTextBox.cs" />
-    <Compile Include="WidthConverter.cs" />
     <Compile Include="WindowsEventLog.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>

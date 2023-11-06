@@ -9,9 +9,6 @@ Copyright © 2021 LogZilla Corp.
         xmlns:local="clr-namespace:SyslogAgent.Config"
         mc:Ignorable="d"
         Title="Syslog Agent Configuration" Width="Auto" Height="Auto" SizeToContent="WidthAndHeight">
-    <Window.Resources>
-        <local:WidthConverter x:Key="WidthConverter" />
-    </Window.Resources>
 
     <DockPanel>
         <StackPanel DockPanel.Dock="Bottom">
