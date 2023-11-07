@@ -8,6 +8,8 @@ namespace SyslogAgent.Config {
         IOptionView LookUpAccount { get; }
         //IOptionView IncludeKeyValuePairs { get; }
         IOptionView SendToSecondary { get; }
+        IValidatedOptionView IncludeEventIds { get; }
+        IValidatedOptionView IgnoreEventIds { get; }
         IValidatedStringView EventIdFilter { get; }
         IValidatedStringView SecondaryHost { get; }
         IValidatedStringView PrimaryHost { get; }

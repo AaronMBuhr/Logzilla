@@ -70,6 +70,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     string tail_file = Util::wstr2str(tail_filename_);
     Logger::debug("Tail requested for file %s\n", tail_file.c_str());
 
+    include_vs_ignore_eventids_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_INCLUDE_VS_IGNORE_EVENTIDS, false);
     loadFilterIds(registry.readString(SYSLOGAGENT_REGISTRYKEY_EVENT_ID_FILTER, L""));
 
     auto channels = registry.readChannels();

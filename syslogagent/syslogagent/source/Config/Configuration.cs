@@ -10,6 +10,7 @@ namespace SyslogAgent.Config {
 
         public int PollInterval { get; set; }
         public bool LookUpAccountIDs { get; set; }
+        public bool IncludeVsIgnoreEventIds { get; set; }
         public string EventIdFilter { get; set; }
         public int Facility { get; set; }
         public int Severity { get; set; }

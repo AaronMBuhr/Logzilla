@@ -95,8 +95,16 @@ namespace Syslog_agent {
 		auto event_id_str = event.getXmlDoc().child("Event").child("System").child("EventID").child_value();
 		DWORD event_id;
 		sscanf_s(event_id_str, "%u", &event_id);
-		if (configuration_.event_id_filter_.find(event_id) != configuration_.event_id_filter_.end()) {
-			return false;
+		if (configuration_.include_vs_ignore_eventids_) {
+			if (configuration_.event_id_filter_.find(event_id) == configuration_.event_id_filter_.end()) {
+                return false;
+            }
+		}
+		else
+		{
+			if (configuration_.event_id_filter_.find(event_id) != configuration_.event_id_filter_.end()) {
+				return false;
+			}
 		}
 		char severity;
 		if (configuration_.severity_ == SYSLOGAGENT_SEVERITY_DYNAMIC) {

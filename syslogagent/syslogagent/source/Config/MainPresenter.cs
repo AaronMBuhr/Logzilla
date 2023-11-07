@@ -198,6 +198,7 @@ namespace SyslogAgent.Config
         {
             var config = new Configuration();
 
+            config.IncludeVsIgnoreEventIds = view.IncludeEventIds.IsSelected;
             config.EventIdFilter = view.EventIdFilter.Content;
             config.Suffix = view.Suffix.Content;
             config.Facility = view.Facility.Option;
@@ -294,6 +295,7 @@ namespace SyslogAgent.Config
                  () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
                  () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
+                 () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds, view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids"),
                  () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter"),
                  () => ValidateFilename(view.DebugLogFilename, "Invalid debug log filename"),
                  () => ValidateFilename(view.TailFilename, "Invalid tail filename"),
@@ -359,7 +361,13 @@ namespace SyslogAgent.Config
             if (!required && host.Content.Trim() == "")
                 return null;
             string errMsg = Communications.TestTcpConnection(host.Content, useTls.IsSelected);
-            return $"{failureMsg} {errMsg}";
+            return (errMsg == null ? null : $"{failureMsg} {errMsg}");
+        }
+
+        static string ValidateIgnoreVsIncludeEventIds( IValidatedStringView eventIds, IValidatedOptionView includeEventIds, IValidatedOptionView ignoreEventIds, string failureMsg )
+        {
+            bool isValid = eventIds.Content.Trim().Length < 1 || (includeEventIds.IsSelected ^ ignoreEventIds.IsSelected);
+            return isValid ? null : failureMsg;
         }
 
         static string ValidateEventIds(IValidatedStringView eventIds, string failureMsg)

@@ -52,6 +52,7 @@ namespace Syslog_agent {
         wstring tail_filename_;
         wstring tail_program_name_;
         int utc_offset_minutes_;
+        bool include_vs_ignore_eventids_;
 
         void loadFromRegistry(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting);
         void saveToRegistry();

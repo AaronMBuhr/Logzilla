@@ -234,16 +234,27 @@ Copyright © 2021 LogZilla Corp.
                     <GroupBox Margin="2,2,2,2" Header="Event Selection">
                         <Grid Margin="10,0,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
+                                <!-- Row for RadioButtons -->
                                 <RowDefinition Height="Auto" />
+                                <!-- Row for TextBlock and TextBox -->
                             </Grid.RowDefinitions>
-                            <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Ignore event ids</TextBlock>
-                            <TextBox Grid.Column="1" Grid.Row="0" Margin="2,0,0,0" Width="200" Name="eventIdFilterText" ToolTip="Enter a comma-separated list of event ids to ignore"></TextBox>
+
+                            <!-- StackPanel for Radio Buttons 'Include' and 'Ignore' on the first row, first column -->
+                            <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal" Margin="2">
+                                <RadioButton Content="Ignore" Name="radioIgnore" Margin="0,0,20,0" />
+                                <RadioButton Content="Include" Name="radioInclude" />
+                            </StackPanel>
+
+                            <!-- 'Ignore event ids' Label on the second row, first column -->
+                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2" VerticalAlignment="Center">Event ids</TextBlock>
+
+                            <!-- 'Ignore event ids' Input TextBox on the second row, second column -->
+                            <TextBox Grid.Column="1" Grid.Row="1" Margin="2,0,0,0" Width="200" Name="eventIdFilterText" ToolTip="Enter a comma-separated list of event ids to ignore" />
                         </Grid>
                     </GroupBox>
                     <GroupBox Margin="2,2,2,2" Header="Message Content">

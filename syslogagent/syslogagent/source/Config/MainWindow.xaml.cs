@@ -175,6 +175,8 @@ namespace SyslogAgent.Config
         public IOptionView SendToSecondary => new ValidatedOptionCheckBox(sendToSecondaryCheck);
         public IValidatedOptionView PrimaryUseTls => new ValidatedOptionCheckBox(primaryUseTlsCheck);
         public IValidatedOptionView SecondaryUseTls => new ValidatedOptionCheckBox(secondaryUseTlsCheck);
+        public IValidatedOptionView IncludeEventIds => new ValidatedOptionRadioButton(radioInclude);
+        public IValidatedOptionView IgnoreEventIds => new ValidatedOptionRadioButton(radioIgnore);
         public IValidatedStringView EventIdFilter => new ValidatedTextBox(eventIdFilterText);
         public IValidatedStringView Suffix => new ValidatedTextBox(suffixText);
         public IValidatedStringView SecondaryHost => new ValidatedTextBox(secondaryHostText);
@@ -462,6 +464,16 @@ namespace SyslogAgent.Config
             SendToSecondary.IsSelected = config.SendToSecondary;
             PrimaryUseTls.IsSelected = config.PrimaryUseTls;
             SecondaryUseTls.IsSelected = config.SecondaryUseTls;
+            if (config.IncludeVsIgnoreEventIds)
+            {
+                radioInclude.IsChecked = true;
+                radioIgnore.IsChecked = false;
+            }
+            else
+            {
+                radioInclude.IsChecked = false;
+                radioIgnore.IsChecked = true;
+            }
             EventIdFilter.Content = config.EventIdFilter;
             Suffix.Content = config.Suffix;
             SecondaryHost.Content = config.SecondaryHost;

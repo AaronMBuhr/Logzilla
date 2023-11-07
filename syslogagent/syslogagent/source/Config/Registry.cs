@@ -19,6 +19,7 @@ namespace SyslogAgent.Config
             openRegistryKey();
             config.PollInterval = (int)mainKey.GetValue(SharedConstants.RegistryKey.EventLogPollInterval, SharedConstants.ConfigDefaults.EventLogPollInterval);
             config.LookUpAccountIDs = GetBinary(SharedConstants.RegistryKey.LookupAccounts, SharedConstants.ConfigDefaults.LookupAccountsB) != 0;
+            config.IncludeVsIgnoreEventIds = GetBinary(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, SharedConstants.ConfigDefaults.IncludeVsIgnoreEventIdsB) != 0;
             config.EventIdFilter = mainKey.GetValue(SharedConstants.RegistryKey.EventIdFilter, SharedConstants.ConfigDefaults.EventIdFilter).ToString();
             config.Facility = (int)mainKey.GetValue(SharedConstants.RegistryKey.Facility, (int)SharedConstants.ConfigDefaults.Facility);
             config.Severity = (int)mainKey.GetValue(SharedConstants.RegistryKey.Severity, (int)SharedConstants.ConfigDefaults.Severity);
@@ -43,6 +44,7 @@ namespace SyslogAgent.Config
                 mainKey.SetValue(SharedConstants.RegistryKey.ConfigVersion, SharedConstants.CurrentConfigVersion);
             mainKey.SetValue(SharedConstants.RegistryKey.EventLogPollInterval, config.PollInterval, RegistryValueKind.DWord);
             PutBool(SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
+            PutBool(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds);
             mainKey.SetValue(SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter, RegistryValueKind.String);
             mainKey.SetValue(SharedConstants.RegistryKey.Facility, config.Facility, RegistryValueKind.DWord);
             mainKey.SetValue(SharedConstants.RegistryKey.Severity, config.Severity, RegistryValueKind.DWord);
@@ -275,6 +277,7 @@ namespace SyslogAgent.Config
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.ConfigVersion, SharedConstants.CurrentConfigVersion);
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.EventLogPollInterval, SharedConstants.ConfigDefaults.EventLogPollInterval);
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
+                WriteRegfileKeyValue( writer, SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds );
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter ?? "");
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Facility, config.Facility);
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Severity, config.Severity);
@@ -357,6 +360,10 @@ namespace SyslogAgent.Config
 
                                 case "LookupAccountSID":
                                     config.LookUpAccountIDs = ValuePortion(parts[1]) == "01";
+                                    break;
+
+                                case "IncludeVsIgnoreEventIds":
+                                    config.IncludeVsIgnoreEventIds = ValuePortion( parts[1]) == "01";
                                     break;
 
                                 case "EventIDFilterList":

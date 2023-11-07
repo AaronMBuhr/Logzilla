@@ -104,6 +104,7 @@
     <Compile Include="Transport.cs" />
     <Compile Include="IValidatedOptionView.cs" />
     <Compile Include="IValidatedStringView.cs" />
+    <Compile Include="ValidatedOptionRadioButton.cs" />
     <Compile Include="ValidatedTextBox.cs" />
     <Compile Include="WindowsEventLog.cs" />
     <Page Include="MainWindow.xaml">

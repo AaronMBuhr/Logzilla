@@ -19,6 +19,7 @@ namespace SyslogAgent
         public static class RegistryKey
         {
             public const string ConfigVersion               =   "ConfigVersion";
+            public const string IncludeVsIgnoreEventIds     =   "IncludeVsIgnoreEventIds";
             public const string EventIdFilter               =   "EventIDFilterList";
             public const string EventLogPollInterval        =   "EventLogPollInterval";
             public const string SendToSecondary             =   "ForwardToMirror";
@@ -54,6 +55,7 @@ namespace SyslogAgent
 
         public static class ConfigDefaults
         {
+            public const byte       IncludeVsIgnoreEventIdsB=   0;
             public const string     EventIdFilter           =   "";
             public const int        EventLogPollInterval    =   10;
             public const byte       SendToSecondaryB        =   0;
@@ -79,7 +81,7 @@ namespace SyslogAgent
         }
 
 
-        public const string CurrentConfigVersion        =   "6.0.0.0";
+        public const string CurrentConfigVersion        =   "6.27.0.0";
         public const string SyslogAgentExeFilename      =   "syslogagent.exe";
         public const string PrimaryCertFilename         =   "primary.cert";
         public const string SecondaryCertFilename       =   "secondary.cert";
