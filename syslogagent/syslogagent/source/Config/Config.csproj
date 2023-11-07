@@ -77,6 +77,7 @@
     </ApplicationDefinition>
     <Compile Include="AgentService.cs" />
     <Compile Include="BaseInpc.cs" />
+    <Compile Include="Communications.cs" />
     <Compile Include="Configuration.cs" />
     <Compile Include="EventLogCandidate.cs" />
     <Compile Include="EventLogGroupMember.cs" />

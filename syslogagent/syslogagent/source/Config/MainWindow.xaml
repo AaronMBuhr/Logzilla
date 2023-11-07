@@ -9,6 +9,7 @@ Copyright © 2021 LogZilla Corp.
         xmlns:local="clr-namespace:SyslogAgent.Config"
         mc:Ignorable="d"
         Title="Syslog Agent Configuration" Width="Auto" Height="Auto" SizeToContent="WidthAndHeight">
+
     <DockPanel>
         <StackPanel DockPanel.Dock="Bottom">
             <Grid>
@@ -22,6 +23,7 @@ Copyright © 2021 LogZilla Corp.
                     <Button x:Name="restartButton" Click="RestartButton_OnClick" Height="20" Width="60" Margin="5" Content="Restart"/>
                 </StackPanel>
             </Grid>
+            <!--
             <StatusBar>
                 <StatusBarItem>
                     <TextBlock Name="messageText"></TextBlock>
@@ -30,6 +32,38 @@ Copyright © 2021 LogZilla Corp.
                     <TextBlock Name="serviceText"></TextBlock>
                 </StatusBarItem>
             </StatusBar>
+            -->
+            <StatusBar HorizontalAlignment="Stretch">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <!-- Fixed width for the left TextBlock column -->
+                        <ColumnDefinition Width="335"/>
+                        <!-- Separator column with a fixed width -->
+                        <ColumnDefinition Width="10"/>
+                        <!-- Fixed width for the right TextBlock column -->
+                        <ColumnDefinition Width="145"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left TextBlock with text wrapping enabled -->
+                    <TextBlock Name="txtBlockStatusBarLeft" 
+                   TextWrapping="Wrap" 
+                   Grid.Column="0" 
+                   Margin="0"
+                   HorizontalAlignment="Stretch" 
+                   VerticalAlignment="Center" />
+
+                    <!-- Separator column. It's just empty space and doesn't need a content presenter. -->
+
+                    <!-- Right TextBlock with right text alignment -->
+                    <TextBlock Name="txtBlockStatusBarRight" 
+                   TextAlignment="Right" 
+                   Grid.Column="2" 
+                   Margin="0"
+                   HorizontalAlignment="Stretch" 
+                   VerticalAlignment="Center" />
+                </Grid>
+            </StatusBar>
+
         </StackPanel>
         <StackPanel PreviewMouseDown="UIElement_OnPreviewMouseDown" PreviewKeyDown="UIElement_OnPreviewKeyDown">
             <WrapPanel>
