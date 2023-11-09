@@ -12,6 +12,7 @@ namespace SyslogAgent.Config {
         public bool LookUpAccountIDs { get; set; }
         public bool IncludeVsIgnoreEventIds { get; set; }
         public string EventIdFilter { get; set; }
+        public bool OnlyWhileRunning { get; set; }
         public int Facility { get; set; }
         public int Severity { get; set; }
         public bool IncludeKeyValuePairs { get; set; }

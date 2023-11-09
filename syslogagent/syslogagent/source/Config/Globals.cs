@@ -1,4 +1,11 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+/* Not going to refactor whole program to pass base state, just using global */
+
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;

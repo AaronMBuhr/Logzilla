@@ -13,7 +13,12 @@ using namespace std;
 namespace Syslog_agent {
 	class EventLogSubscription {
 	public:
-		EventLogSubscription(wstring subscription_name, wstring channel, wstring query, wstring bookmark_xml, unique_ptr<ChannelEventHandlerBase> event_handler) :
+		EventLogSubscription(
+			wstring subscription_name, 
+			wstring channel, 
+			wstring query, 
+			wstring bookmark_xml,
+			unique_ptr<ChannelEventHandlerBase> event_handler) :
 			subscription_name_(subscription_name),
 			channel_(channel),
 			query_(query),

@@ -178,6 +178,8 @@ namespace SyslogAgent.Config
         public IValidatedOptionView IncludeEventIds => new ValidatedOptionRadioButton(radioInclude);
         public IValidatedOptionView IgnoreEventIds => new ValidatedOptionRadioButton(radioIgnore);
         public IValidatedStringView EventIdFilter => new ValidatedTextBox(eventIdFilterText);
+        public IValidatedOptionView OnlyWhileRunning => new ValidatedOptionRadioButton(radioOnlyWhileRunning);
+        public IValidatedOptionView CatchUp => new ValidatedOptionRadioButton(radioCatchUp);
         public IValidatedStringView Suffix => new ValidatedTextBox(suffixText);
         public IValidatedStringView SecondaryHost => new ValidatedTextBox(secondaryHostText);
         public IValidatedStringView PrimaryHost => new ValidatedTextBox(primaryHostText);

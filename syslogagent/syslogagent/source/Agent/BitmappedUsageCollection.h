@@ -115,7 +115,7 @@ public:
 		return count;
 	}
 
-	std::string asHexString() {
+	const std::string asHexString() {
 		std::string result;
 		for (auto& bm : usage_bitmaps_) {
 			result.append(bm->asHexString());
@@ -123,7 +123,7 @@ public:
 		return result;
 	}
 
-	std::string asBinaryString() {
+	const std::string asBinaryString() {
 		std::string result;
 		for (auto& bm : usage_bitmaps_) {
 			result.append(bm->asBinaryString());

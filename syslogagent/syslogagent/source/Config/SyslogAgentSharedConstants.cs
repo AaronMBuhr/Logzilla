@@ -21,6 +21,7 @@ namespace SyslogAgent
             public const string ConfigVersion               =   "ConfigVersion";
             public const string IncludeVsIgnoreEventIds     =   "IncludeVsIgnoreEventIds";
             public const string EventIdFilter               =   "EventIDFilterList";
+            public const string OnlyWhileRunning            =   "OnlyWhileRunning";
             public const string EventLogPollInterval        =   "EventLogPollInterval";
             public const string SendToSecondary             =   "ForwardToMirror";
             public const string LookupAccounts              =   "LookupAccountSID";
@@ -57,6 +58,7 @@ namespace SyslogAgent
         {
             public const byte       IncludeVsIgnoreEventIdsB=   0;
             public const string     EventIdFilter           =   "";
+            public const byte       OnlyWhileRunning        =   0;
             public const int        EventLogPollInterval    =   10;
             public const byte       SendToSecondaryB        =   0;
             public const byte       LookupAccountsB         =   1;

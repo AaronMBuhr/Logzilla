@@ -163,6 +163,10 @@ namespace SyslogAgent.Config
         public void Load()
         {
             registry_.ReadConfigFromRegistry(ref config_);
+            view.IncludeEventIds.IsSelected = config_.IncludeVsIgnoreEventIds;
+            view.IgnoreEventIds.IsSelected = !config_.IncludeVsIgnoreEventIds;
+            view.OnlyWhileRunning.IsSelected = config_.OnlyWhileRunning;
+            view.CatchUp.IsSelected = !config_.OnlyWhileRunning;
             view.EventIdFilter.Content = config_.EventIdFilter;
             view.Suffix.Content = config_.Suffix;
             view.Facility.Option = config_.Facility;
@@ -199,6 +203,7 @@ namespace SyslogAgent.Config
             var config = new Configuration();
 
             config.IncludeVsIgnoreEventIds = view.IncludeEventIds.IsSelected;
+            config.OnlyWhileRunning = view.OnlyWhileRunning.IsSelected;
             config.EventIdFilter = view.EventIdFilter.Content;
             config.Suffix = view.Suffix.Content;
             config.Facility = view.Facility.Option;

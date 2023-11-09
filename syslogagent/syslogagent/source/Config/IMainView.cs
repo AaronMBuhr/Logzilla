@@ -11,6 +11,8 @@ namespace SyslogAgent.Config {
         IValidatedOptionView IncludeEventIds { get; }
         IValidatedOptionView IgnoreEventIds { get; }
         IValidatedStringView EventIdFilter { get; }
+        IValidatedOptionView OnlyWhileRunning { get; }
+        IValidatedOptionView CatchUp { get; }
         IValidatedStringView SecondaryHost { get; }
         IValidatedStringView PrimaryHost { get; }
         IValidatedOptionView PrimaryUseTls { get; }

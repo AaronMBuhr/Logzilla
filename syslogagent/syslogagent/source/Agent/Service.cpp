@@ -162,7 +162,7 @@ void Service::run(bool running_as_console) {
 				log.name_,
 				log.channel_,
 				wstring(L"*"),
-				log.bookmark_,
+				(config_.only_while_running_ ? NULL : log.bookmark_),
 				std::move(handler));
 			subscriptions_.push_back(std::move(subscription));
 			auto bookmark = Registry::readBookmark(log.channel_.c_str());

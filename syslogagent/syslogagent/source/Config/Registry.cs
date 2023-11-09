@@ -21,6 +21,7 @@ namespace SyslogAgent.Config
             config.LookUpAccountIDs = GetBinary(SharedConstants.RegistryKey.LookupAccounts, SharedConstants.ConfigDefaults.LookupAccountsB) != 0;
             config.IncludeVsIgnoreEventIds = GetBinary(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, SharedConstants.ConfigDefaults.IncludeVsIgnoreEventIdsB) != 0;
             config.EventIdFilter = mainKey.GetValue(SharedConstants.RegistryKey.EventIdFilter, SharedConstants.ConfigDefaults.EventIdFilter).ToString();
+            config.OnlyWhileRunning = GetBinary( SharedConstants.RegistryKey.OnlyWhileRunning, SharedConstants.ConfigDefaults.OnlyWhileRunning ) != 0;
             config.Facility = (int)mainKey.GetValue(SharedConstants.RegistryKey.Facility, (int)SharedConstants.ConfigDefaults.Facility);
             config.Severity = (int)mainKey.GetValue(SharedConstants.RegistryKey.Severity, (int)SharedConstants.ConfigDefaults.Severity);
             //IncludeKeyValuePairs = GetBinary(SharedConstants.RegistryKey.IncludeKeyValuePairs, SharedConstants.ConfigDefaults.IncludeKeyValuePairsB) != 0,
@@ -39,13 +40,14 @@ namespace SyslogAgent.Config
             }
 
         public void WriteConfigToRegistry(Configuration config) {
-                openRegistryKey();
+            openRegistryKey();
 
-                mainKey.SetValue(SharedConstants.RegistryKey.ConfigVersion, SharedConstants.CurrentConfigVersion);
+            mainKey.SetValue(SharedConstants.RegistryKey.ConfigVersion, SharedConstants.CurrentConfigVersion);
             mainKey.SetValue(SharedConstants.RegistryKey.EventLogPollInterval, config.PollInterval, RegistryValueKind.DWord);
             PutBool(SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
             PutBool(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds);
             mainKey.SetValue(SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter, RegistryValueKind.String);
+            mainKey.SetValue( SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
             mainKey.SetValue(SharedConstants.RegistryKey.Facility, config.Facility, RegistryValueKind.DWord);
             mainKey.SetValue(SharedConstants.RegistryKey.Severity, config.Severity, RegistryValueKind.DWord);
             //PutBool(SharedConstants.RegistryKey.IncludeKeyValuePairs, value.IncludeKeyValuePairs);
@@ -279,6 +281,7 @@ namespace SyslogAgent.Config
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
                 WriteRegfileKeyValue( writer, SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds );
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter ?? "");
+                WriteRegfileKeyValue( writer, SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Facility, config.Facility);
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Severity, config.Severity);
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Suffix, config.Suffix ?? "");
@@ -351,70 +354,74 @@ namespace SyslogAgent.Config
                             switch (DeQuote(parts[0]))
                             {
                                 // for now we're not going to worry about config version matching
-                                case "ConfigVersion":
+                                case SharedConstants.RegistryKey.ConfigVersion:
                                     break;
 
-                                case "EventLogPollInterval":
+                                case SharedConstants.RegistryKey.EventLogPollInterval:
                                     config.PollInterval = System.Convert.ToInt32(ValuePortion(parts[1]), 16);
                                     break;
 
-                                case "LookupAccountSID":
+                                case SharedConstants.RegistryKey.LookupAccounts:
                                     config.LookUpAccountIDs = ValuePortion(parts[1]) == "01";
                                     break;
 
-                                case "IncludeVsIgnoreEventIds":
+                                case SharedConstants.RegistryKey.IncludeVsIgnoreEventIds:
                                     config.IncludeVsIgnoreEventIds = ValuePortion( parts[1]) == "01";
                                     break;
 
-                                case "EventIDFilterList":
+                                case SharedConstants.RegistryKey.EventIdFilter:
                                     config.EventIdFilter = DeQuote(parts[1]);
                                     break;
 
-                                case "Facility":
+                                case SharedConstants.RegistryKey.OnlyWhileRunning:
+                                    config.OnlyWhileRunning = ValuePortion( parts[1] ) == "01";
+                                    break;
+
+                                case SharedConstants.RegistryKey.Facility:
                                     config.Facility = System.Convert.ToInt32(DeQuote(ValuePortion(parts[1])), 16);
                                     break;
 
-                                case "Severity":
+                                case SharedConstants.RegistryKey.Severity:
                                     config.Severity = System.Convert.ToInt32(DeQuote(ValuePortion(parts[1])), 16);
                                     break;
 
-                                case "Suffix":
+                                case SharedConstants.RegistryKey.Suffix:
                                     config.Suffix = DeQuote(parts[1]).Replace("\\", "");
                                     break;
 
-                                case "Syslog":
+                                case SharedConstants.RegistryKey.PrimaryHost:
                                     config.PrimaryHost = DeQuote(parts[1]);
                                     break;
 
-                                case "Syslog1":
+                                case SharedConstants.RegistryKey.SecondaryHost:
                                     config.SecondaryHost = DeQuote(parts[1]);
                                     break;
 
-                                case "ForwardToMirror":
+                                case SharedConstants.RegistryKey.SendToSecondary:
                                     config.SendToSecondary = ValuePortion(parts[1]) == "01"; ;
                                     break;
 
-                                case "PrimaryUseTLS":
+                                case SharedConstants.RegistryKey.PrimaryUseTls:
                                     config.PrimaryUseTls = ValuePortion(parts[1]) == "01";
                                     break;
 
-                                case "SecondaryUseTLS":
+                                case SharedConstants.RegistryKey.SecondaryUseTls:
                                     config.SecondaryUseTls = ValuePortion(parts[1]) == "01";
                                     break;
 
-                                case "DebugLevel":
+                                case SharedConstants.RegistryKey.DebugLevelSetting:
                                     config.DebugLevel = System.Convert.ToInt32(ValuePortion(parts[1]), 16);
                                     break;
 
-                                case "DebugLogFile":
+                                case SharedConstants.RegistryKey.DebugLogFile:
                                     config.DebugLogFilename = DeQuote(parts[1]).Replace("\\\\", "\\");
                                     break;
 
-                                case "TailFilename":
+                                case SharedConstants.RegistryKey.TailFilename:
                                     config.TailFilename = DeQuote(parts[1]).Replace("\"", "").Replace("\\\\", "\\");
                                     break;
 
-                                case "TailProgramName":
+                                case SharedConstants.RegistryKey.TailProgramName:
                                     config.TailProgramName = DeQuote(parts[1]);
                                     break;
 
