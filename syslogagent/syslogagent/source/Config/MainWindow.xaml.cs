@@ -181,8 +181,10 @@ namespace SyslogAgent.Config
         public IValidatedOptionView OnlyWhileRunning => new ValidatedOptionRadioButton(radioOnlyWhileRunning);
         public IValidatedOptionView CatchUp => new ValidatedOptionRadioButton(radioCatchUp);
         public IValidatedStringView Suffix => new ValidatedTextBox(suffixText);
+        public IValidatedStringView PrimaryHost => new ValidatedTextBox( primaryHostText );
+        public IValidatedStringView PrimaryApiKey => new ValidatedTextBox( primaryApiKeyText );
         public IValidatedStringView SecondaryHost => new ValidatedTextBox(secondaryHostText);
-        public IValidatedStringView PrimaryHost => new ValidatedTextBox(primaryHostText);
+        public IValidatedStringView SecondaryApiKey => new ValidatedTextBox(secondaryApiKeyText);
         // public SelectionListView Logs => new SelectionListBox(logsList);
         public IOptionListView Facility => new OptionListCombo(facilityCombo);
         public IOptionListView Severity => new OptionListCombo(severityCombo);
@@ -478,8 +480,10 @@ namespace SyslogAgent.Config
             }
             EventIdFilter.Content = config.EventIdFilter;
             Suffix.Content = config.Suffix;
-            SecondaryHost.Content = config.SecondaryHost;
             PrimaryHost.Content = config.PrimaryHost;
+            PrimaryApiKey.Content = config.PrimaryApiKey;
+            SecondaryHost.Content = config.SecondaryHost;
+            SecondaryApiKey.Content = config.SecondaryApiKey;
             Facility.Option = config.Facility;
             Severity.Option = config.Severity;
             DebugLevel.Option = config.DebugLevel;

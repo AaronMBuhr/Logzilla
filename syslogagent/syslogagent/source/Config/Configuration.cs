@@ -18,7 +18,9 @@ namespace SyslogAgent.Config {
         public bool IncludeKeyValuePairs { get; set; }
         public string Suffix { get; set; }
         public string PrimaryHost { get; set; }
+        public string PrimaryApiKey { get; set; }
         public string SecondaryHost { get; set; }
+        public string SecondaryApiKey { get; set; }
         public bool SendToSecondary { get; set; }
         public bool PrimaryUseTls { get; set; }
         public bool SecondaryUseTls { get; set; }

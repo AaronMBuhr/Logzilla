@@ -172,10 +172,12 @@ namespace SyslogAgent.Config
             view.Facility.Option = config_.Facility;
             view.LookUpAccount.IsSelected = config_.LookUpAccountIDs;
             //view.IncludeKeyValuePairs.IsSelected = config.IncludeKeyValuePairs;
-            view.SecondaryHost.Content = config_.SecondaryHost;
             // view.PollInterval.Content = config.PollInterval.ToString();
             view.PrimaryHost.Content = config_.PrimaryHost;
+            view.PrimaryApiKey.Content = config_.PrimaryApiKey;
             view.SendToSecondary.IsSelected = config_.SendToSecondary;
+            view.SecondaryHost.Content = config_.SecondaryHost;
+            view.SecondaryApiKey.Content = config_.SecondaryApiKey;
             view.Severity.Option = (config_.Severity + 1) % 9;
             view.Facility.Option = config_.Facility % 24;
             view.DebugLevel.Option = config_.DebugLevel % 9;
@@ -210,12 +212,14 @@ namespace SyslogAgent.Config
             // config.PollInterval = Convert.ToInt32(view.PollInterval.Content);
             config.LookUpAccountIDs = view.LookUpAccount.IsSelected;
             //config.IncludeKeyValuePairs = view.IncludeKeyValuePairs.IsSelected;
+            config.PrimaryHost = view.PrimaryHost.Content;
+            config.PrimaryApiKey = view.PrimaryApiKey.Content;
             config.SecondaryHost = view.SecondaryHost.Content;
+            config.SecondaryApiKey = view.SecondaryApiKey.Content;
             config.SendToSecondary = view.SendToSecondary.IsSelected;
             config.PrimaryUseTls = view.PrimaryUseTls.IsSelected;
             config.SecondaryUseTls = view.SecondaryUseTls.IsSelected;
             config.Severity = (view.Severity.Option + 8) % 9;
-            config.PrimaryHost = view.PrimaryHost.Content;
             config.DebugLevel = view.DebugLevel.Option;
             config.DebugLogFilename = view.DebugLogFilename.Content;
             config.TailFilename = view.TailFilename.Content;
@@ -295,10 +299,10 @@ namespace SyslogAgent.Config
 
             var validationFunctions = new List<Func<string>>
             {
-                 () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
-                 () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, true, "Primary host"),
-                 () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
-                 () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
+                 //() => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
+                 //() => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, true, "Primary host"),
+                 //() => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
+                 //() => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
                  () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds, view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids"),
                  () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter"),

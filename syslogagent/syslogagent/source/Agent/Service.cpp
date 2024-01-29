@@ -23,7 +23,6 @@ Copyright © 2021 Logzilla Corp.
 #include "EventLogSubscription.h"
 #include "FileWatcher.h"
 #include "MessageQueueLogMessageSender.h"
-#include "PersistentConnections.h"
 #include "Service.h"
 #include "SyslogAgentSharedConstants.h"
 #include "SyslogSender.h"
@@ -63,14 +62,6 @@ void Service::run(bool running_as_console) {
 
 	Registry::loadSetupFile();
 
-	WSADATA socket_data;
-	int wsastartup_retval = WSAStartup(MAKEWORD(2, 2), &socket_data);
-	if (wsastartup_retval != 0) {
-		Logger::fatal("Service::run() WSAStartup failed: %d\n", wsastartup_retval);
-		exit(1);
-	}
-
-	gethostname(config_.host_name_, sizeof config_.host_name_);
 	config_.use_log_agent_ = true;
 
 	if (config_.tail_filename_ != L"") {
@@ -88,48 +79,38 @@ void Service::run(bool running_as_console) {
 			);
 	}
 
-	WinsockNetworkClient::ConnectionProtocolEnum protocol;
-	if (config_.use_tcp_) {
-		protocol = WinsockNetworkClient::ConnectionProtocolEnum::TCP;
-	}
-	else {
-		protocol = WinsockNetworkClient::ConnectionProtocolEnum::UDP;
-	}
 
-	Service::primary_network_client_
-		= shared_ptr<NetworkClient>(
-			static_cast<NetworkClient*>(new WinsockNetworkClient(
-				protocol,
-				config_.primary_host_,
-				(config_.primary_use_tls_ ? std::stoul(config_.primary_tls_port_) : std::stoul(config_.primary_port_)))));
+	Service::primary_network_client_ = make_shared<NetworkClient>();
+	printf("primary: %p\n", Service::primary_network_client_.get());
+	printf("primary: %p\n", Service::primary_network_client_.get());
+	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key, config_.primary_host_)) {
+		Logger::fatal("Could not initialize primary network client\n");
+		exit(1);
+	}
+	printf("primary: %p vs\n", Service::primary_network_client_.get());
 
 	// read primary cert file
 	if (config_.primary_use_tls_) {
 		wstring primary_cert_path = Util::getThisPath(true) + config_.PRIMARY_CERT_FILENAME;
-		string primary_cert_pem = Util::readFileAsString(primary_cert_path.c_str());
-		if (primary_cert_pem.length() < 1) {
+		if (!primary_network_client_->loadCertificate(primary_cert_path)) {
 			Logger::fatal("Could not read primary cert from %s\n", Util::wstr2str(primary_cert_path).c_str());
 			exit(1);
 		}
-		Service::primary_network_client_->enableTls(primary_cert_pem.c_str());
 	}
 
 	if (config_.hasSecondaryHost()) {
-		Service::secondary_network_client_
-			= shared_ptr<NetworkClient>(
-				static_cast<NetworkClient*>(new WinsockNetworkClient(
-					protocol,
-					config_.secondary_host_,
-					(config_.secondary_use_tls_ ? std::stoul(config_.secondary_tls_port_) : std::stoul(config_.secondary_port_)))));
+		Service::secondary_network_client_ = make_shared<NetworkClient>();
+		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key, config_.secondary_host_))
+			Logger::fatal("Could not initialize secondary network client\n");
+		exit(1);
+
 		// read secondary cert file
 		if (config_.secondary_use_tls_) {
 			wstring secondary_cert_path = Util::getThisPath(true) + config_.SECONDARY_CERT_FILENAME;
-			string secondary_cert_pem = Util::readFileAsString(secondary_cert_path.c_str());
-			if (secondary_cert_pem.length() < 1) {
-				Logger::fatal("Could not read primary cert from %s\n", Util::wstr2str(secondary_cert_path).c_str());
-				exit(1);
-			}
-			Service::secondary_network_client_->enableTls(secondary_cert_pem.c_str());
+			if (!secondary_network_client_->loadCertificate(secondary_cert_path)) {
+                Logger::fatal("Could not read secondary cert from %s\n", Util::wstr2str(secondary_cert_path).c_str());
+                exit(1);
+            }
 		}
 	}
 	else {
@@ -141,9 +122,7 @@ void Service::run(bool running_as_console) {
 	if (secondary_network_client_) {
 		clients.push_back(secondary_network_client_);
 	}
-
-	PersistentConnections persistent_connections_(clients);
-	persistent_connections_.start(MSEC_BETWEEN_CONNECTION_ATTEMPTS);
+	printf("primary: %p vs %p\n", Service::primary_network_client_.get(), clients[0].get());
 
 	thread sender(sendMessagesThread);
 	bool first_loop = true;
@@ -224,11 +203,6 @@ void Service::run(bool running_as_console) {
 	SyslogSender::stop();
 	sender.join();
 
-	Logger::debug("service run stopping persistent connections\n");
-	persistent_connections_.stop();
-	persistent_connections_.waitForEnd();
-	Logger::debug("service run stopped persistent connections\n");
-	WSACleanup();
 	// handle restart only for automated restarts, not for manual shutdown...
 	if (!shutdown_requested_ && (!service_shutdown_requested_) && restart_needed) {
 		if (running_as_console) {

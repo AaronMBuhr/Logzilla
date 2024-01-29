@@ -30,7 +30,9 @@ namespace SyslogAgent
             public const string SecondaryPort               =   "SendToBackupPort";
             public const string PrimaryHost                 =   "Syslog";
             public const string PrimaryPort                 =   "SendToPort"; // deprecated
+            public const string PrimaryApiKey               =   "PrimaryLogZillaApiKey";
             public const string SecondaryHost               =   "Syslog1";
+            public const string SecondaryApiKey             =   "SecondaryLogZillaApiKey";
             public const string PrimaryUseTls               =   "PrimaryUseTLS";
             public const string SecondaryUseTls             =   "SecondaryUseTLS";
             public const string UseTCP                      =   "TCPDelivery"; // deprecated
@@ -52,6 +54,7 @@ namespace SyslogAgent
             public const string WindowsEventChannelsKey     =   @"SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT\Channels";
             public const string SelectedEventChannelsKey    =   @"SOFTWARE\LogZilla\SyslogAgent\Channels";
             public const string InitialSetupRegFileKey      =   @"InitialSetupRegFile";
+            public const string ApiTestPath                 =   @"api/";
         }
 
         public static class ConfigDefaults
@@ -66,9 +69,9 @@ namespace SyslogAgent
             public const byte       Facility                =   20;
             public const byte       Severity                =   8;
             public const string     PrimaryHost             =   "";
-            public const string     PrimaryPortS            =   "515";
-            public const string     PrimaryTlsPortS         =   "1999";
+            public const string     PrimaryApiKey           =   "";
             public const string     SecondaryHost           =   "";
+            public const string     SecondaryApiKey         =   "";
             public const bool       UseForwarder            =   false;
             public const string     ForwarderDest           =   "";
             public const string     UdpFwdPortS             =   "";
@@ -80,6 +83,7 @@ namespace SyslogAgent
             public const string     DebugLogFilename        = "syslogagent.log";
             public const string     TailFilename            =   "";
             public const string     TailProgramName         =   "";
+            public const string SyslogAgentHttpPath         =   "SyslogAgentHttpPath";
         }
 
 

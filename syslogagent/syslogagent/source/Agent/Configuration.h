@@ -20,6 +20,7 @@ namespace Syslog_agent {
         static const wstring PRIMARY_CERT_FILENAME;
         static const wstring SECONDARY_CERT_FILENAME;
 
+        wstring api_path = SYSLOGAGENT_HTTP_API_PATH;
         bool lookup_accounts_ = false;
         bool include_key_value_pairs_ = false;
         bool forward_to_secondary_ = false;
@@ -36,15 +37,9 @@ namespace Syslog_agent {
         int severity_;
         char host_name_[256];
         wstring primary_host_ = SYSLOGAGENT_DEFAULT_PRIMARY_HOST;
-        wstring primary_port_ = SYSLOGAGENT_DEFAULT_PRIMARY_PORT_S;
-        wstring primary_tls_port_ = SYSLOGAGENT_DEFAULT_PRIMARY_TLS_PORT_S;
+        wstring primary_api_key = L"";
         wstring secondary_host_ = SYSLOGAGENT_DEFAULT_SECONDARY_HOST;
-        wstring secondary_port_ = SYSLOGAGENT_DEFAULT_SECONDARY_PORT_S;
-        wstring secondary_tls_port_ = SYSLOGAGENT_DEFAULT_SECONDARY_TLS_PORT_S;
-        const bool use_forwarder_ = SYSLOGAGENT_DEFAULT_USE_FORWARDER;
-        wstring forwarder_destination_ = SYSLOGAGENT_DEFAULT_FORWARDER_DEST;
-        wstring udp_forwarder_port_ = SYSLOGAGENT_DEFAULT_UDP_FWD_PORT_S;
-        wstring tcp_forwarder_port_ = SYSLOGAGENT_DEFAULT_TCP_FWD_PORT_S;
+        wstring secondary_api_key = L"";
         wstring suffix_ = SYSLOGAGENT_DEFAULT_SUFFIX;
         wstring debug_log_file_ = SYSLOGAGENT_DEFAULT_DEBUG_LOG_FILENAME;
         vector<LogConfiguration> logs_;

@@ -95,14 +95,17 @@ Copyright © 2021 LogZilla Corp.
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Primary LogZilla server</TextBlock>
                         <TextBox Grid.Column="2" Grid.Row="0" Margin="2,2,2,2" Name="primaryHostText" Width="200" />
-                        <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Primary Use TLS</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="1" Margin="2,2,2,2" Name="primaryUseTlsCheck"/>
+                        <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Primary LogZilla API Key</TextBlock>
+                        <TextBox Grid.Column="2" Grid.Row="1" Margin="2,2,2,2" Name="primaryApiKeyText" Width="200"/>
+                        <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Primary Use TLS</TextBlock>
+                        <CheckBox Grid.Column="1" Grid.Row="2" Margin="2,2,2,2" Name="primaryUseTlsCheck"/>
                         <!--<TextBox Grid.Column="2" Grid.Row="1" Margin="2,2,2,2" Name="primaryTlsCertFileText" Width="200" />-->
-                        <Button Grid.Column="2" Grid.Row="1" Name="choosePrimaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
+                        <Button Grid.Column="2" Grid.Row="2" Name="choosePrimaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
                             Select Primary Cert
                             <Button.Resources>
                                 <Style TargetType="Border">
@@ -110,14 +113,16 @@ Copyright © 2021 LogZilla Corp.
                                 </Style>
                             </Button.Resources>
                         </Button>
-                        <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Secondary LogZilla server</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="2" Margin="2,2,2,2" Name="sendToSecondaryCheck" 
+                        <TextBlock Grid.Column="0" Grid.Row="3" Margin="2,2,2,2">Secondary LogZilla server</TextBlock>
+                        <CheckBox Grid.Column="1" Grid.Row="3" Margin="2,2,2,2" Name="sendToSecondaryCheck" 
                                   Checked="sendToSecondaryCheck_Checked" Unchecked="sendToSecondaryCheck_Unchecked"/>
-                        <TextBox Grid.Column="2" Grid.Row="2" Margin="2,2,2,2" Name="secondaryHostText" Width="200"/>
-                        <TextBlock Grid.Column="0" Grid.Row="3" Margin="2,2,2,2">Secondary Use TLS</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="3" Margin="2,2,2,2" Name="secondaryUseTlsCheck"/>
+                        <TextBox Grid.Column="2" Grid.Row="3" Margin="2,2,2,2" Name="secondaryHostText" Width="200"/>
+                        <TextBlock Grid.Column="0" Grid.Row="4" Margin="2,2,2,2">Secondary API Key</TextBlock>
+                        <TextBox  Grid.Column="2" Grid.Row="4" Margin="2,2,2,2" Name="secondaryApiKeyText" Width="200" />
+                        <TextBlock Grid.Column="0" Grid.Row="5" Margin="2,2,2,2">Secondary Use TLS</TextBlock>
+                        <CheckBox Grid.Column="1" Grid.Row="5" Margin="2,2,2,2" Name="secondaryUseTlsCheck"/>
                         <!--<TextBox Grid.Column="2" Grid.Row="3" Margin="2,2,2,2" Name="secondaryTlsCertFile" Width="200" />-->
-                        <Button Grid.Column="2" Grid.Row="3" Name="chooseSecondaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
+                        <Button Grid.Column="2" Grid.Row="5" Name="chooseSecondaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
                             Select Secondary Cert
                             <Button.Resources>
                                 <Style TargetType="Border">

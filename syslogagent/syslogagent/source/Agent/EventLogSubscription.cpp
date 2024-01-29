@@ -36,6 +36,9 @@ namespace Syslog_agent {
         }
         else {
             bookmark_ = EvtCreateBookmark(bookmark_xml);
+            if (bookmark_ == NULL) {
+                bookmark_ = EvtCreateBookmark(NULL);
+            }
         }
         if (bookmark_ == NULL) {
             Logger::fatal("EventLogSubscription::subscribe()> could not create bookmark for %s\n", channel_.c_str());
