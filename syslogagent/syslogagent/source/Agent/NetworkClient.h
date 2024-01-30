@@ -25,7 +25,7 @@ namespace Syslog_agent {
         { }
         ~NetworkClient();
 
-        bool initialize(const Configuration* config, const wstring api_key,const std::wstring& url, bool use_ssl, int port = 0);
+        bool initialize(const Configuration* config, const wstring api_key, const std::wstring& url, bool use_ssl, int port = 0);
         bool initialize(const Configuration* config, const wstring api_key, const std::wstring& url);
         bool loadCertificate(const std::wstring& cert_path);
         bool connect();
@@ -37,7 +37,7 @@ namespace Syslog_agent {
 
     private:
         wstring api_key_;
-        const Configuration *config_;
+        const Configuration* config_;
         bool use_ssl_;
         std::wstring url_;
         int port_;
