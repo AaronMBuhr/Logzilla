@@ -43,66 +43,6 @@ namespace Syslog_agent {
     }
 
 
-#if THIS_DIDNT_WORK
-    void CALLBACK NetworkClient::StatusCallback(
-        HINTERNET hInternet,
-        DWORD_PTR dwContext,
-        DWORD dwInternetStatus,
-        LPVOID lpvStatusInformation,
-        DWORD dwStatusInformationLength
-    ) {
-        printf("StatusCallback called, status %d\n", dwInternetStatus);
-        switch (dwInternetStatus) {
-        case WINHTTP_CALLBACK_STATUS_SECURE_FAILURE: 
-            DWORD dwStatusFlags = *(LPDWORD)lpvStatusInformation;
-
-            printf("dwStatusFlags %d\n", dwStatusFlags);
-
-            // Handle various secure failure flags
-            if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_CERT_REV_FAILED) {
-                // Certificate revocation check failed
-                printf("Certificate revocation check failed\n");
-            }
-
-            if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CERT) {
-                // The server certificate is invalid
-                printf("The server certificate is invalid\n");
-            }
-
-            if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID) {
-                // The certificate's CN (common name) does not match the server's address
-                printf("The certificate's CN (common name) does not match the server's address\n");
-            }
-
-            break;
-        }
-
-        // Cast dwContext back to NetworkClient*
-        NetworkClient* pThis = reinterpret_cast<NetworkClient*>(dwContext);
-        if (pThis) {
-            // Now you can call instance methods or access instance data
-            // pThis->requestCallbackStatus_ = dwInternetStatus;
-            pThis->setRequestCallbackStatus(dwInternetStatus);
-        }
-
-        //if (dwInternetStatus == WINHTTP_CALLBACK_STATUS_SECURE_FAILURE) {
-        //    DWORD dwStatusFlags = *(LPDWORD)lpvStatusInformation;
-
-        //    // Check which security errors occurred
-        //    if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID) {
-        //        // The server's certificate common name doesn't match the requested host
-        //        // Additional handling can be done here
-        //    }
-
-        //    if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CERT) {
-        //        // The server's certificate is invalid
-        //        // Additional handling can be done here
-        //    }
-        //}
-    }
-#endif
-
-
     bool NetworkClient::initialize(const Configuration* config, const wstring api_key, const std::wstring& url, bool use_ssl, int port)
     {
         config_ = config;
@@ -161,39 +101,6 @@ namespace Syslog_agent {
         use_ssl_ = use_ssl;
         hConnect_ = NULL;
         hRequest_ = NULL;
-
-#if THIS_DIDNT_WORK
-        if (use_ssl_) {
-            // Set the callback function
-            WinHttpSetStatusCallback(
-                hSession_,
-                (WINHTTP_STATUS_CALLBACK)StatusCallback,
-                WINHTTP_CALLBACK_FLAG_ALL_NOTIFICATIONS,
-                NULL
-            );
-            // Pass 'this' pointer as the context value
-            //if (!WinHttpSetOption(
-            //    hSession_,
-            //    WINHTTP_OPTION_CONTEXT_VALUE,
-            //    (LPVOID)this,
-            //    sizeof(LPVOID)
-            //)) {
-            //    Logger::critical("WinHttpSetOption failed with error %u.\n", GetLastError());
-            //    return false;
-            //}
-            LPVOID this_ptr = (LPVOID) this;
-            LPVOID test = (LPVOID) &this_ptr;
-            if (!WinHttpSetOption(
-                hSession_,
-                WINHTTP_OPTION_CONTEXT_VALUE,
-                (LPVOID) test,
-                sizeof(test)
-            )) {
-                Logger::critical("WinHttpSetOption failed with error %u.\n", GetLastError());
-                return false;
-            }
-        }
-#endif
 
         return true;
 
@@ -373,16 +280,6 @@ namespace Syslog_agent {
                 GetLastError());
             return false;
         }
-
-#if THIS_DIDNT_WORK
-        if (use_ssl_) {
-            if (requestCallbackStatus_ != WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID) {
-                Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpReceiveResponse.\n",
-                                       GetLastError());
-                return false;
-            }
-        }
-#endif
 
         return true;
     }

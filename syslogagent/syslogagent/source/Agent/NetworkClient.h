@@ -48,20 +48,6 @@ namespace Syslog_agent {
         BYTE* pfxBuffer_;
         bool server_cert_checked_;
 
-#if THIS_DIDNT_WORK
-        volatile DWORD requestCallbackStatus_;
-        static void CALLBACK StatusCallback(
-            HINTERNET hInternet,
-            DWORD_PTR dwContext,
-            DWORD dwInternetStatus,
-            LPVOID lpvStatusInformation,
-            DWORD dwStatusInformationLength
-        );
-        void setRequestCallbackStatus(DWORD status) {
-            requestCallbackStatus_ = status;
-        }
-#endif
-
     };
 
 }
