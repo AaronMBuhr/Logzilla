@@ -6,10 +6,12 @@
 class MessageQueueLogMessageSender : public JsonLogMessageHandler {
 
 public:
-	MessageQueueLogMessageSender(MessageQueue& message_queue) : message_queue_(message_queue) { };
+	MessageQueueLogMessageSender(shared_ptr<MessageQueue> primary_message_queue, shared_ptr<MessageQueue> secondary_message_queue) 
+		: primary_message_queue_(primary_message_queue), secondary_message_queue_(secondary_message_queue) { };
 	void handleJsonMessage(const char* json_message) override;
 
 private:
-	MessageQueue& message_queue_;
+	shared_ptr<MessageQueue> primary_message_queue_;
+	shared_ptr<MessageQueue> secondary_message_queue_;
 };
 

@@ -85,8 +85,8 @@ namespace SyslogAgent
 
         public const string CurrentConfigVersion        =   "6.27.0.0";
         public const string SyslogAgentExeFilename      =   "syslogagent.exe";
-        public const string PrimaryCertFilename         =   "primary.cert";
-        public const string SecondaryCertFilename       =   "secondary.cert";
+        public const string PrimaryCertFilename         =   "primary.pfx";
+        public const string SecondaryCertFilename       =   "secondary.pfx";
 
     }
 }

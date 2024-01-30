@@ -16,10 +16,12 @@ namespace Syslog_agent {
 
 	EventHandlerMessageQueuer::EventHandlerMessageQueuer(
 		Configuration& configuration,
-		MessageQueue& message_queue,
+		shared_ptr<MessageQueue> primary_message_queue,
+		shared_ptr<MessageQueue> secondary_message_queue,
 		const wchar_t* log_name)
 		: configuration_(configuration),
-		message_queue_(message_queue)
+		primary_message_queue_(primary_message_queue),
+		secondary_message_queue_(secondary_message_queue)
 	{
 		DWORD chars_written;
 		chars_written = WideCharToMultiByte(CP_UTF8, 0, log_name, wcslen(log_name), log_name_utf8_, 999, NULL, NULL);
@@ -44,12 +46,20 @@ namespace Syslog_agent {
 		char* json_buffer = Globals::instance()->getMessageBuffer("json_buffer");
 		if (generateLogMessage(event, json_buffer, Globals::MESSAGE_BUFFER_SIZE)) {
 #if !DEBUG_SETTINGS_SKIP_MESSAGEQUEUE
-			message_queue_.lock();
-			if (message_queue_.isFull()) {
-				message_queue_.removeFront();
+			primary_message_queue_->lock();
+			if (primary_message_queue_->isFull()) {
+				primary_message_queue_->removeFront();
 			}
-			message_queue_.enqueue(json_buffer, (const int)strlen(json_buffer));
-			message_queue_.unlock();
+			primary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
+			primary_message_queue_->unlock();
+			if (secondary_message_queue_ != nullptr) {
+                secondary_message_queue_->lock();
+				if (secondary_message_queue_->isFull()) {
+                    secondary_message_queue_->removeFront();
+                }
+                secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
+                secondary_message_queue_->unlock();
+            }
 			SyslogSender::enqueue_event_.signal();
 #endif
 		}
