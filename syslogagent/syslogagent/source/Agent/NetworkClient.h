@@ -18,7 +18,9 @@ namespace Syslog_agent {
             pCertContext_(NULL),
             hCertStore_(NULL),
             pfxBuffer_(NULL),
-            config_(NULL)
+            config_(NULL),
+            port_(0),
+            server_cert_checked_(false)
         { }
         ~NetworkClient();
 
@@ -28,6 +30,7 @@ namespace Syslog_agent {
         bool connect();
         bool post(const wchar_t* buf, size_t length);
         bool post(const std::wstring& data);
+        bool checkServerCert();
         bool readResponse(std::string& response);
         void close();
 
@@ -44,6 +47,7 @@ namespace Syslog_agent {
         HCERTSTORE hCertStore_;
         BYTE* pfxBuffer_;
         volatile DWORD requestCallbackStatus_;
+        bool server_cert_checked_;
 
         static void CALLBACK StatusCallback(
             HINTERNET hInternet,
@@ -54,10 +58,7 @@ namespace Syslog_agent {
         );
 
         void setRequestCallbackStatus(DWORD status) {
-            printf("setRequestCallbackStatus: %p\n", this);
-            printf("setRequestCallbackStatus(%d to %d)\n", requestCallbackStatus_, status);
             requestCallbackStatus_ = status;
-            printf("setRequestCallbackStatus(%d) done\n", requestCallbackStatus_);
         }
 
     };

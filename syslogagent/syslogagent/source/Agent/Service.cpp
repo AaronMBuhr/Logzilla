@@ -81,13 +81,10 @@ void Service::run(bool running_as_console) {
 
 
 	Service::primary_network_client_ = make_shared<NetworkClient>();
-	printf("primary: %p\n", Service::primary_network_client_.get());
-	printf("primary: %p\n", Service::primary_network_client_.get());
 	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key, config_.primary_host_)) {
 		Logger::fatal("Could not initialize primary network client\n");
 		exit(1);
 	}
-	printf("primary: %p vs\n", Service::primary_network_client_.get());
 
 	// read primary cert file
 	if (config_.primary_use_tls_) {
@@ -122,7 +119,6 @@ void Service::run(bool running_as_console) {
 	if (secondary_network_client_) {
 		clients.push_back(secondary_network_client_);
 	}
-	printf("primary: %p vs %p\n", Service::primary_network_client_.get(), clients[0].get());
 
 	thread sender(sendMessagesThread);
 	bool first_loop = true;

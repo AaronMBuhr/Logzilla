@@ -50,14 +50,37 @@ namespace Syslog_agent {
         LPVOID lpvStatusInformation,
         DWORD dwStatusInformationLength
     ) {
+        printf("StatusCallback called, status %d\n", dwInternetStatus);
+        switch (dwInternetStatus) {
+        case WINHTTP_CALLBACK_STATUS_SECURE_FAILURE: 
+            DWORD dwStatusFlags = *(LPDWORD)lpvStatusInformation;
+
+            printf("dwStatusFlags %d\n", dwStatusFlags);
+
+            // Handle various secure failure flags
+            if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_CERT_REV_FAILED) {
+                // Certificate revocation check failed
+                printf("Certificate revocation check failed\n");
+            }
+
+            if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CERT) {
+                // The server certificate is invalid
+                printf("The server certificate is invalid\n");
+            }
+
+            if (dwStatusFlags & WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID) {
+                // The certificate's CN (common name) does not match the server's address
+                printf("The certificate's CN (common name) does not match the server's address\n");
+            }
+
+            break;
+        }
+
         // Cast dwContext back to NetworkClient*
-        printf("StatusCallback: %p\n", dwContext);
         NetworkClient* pThis = reinterpret_cast<NetworkClient*>(dwContext);
-        printf("StatusCallback: %p\n", pThis);
         if (pThis) {
             // Now you can call instance methods or access instance data
             // pThis->requestCallbackStatus_ = dwInternetStatus;
-            printf("StatusCallback: %d\n", dwInternetStatus);
             pThis->setRequestCallbackStatus(dwInternetStatus);
         }
 
@@ -167,7 +190,6 @@ namespace Syslog_agent {
                 Logger::critical("WinHttpSetOption failed with error %u.\n", GetLastError());
                 return false;
             }
-            printf("init: %p\n", this);
         }
        
         return true;
@@ -219,7 +241,13 @@ namespace Syslog_agent {
             return false;
         }
 
-        pCertContext_ = CertFindCertificateInStore(hCertStore_, X509_ASN_ENCODING, 0, CERT_FIND_ANY, NULL, NULL);
+        pCertContext_ = CertFindCertificateInStore(
+            hCertStore_, 
+            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 
+            0, 
+            CERT_FIND_ANY, 
+            NULL, 
+            NULL);
         if (!pCertContext_) {
             Logger::critical("NetworkClient::LoadCertificate()> Error %u in CertFindCertificateInStore.\n",
                 GetLastError());
@@ -244,7 +272,16 @@ namespace Syslog_agent {
         if (!hConnect_)
         {
             Logger::recoverable_error("NetworkClient::Connect()> Error %u in WinHttpConnect.\n", GetLastError());
+            server_cert_checked_ = false;
             return false;
+        }
+
+        if (use_ssl_ && server_cert_checked_ == false) {
+            if (!checkServerCert()) {
+                Logger::critical("NetworkClient::Connect()> Server cert check failed! Error %u.\n", GetLastError());
+                return false;
+            }
+            server_cert_checked_ = true;
         }
 
         return true;
@@ -259,8 +296,6 @@ namespace Syslog_agent {
         //{
         //    Logger::debug("NetworkClient::Post()> got connection Info");
         //}
-        // printf("NetworkClient::Post()> %d\n", requestCallbackStatus_);
-        printf("post: %p\n", this);
 
 
         if (use_ssl_) {
@@ -412,4 +447,125 @@ namespace Syslog_agent {
         }
     }
 
+    
+    bool NetworkClient::checkServerCert() {
+
+        if (use_ssl_ == false) {
+            return true;
+        }
+
+        hRequest_ = WinHttpOpenRequest(hConnect_, L"GET", L"/",
+            NULL, WINHTTP_NO_REFERER,
+            WINHTTP_DEFAULT_ACCEPT_TYPES,
+            WINHTTP_FLAG_SECURE);
+
+        if (!hRequest_)
+        {
+            Logger::critical("NetworkClient::checkServerCert()> Error %u in WinHttpOpenRequest.\n",
+                GetLastError());
+            return false;
+        }
+
+        //DWORD dwFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
+        //    SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE |
+        //    SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
+        //    SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
+        DWORD dwFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+        // DWORD dwFlags = SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+
+        // This is an example; adjust the flags based on your security requirements
+        // Note: Ignoring these errors can make the connection less secure
+
+        if (!WinHttpSetOption(hRequest_, WINHTTP_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags)))
+        {
+            Logger::critical("NetworkClient::checkServerCert()> Error %u in WinHttpSetOption.\n", GetLastError());
+            WinHttpCloseHandle(hRequest_);
+            WinHttpCloseHandle(hConnect_);
+            hRequest_ = NULL;
+            hConnect_ = NULL;
+            return false;
+        }
+
+        if (!WinHttpSendRequest(hRequest_,
+            WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+            WINHTTP_NO_REQUEST_DATA, 0, 0, 0))
+        {
+            Logger::critical("NetworkClient::checkServerCert()> Error %u in WinHttpSendRequest.\n",
+                GetLastError());
+            return false;
+        }
+
+        if (!WinHttpReceiveResponse(hRequest_, NULL))
+        {
+            Logger::critical("NetworkClient::checkServerCert()> Error %u in WinHttpReceiveResponse.\n",
+                GetLastError());
+            return false;
+        }
+
+        PCCERT_CONTEXT pServerCert = NULL;
+        DWORD dwSize = sizeof(pServerCert);
+
+        BOOL bResults = WinHttpQueryOption(
+            hRequest_,
+            WINHTTP_OPTION_SERVER_CERT_CONTEXT,
+            &pServerCert,
+            &dwSize
+        );
+
+        if (!bResults || !pServerCert) {
+            Logger::critical("NetworkClient::checkServerCert()> Error %u in WinHttpReceiveResponse.\n",
+                GetLastError());
+        }
+
+
+        BYTE hash[20]; // SHA-1 hash size
+        DWORD hashSize = sizeof(hash);
+
+        // Get the thumbprint of the server's certificate
+        CertGetCertificateContextProperty(pServerCert, CERT_SHA1_HASH_PROP_ID, hash, &hashSize);
+
+        BYTE pfxHash[20]; // SHA-1 hash size
+        DWORD pfxHashSize = sizeof(pfxHash);
+
+        // Get the thumbprint of the certificate from the PFX file
+        CertGetCertificateContextProperty(pCertContext_, CERT_SHA1_HASH_PROP_ID, pfxHash, &pfxHashSize);
+
+        // Compare the thumbprints
+        if (hashSize != pfxHashSize || memcmp(hash, pfxHash, hashSize) != 0) {
+            return false;
+        }
+
+        return true;
+    }
+
 }
+
+
+# if LOAD_PFX_WITH_PASSWORD
+HCERTSTORE hPFXCertStore = NULL;
+PCCERT_CONTEXT pPFXCertContext = NULL;
+
+// Load the PFX file
+HANDLE hFile = CreateFile(L"path_to_your.pfx", GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+DWORD fileSize = GetFileSize(hFile, NULL);
+BYTE* pfxBuffer = new BYTE[fileSize];
+
+DWORD bytesRead = 0;
+ReadFile(hFile, pfxBuffer, fileSize, &bytesRead, NULL);
+CloseHandle(hFile);
+
+CRYPT_DATA_BLOB pfxBlob;
+pfxBlob.pbData = pfxBuffer;
+pfxBlob.cbData = fileSize;
+
+// Use the password for the PFX file here
+LPCWSTR szPassword = L"your_pfx_password";
+
+hPFXCertStore = PFXImportCertStore(&pfxBlob, szPassword, 0);
+if (!hPFXCertStore) {
+    // Handle error
+}
+
+delete[] pfxBuffer; // Don't forget to free the memory once it's no longer needed
+#endif
+
