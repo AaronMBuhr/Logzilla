@@ -13,6 +13,7 @@ using System.Globalization;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Security.Policy;
 
 namespace SyslogAgent.Config
 {
@@ -297,8 +298,12 @@ namespace SyslogAgent.Config
             {
                  () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
                  () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, true, "Primary host"),
+                 () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, false, "Primary host certificate does not match the .pfx file"),
+                 () => ValidateApiKey(true, view.PrimaryHost, view.PrimaryApiKey, "Invalid primary API key"),
                  () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
                  () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
+                 () => ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost, true, "Secondary host certificate does not match the .pfx file"),
+                 () => ValidateApiKey(view.SecondaryUseTls.IsSelected, view.SecondaryHost, view.SecondaryApiKey, "Invalid secondary API key"),
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
                  () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds, view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids"),
                  () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter"),
@@ -348,16 +353,29 @@ namespace SyslogAgent.Config
 
         static string ValidateInternetHost(IValidatedStringView host, bool required, string failureMsg)
         {
+            string host_address = host.Content.Trim();
+            if( host_address == "" )
+            {
+                if( required )
+                {
+                    host.IsValid = false;
+                    return failureMsg;
+                }
+                else
+                {
+                    return null;
+                }   
+            }
+
             var regex_valid_ip = @"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
             var regex_valid_host = @"^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$";
             bool isValid;
-            if (host.Content.Trim() == "")
-                isValid = host.IsValid = !required;
-            else
+            if (host_address.StartsWith("http://") || host_address.StartsWith("https://"))
             {
-                isValid = host.IsValid = Regex.Match(host.Content, regex_valid_ip).Success
-                    || Regex.Match(host.Content, regex_valid_host).Success;
+                host_address = host_address.Substring(host_address.IndexOf("://") + 3);
             }
+            isValid = host.IsValid = Regex.Match(host_address, regex_valid_ip).Success
+                || Regex.Match(host_address, regex_valid_host).Success;
             return isValid ? null : failureMsg;
         }
 
@@ -365,9 +383,107 @@ namespace SyslogAgent.Config
         {
             if (!required && host.Content.Trim() == "")
                 return null;
-            string errMsg = Communications.TestTcpConnection(host.Content, useTls.IsSelected);
+
+            string url = host.Content.Trim();
+            if( !url.Contains( "://" ) )
+            {
+                url = "http://" + url; // Prepend with default scheme (http) if no scheme is specified
+            }
+
+            string scheme;
+            string hostpart;
+            int port;
+            string path;
+            try
+            {
+                var uri = new Uri( url );
+
+                scheme = uri.Scheme; // http or https
+                hostpart = uri.Host; // Hostname
+                port = uri.IsDefaultPort ? (scheme == "https" ? 443 : 80) : uri.Port; // Port (if specified and not the default for the scheme)
+                path = uri.AbsolutePath; // Path (if specified)
+
+            }
+            catch( UriFormatException )
+            {
+                return failureMsg;
+            }
+
+            if (port == 0)
+            { 
+                return failureMsg; 
+            }
+
+            if (scheme == "https")
+            {
+                if (!useTls.IsSelected)
+                {
+                    return failureMsg;
+                }
+            }
+            else if (scheme == "http")
+            {
+                if (useTls.IsSelected)
+                {
+                    return failureMsg;
+                }
+            }
+            else
+            {
+                return failureMsg;
+            }
+    
+            string errMsg = Communications.TestTcpConnection(hostpart, port);
             return (errMsg == null ? null : $"{failureMsg} {errMsg}");
         }
+
+        static string ValidateTlsCertificate(IValidatedOptionView useTls, IValidatedStringView host, bool is_secondary, string failureMsg)
+        {
+            if ( !useTls.IsSelected )
+            {
+                return null;
+            }
+            string certfile_directory = Globals.ExeFilePath;
+            string certfile_path = certfile_directory + ( is_secondary ? SharedConstants.SecondaryCertFilename : SharedConstants.PrimaryCertFilename );
+            string pfx_password = ""; // can add this functionality later if desired
+            var checker = new CertificateChecker( certfile_path, pfx_password );
+            bool isMatch = checker.CheckRemoteCertificateSynchronous( (host.Content.StartsWith( "https://" ) ? "" : "https://") + host.Content );
+
+            //if( isMatch )
+            //{
+            //    Console.WriteLine( "The remote server's certificate matches the one in the PFX file." );
+            //}
+            //else
+            //{
+            //    Console.WriteLine( "The remote server's certificate does not match the one in the PFX file." );
+            //}
+
+            return isMatch ? null : failureMsg;
+        }
+
+        static string ValidateApiKey(bool required, IValidatedStringView host, IValidatedStringView apiKey, string failureMsg)
+        {
+            if (!required)
+                return null;
+            bool isValid = apiKey.IsValid = apiKey.Content.Trim().Length < 1 || Regex.Match(apiKey.Content, @"^[a-zA-Z0-9]{48}$").Success;
+            if (!isValid)
+            {
+                return failureMsg;
+            }
+            var fetcher = new HttpFetcher();
+            string url = host.Content.Trim();
+            if (!url.Contains("://"))
+            {
+                url = "http://" + url; // Prepend with default scheme (http) if no scheme is specified
+            }
+            string result = fetcher.GetSynchronous(url + SharedConstants.ApiPath, apiKey.Content);
+            if (result == null)
+            {
+                return failureMsg;
+            }
+            return null;
+        }
+
 
         static string ValidateIgnoreVsIncludeEventIds( IValidatedStringView eventIds, IValidatedOptionView includeEventIds, IValidatedOptionView ignoreEventIds, string failureMsg )
         {

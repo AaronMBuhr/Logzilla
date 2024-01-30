@@ -39,7 +39,7 @@ namespace Syslog_agent {
         }
         if (bookmark_ == NULL) {
             Logger::fatal("EventLogSubscription::subscribe()> could not create bookmark for %s\n", channel_.c_str());
-            exit(1);
+            exit(1); // shouldn't be necessary
         }
         EVT_HANDLE new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), query_.c_str(), bookmark_, this,
             EventLogSubscription::handleSubscriptionEvent, EvtSubscribeStartAfterBookmark);

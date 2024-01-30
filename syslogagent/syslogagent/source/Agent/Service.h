@@ -9,6 +9,7 @@ Copyright © 2021 Logzilla Corp.
 #include "Configuration.h"
 #include "EventLogSubscription.h"
 #include "FileWatcher.h"
+#include "Logger.h"
 #include "MessageQueue.h"
 #include "MessageQueueLogMessageSender.h"
 #include "WindowsEvent.h"
@@ -53,5 +54,10 @@ namespace Syslog_agent {
         static bool setForRestart(); // returns false for failure
         static bool setForNoRestart(); // returns false for failure
         static vector<EventLogSubscription> subscriptions_;
+        // Flag to indicate that a fatal shutdown is in progress
+        static std::atomic<bool> fatal_shutdown_in_progress;
+
+        static void fatalErrorHandler(const char* msg);
+
     };
 }
