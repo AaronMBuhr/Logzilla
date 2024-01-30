@@ -17,8 +17,9 @@ namespace Syslog_agent {
     public:
         static const int MAX_MESSAGE_SIZE = 65535;
         SyslogSender(
-            MessageQueue& queue, 
-            Configuration& config, 
+            Configuration& config,
+            shared_ptr<MessageQueue> primary_queue,
+            shared_ptr<MessageQueue> secondary_queue,
             shared_ptr<NetworkClient> primary_network_client,
             shared_ptr<NetworkClient> secondary_network_client
         );
@@ -30,10 +31,11 @@ namespace Syslog_agent {
         }
 
     private:
+        Configuration& config_;
+        shared_ptr<MessageQueue> primary_queue_;
+        shared_ptr<MessageQueue> secondary_queue_;
         shared_ptr<NetworkClient> primary_network_client_;
         shared_ptr<NetworkClient> secondary_network_client_;
-        MessageQueue& queue_;
-        Configuration& config_;
         volatile static bool stop_requested_;
     };
 }

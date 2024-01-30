@@ -299,10 +299,10 @@ namespace SyslogAgent.Config
 
             var validationFunctions = new List<Func<string>>
             {
-                 //() => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
-                 //() => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, true, "Primary host"),
-                 //() => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
-                 //() => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
+                 () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
+                 () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, true, "Primary host"),
+                 () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
+                 () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
                  () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds, view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids"),
                  () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter"),

@@ -31,8 +31,9 @@ Copyright © 2021 Logzilla Corp.
 using namespace Syslog_agent;
 
 unique_ptr<thread> Service::send_thread_ = nullptr;
-MessageQueue Service::message_queue_(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 Configuration Service::config_;
+shared_ptr<MessageQueue> Service::primary_message_queue_ = nullptr;
+shared_ptr<MessageQueue> Service::secondary_message_queue_ = nullptr;
 shared_ptr<NetworkClient> Service::primary_network_client_ = nullptr;
 shared_ptr<NetworkClient> Service::secondary_network_client_ = nullptr;
 shared_ptr<MessageQueueLogMessageSender> Service::log_msg_sender_ = nullptr;
@@ -46,8 +47,9 @@ vector<EventLogSubscription> Service::subscriptions_;
 void sendMessagesThread() {
 	try {
 		SyslogSender sender(
-			Service::message_queue_,
 			Service::config_,
+			Service::primary_message_queue_,
+			Service::secondary_message_queue_,
 			Service::primary_network_client_,
 			Service::secondary_network_client_);
 		sender.run();
@@ -65,9 +67,8 @@ void Service::run(bool running_as_console) {
 	config_.use_log_agent_ = true;
 
 	if (config_.tail_filename_ != L"") {
-		log_msg_sender_ = make_shared<MessageQueueLogMessageSender>(message_queue_);
 		string program_name = Util::wstr2str(config_.tail_program_name_);
-		log_msg_sender_ = make_shared<MessageQueueLogMessageSender>(message_queue_);
+		log_msg_sender_ = make_shared<MessageQueueLogMessageSender>(primary_message_queue_, secondary_message_queue_);
 		filewatcher_ = make_shared<FileWatcher>(
 			static_cast<shared_ptr<JsonLogMessageHandler>>(log_msg_sender_),
 			config_.tail_filename_.c_str(),
@@ -79,6 +80,7 @@ void Service::run(bool running_as_console) {
 			);
 	}
 
+	Service::primary_message_queue_ = make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 
 	Service::primary_network_client_ = make_shared<NetworkClient>();
 	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key, config_.primary_host_)) {
@@ -96,6 +98,7 @@ void Service::run(bool running_as_console) {
 	}
 
 	if (config_.hasSecondaryHost()) {
+		Service::secondary_message_queue_ = make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 		Service::secondary_network_client_ = make_shared<NetworkClient>();
 		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key, config_.secondary_host_))
 			Logger::fatal("Could not initialize secondary network client\n");
@@ -111,6 +114,7 @@ void Service::run(bool running_as_console) {
 		}
 	}
 	else {
+		Service::secondary_message_queue_ = nullptr;
 		Service::secondary_network_client_ = nullptr;
 	}
 
@@ -131,7 +135,8 @@ void Service::run(bool running_as_console) {
 			unique_ptr<EventHandlerMessageQueuer> handler
 				= make_unique<EventHandlerMessageQueuer>(
 					config_,
-					message_queue_,
+					primary_message_queue_,
+					secondary_message_queue_,
 					const_cast<const wchar_t*>(log.name_.c_str()));
 			EventLogSubscription subscription(
 				log.name_,
@@ -162,10 +167,11 @@ void Service::run(bool running_as_console) {
 			if (shutdown_requested_) {
 				break;
 			}
-			if (message_queue_.length() > 0) {
-				Logger::debug("Queue length==%d\n", message_queue_.length());
+			if (primary_message_queue_->length() > 0) {
+				Logger::debug("Primary Queue length==%d\n", primary_message_queue_->length());
 			}
-			if (config_.use_log_agent_ && message_queue_.isEmpty()) {
+			if (config_.use_log_agent_ && primary_message_queue_->isEmpty() 
+				&& (secondary_message_queue_ == nullptr || secondary_message_queue_->isEmpty())) {
 				//Logger::debug("Saving config to registry");
 				config_.saveToRegistry();
 			}

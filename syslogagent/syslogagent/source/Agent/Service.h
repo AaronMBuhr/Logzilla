@@ -33,7 +33,8 @@ namespace Syslog_agent {
         static const int MESSAGE_BUFFERS_CHUNK_SIZE = 100;
         static const int MSEC_BETWEEN_CONNECTION_ATTEMPTS = 4000;
         static unique_ptr<thread> send_thread_;
-        static MessageQueue message_queue_;
+        static shared_ptr<MessageQueue> primary_message_queue_;
+        static shared_ptr<MessageQueue> secondary_message_queue_;
         static Configuration config_;
         static shared_ptr<NetworkClient> primary_network_client_;
         static shared_ptr<NetworkClient> secondary_network_client_;

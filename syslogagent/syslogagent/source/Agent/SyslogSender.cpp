@@ -19,13 +19,15 @@ WindowsEvent SyslogSender::enqueue_event_(L"SyslogAgentEnqueueEvent");
 volatile bool SyslogSender::stop_requested_ = false;
 
 SyslogSender::SyslogSender(
-	MessageQueue& queue,
-	Configuration& config,
+    Configuration& config,
+    shared_ptr<MessageQueue> primary_queue,
+    shared_ptr<MessageQueue> secondary_queue,
 	shared_ptr<NetworkClient> primary_network_client,
 	shared_ptr<NetworkClient> secondary_network_client
 ) :
-	queue_(queue),
-	config_(config),
+    config_(config),
+    primary_queue_(primary_queue),
+    secondary_queue_(secondary_queue),
 	primary_network_client_(primary_network_client),
 	secondary_network_client_(secondary_network_client)
 {}
@@ -45,32 +47,46 @@ void SyslogSender::run() const {
             }
         }
 
-        while (!SyslogSender::stop_requested_ && !queue_.isEmpty()) {
+        while (!SyslogSender::stop_requested_ 
+            && (!primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()))) {
+            int msg_size;
+            bool connected;
+            bool posted;
+            string response;
             Debug::senderHeartbeat();
-            queue_.lock();
-            int msg_size = queue_.peek(buf, Globals::MESSAGE_BUFFER_SIZE);
-            Logger::debug2("SyslogSender::run() sending msg %d bytes\n", msg_size);
+            if (!primary_queue_->isEmpty()) {
+                primary_queue_->lock();
+                msg_size = primary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE);
+                Logger::debug2("SyslogSender::run() sending msg %d bytes to primary\n", msg_size);
 
-            bool connected = primary_network_client_->connect();
-            bool posted = false;
-            if (!connected) {
-                Logger::recoverable_error("SyslogSender::run() primary server not connected, error: %u\n", GetLastError());
-                // queue_.unlock();
-            }
-            else {
-                posted = primary_network_client_->post(reinterpret_cast<wchar_t*>(buf), msg_size);
-                if (posted) {
-                    Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
+                connected = primary_network_client_->connect();
+                posted = false;
+                if (!connected) {
+                    Logger::recoverable_error("SyslogSender::run() primary server not connected, error: %u\n", GetLastError());
+                    // queue_.unlock();
                 }
                 else {
-                    Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, GetLastError());
+                    posted = primary_network_client_->post(reinterpret_cast<wchar_t*>(buf), msg_size);
+                    if (posted) {
+                        Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
+                        primary_queue_->removeFront();
+                    }
+                    else {
+                        Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, GetLastError());
+                    }
+                    primary_network_client_->readResponse(response);
+                    primary_network_client_->close();
                 }
-                string response;
-                primary_network_client_->readResponse(response);
-                primary_network_client_->close();
+                //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
+                primary_queue_->unlock();
             }
-            if (secondary_network_client_) {
+            if (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()) {
+                secondary_queue_->lock();
+                msg_size = secondary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE);
+                Logger::debug2("SyslogSender::run() sending msg %d bytes to secondary\n", msg_size);
+
                 connected = secondary_network_client_->connect();
+                posted = false;
                 if (!connected) {
                     Logger::recoverable_error("SyslogSender::run() secondary server not connected, error: %u\n", GetLastError());
                     // queue_.unlock();
@@ -78,18 +94,36 @@ void SyslogSender::run() const {
                 else {
                     posted = secondary_network_client_->post(reinterpret_cast<wchar_t*>(buf), msg_size);
                     if (posted) {
-                        Logger::debug2("SyslogSender::run() message sent to secondary server (bytes %d)\n", msg_size);
+                        Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
+                        secondary_queue_->removeFront();
                     }
                     else {
-                        Logger::debug("SyslogSender::run() error: message not sent to secondary server (bytes %d), error: %u\n", msg_size, GetLastError());
+                        Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, GetLastError());
                     }
+                    secondary_network_client_->readResponse(response);
+                    secondary_network_client_->close();
                 }
-                secondary_network_client_->close();
+                if (secondary_network_client_) {
+                    connected = secondary_network_client_->connect();
+                    if (!connected) {
+                        Logger::recoverable_error("SyslogSender::run() secondary server not connected, error: %u\n", GetLastError());
+                        // queue_.unlock();
+                    }
+                    else {
+                        posted = secondary_network_client_->post(reinterpret_cast<wchar_t*>(buf), msg_size);
+                        if (posted) {
+                            Logger::debug2("SyslogSender::run() message sent to secondary server (bytes %d)\n", msg_size);
+                        }
+                        else {
+                            Logger::debug("SyslogSender::run() error: message not sent to secondary server (bytes %d), error: %u\n", msg_size, GetLastError());
+                        }
+                    }
+                    secondary_network_client_->close();
+                }
+                //Logger::force("Syslog_sender::run() queue size before: %d\n", queue_.length());
+                //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
+                secondary_queue_->unlock();
             }
-            //Logger::force("Syslog_sender::run() queue size before: %d\n", queue_.length());
-            queue_.removeFront();
-            //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
-            queue_.unlock();
         }
     }
     Globals::instance()->releaseMessageBuffer("SyslogSender::run()", buf);

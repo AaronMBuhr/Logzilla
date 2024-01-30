@@ -306,17 +306,23 @@ namespace SyslogAgent.Config
             }
         }
 
-        private void ChooseCertFileButton_Click(object sender, RoutedEventArgs e)
+        private void ChooseCertFileButton_Click( object sender, RoutedEventArgs e )
         {
             System.Windows.Controls.Button button_clicked = (System.Windows.Controls.Button)sender;
             bool is_secondary = button_clicked.Name == "chooseSecondaryCertFileButton";
-            using (OpenFileDialog open_file_dialog = new OpenFileDialog())
+            using( OpenFileDialog open_file_dialog = new OpenFileDialog() )
             {
+                // Set the default file filter to .pfx files
+                open_file_dialog.Filter = "PFX files (*.pfx)|*.pfx";
+
+                // Optionally set FilterIndex to 1 if you want the first (and in this case, the only) filter option to be selected by default
+                open_file_dialog.FilterIndex = 1;
+
                 DialogResult dialog_result = open_file_dialog.ShowDialog();
-                if (dialog_result == System.Windows.Forms.DialogResult.OK)
+                if( dialog_result == System.Windows.Forms.DialogResult.OK )
                 {
-                    WriteCertFile(open_file_dialog.FileName, is_secondary);
-                    if (is_secondary)
+                    WriteCertFile( open_file_dialog.FileName, is_secondary );
+                    if( is_secondary )
                     {
                         Globals.SecondaryTlsFilename = open_file_dialog.FileName;
                     }
@@ -327,7 +333,7 @@ namespace SyslogAgent.Config
                 }
                 else
                 {
-                    System.Windows.MessageBox.Show("Cancelled");
+                    System.Windows.MessageBox.Show( "Cancelled" );
                 }
             }
         }
