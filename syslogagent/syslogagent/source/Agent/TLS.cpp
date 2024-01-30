@@ -153,7 +153,7 @@ void TLS::setupTlsForConnection() {
 
     if (gnutls_check_version("3.6.6") == NULL) {
         Logger::fatal("TLS::setupTlsForConnection() GnuTLS 3.4.6 or later is required\n");
-        exit(1);
+        exit(1); // shouldn't be necessary
     }
 
     /* for backwards compatibility with gnutls < 3.3.0 */
@@ -206,7 +206,7 @@ bool TLS::doHandshake(SOCKET socket) {
             exit(1);
         }
         Logger::fatal("TLS::setupTlsForConnection() *** Handshake failed: %s\n", gnutls_strerror(ret));
-        exit(1);
+        exit(1); // shouldn't be necessary
         return false;
     }
     else {

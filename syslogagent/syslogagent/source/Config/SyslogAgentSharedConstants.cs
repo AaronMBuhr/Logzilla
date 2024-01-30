@@ -83,7 +83,7 @@ namespace SyslogAgent
             public const string     DebugLogFilename        = "syslogagent.log";
             public const string     TailFilename            =   "";
             public const string     TailProgramName         =   "";
-            public const string SyslogAgentHttpPath         =   "SyslogAgentHttpPath";
+            public const string     SyslogAgentHttpPath     =   "SyslogAgentHttpPath";
         }
 
 
@@ -91,6 +91,7 @@ namespace SyslogAgent
         public const string SyslogAgentExeFilename      =   "syslogagent.exe";
         public const string PrimaryCertFilename         =   "primary.pfx";
         public const string SecondaryCertFilename       =   "secondary.pfx";
+        public const string ApiPath                     =   "/api/";
 
     }
 }

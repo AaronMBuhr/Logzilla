@@ -30,6 +30,7 @@ Copyright © 2021 Logzilla Corp.
 
 using namespace Syslog_agent;
 
+std::atomic<bool> Service::fatal_shutdown_in_progress = false; 
 unique_ptr<thread> Service::send_thread_ = nullptr;
 Configuration Service::config_;
 shared_ptr<MessageQueue> Service::primary_message_queue_ = nullptr;
@@ -62,6 +63,8 @@ void sendMessagesThread() {
 
 void Service::run(bool running_as_console) {
 
+	Logger::setFatalErrorHandler(Service::fatalErrorHandler);
+
 	Registry::loadSetupFile();
 
 	config_.use_log_agent_ = true;
@@ -85,7 +88,7 @@ void Service::run(bool running_as_console) {
 	Service::primary_network_client_ = make_shared<NetworkClient>();
 	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key, config_.primary_host_)) {
 		Logger::fatal("Could not initialize primary network client\n");
-		exit(1);
+		exit(1); // shouldn't be necessary
 	}
 
 	// read primary cert file
@@ -93,7 +96,7 @@ void Service::run(bool running_as_console) {
 		wstring primary_cert_path = Util::getThisPath(true) + config_.PRIMARY_CERT_FILENAME;
 		if (!primary_network_client_->loadCertificate(primary_cert_path)) {
 			Logger::fatal("Could not read primary cert from %s\n", Util::wstr2str(primary_cert_path).c_str());
-			exit(1);
+			exit(1); // shouldn't be necessary
 		}
 	}
 
@@ -102,14 +105,14 @@ void Service::run(bool running_as_console) {
 		Service::secondary_network_client_ = make_shared<NetworkClient>();
 		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key, config_.secondary_host_))
 			Logger::fatal("Could not initialize secondary network client\n");
-		exit(1);
+		exit(1); // shouldn't be necessary
 
 		// read secondary cert file
 		if (config_.secondary_use_tls_) {
 			wstring secondary_cert_path = Util::getThisPath(true) + config_.SECONDARY_CERT_FILENAME;
 			if (!secondary_network_client_->loadCertificate(secondary_cert_path)) {
                 Logger::fatal("Could not read secondary cert from %s\n", Util::wstr2str(secondary_cert_path).c_str());
-                exit(1);
+                exit(1); // shouldn't be necessary
             }
 		}
 	}
@@ -229,3 +232,27 @@ void Service::shutdown() {
 	shutdown_requested_ = true;
 	shutdown_event_.signal();
 }
+
+
+void Service::fatalErrorHandler(const char* msg) {
+	// Check if a fatal shutdown is already in progress
+	if (fatal_shutdown_in_progress.exchange(true)) {
+		// Fatal shutdown already in progress, return immediately to avoid recursion or repeated shutdown attempts
+		return;
+	}
+
+	// Perform a graceful shutdown if possible
+	// (Implement this method to try to shut down your application components safely)
+	try {
+		shutdown();
+	}
+	catch (...) {
+		// Catch all exceptions to avoid any throw from leaving the fatal handler
+	}
+	Sleep(30000); // Wait for 30 seconds to allow the graceful shutdown to complete
+
+	// Forcefully exit the application if the graceful shutdown didn't work or isn't possible
+	// Use _exit instead of exit to avoid calling static destructors or atexit handlers
+	_exit(1);
+}
+

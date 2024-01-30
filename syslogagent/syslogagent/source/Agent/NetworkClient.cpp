@@ -281,6 +281,45 @@ namespace Syslog_agent {
             return false;
         }
 
+        DWORD dwStatusCode = 0;
+        DWORD dwSize = sizeof(dwStatusCode);
+
+        // Ensure we can query for the status code
+        if (!WinHttpQueryHeaders(hRequest_,
+            WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+            WINHTTP_HEADER_NAME_BY_INDEX,
+            &dwStatusCode,
+            &dwSize,
+            WINHTTP_NO_HEADER_INDEX))
+        {
+            // Handle the error
+            Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpQueryHeaders.\n",
+                GetLastError());
+            return false;
+        }
+
+        if (dwStatusCode >= 200 && dwStatusCode <= 299)
+        {
+            return true;
+        }
+        else if (dwStatusCode == 401)
+        {
+            Logger::fatal("NetworkClient::Post()> Wrong API key (HTTP status code %u).\n", dwStatusCode);
+            return false;
+        }
+        else if (dwStatusCode == 403)
+        {
+            // Handle forbidden case
+            Logger::fatal("NetworkClient::Post()> Access forbidden, check API key (HTTP status code %u).\n", dwStatusCode);
+            return false;
+        }
+        else
+        {
+            // Error, you can handle specific status codes as needed
+            Logger::recoverable_error("NetworkClient::Post()> Error: received HTTP status code %u.\n", dwStatusCode);
+            return false;
+        }
+
         return true;
     }
 

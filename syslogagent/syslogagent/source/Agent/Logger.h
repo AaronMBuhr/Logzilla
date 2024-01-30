@@ -12,6 +12,8 @@ using namespace std;
 class Logger
 {
 public:
+	typedef void (*FATAL_ERROR_HANDLER)(const char* fatal_error_message);
+
 	static const int MAX_LOGMSG_LENGTH = 16384;
 	static const wstring DEFAULT_LOG_FILENAME;
 	enum LogLevel { DEBUG3, DEBUG2, DEBUG, VERBOSE, INFO, WARN, RECOVERABLE_ERROR, CRITICAL, FATAL, NOLOG, ALWAYS, FORCE };
@@ -19,6 +21,9 @@ public:
 	static char* LOGLEVEL_ABBREVS_WITHBRACKET[12];
 	enum LogDestination { DEST_CONSOLE, DEST_FILE, DEST_CONSOLE_AND_FILE };
 
+	static void setFatalErrorHandler(FATAL_ERROR_HANDLER fatal_error_handler) {
+		singleton()->fatal_error_handler_ = fatal_error_handler;
+	}
 	static void setLogLevel(const LogLevel log_level);
 	static LogLevel getLogLevel();
 	static LogDestination getlogDestination() { return singleton()->log_destination_; }
@@ -34,7 +39,7 @@ public:
 	static bool isUnittestRunning();
 	static string getUnitTestLog();
 	static int writeToFile(const char *filename, bool append, const char* format, ...);
-
+	static void fatal(const char* format, ...);
 	template<typename... _args> static bool debug3(const char* format, _args... args) {
 		return log(DEBUG3, format, args...);
 	}
@@ -59,9 +64,9 @@ public:
 	template<typename... _args> static bool critical(const char* format, _args... args) {
 		return log(CRITICAL, format, args...);
 	}
-	template<typename... _args> static bool fatal(const char* format, _args... args) {
-		return log(FATAL, format, args...);
-	}
+	//template<typename... _args> static bool fatal(const char* format, _args... args) {
+	//	return log(FATAL, format, args...);
+	//}
 	template<typename... _args> static bool always(const char* format, _args... args) {
 		return log(ALWAYS, format, args...);
 	}
@@ -108,6 +113,7 @@ private:
 	bool log_events_to_file_;
 	short is_unittest_running_;
 	vector<string> unit_test_messages_;
+	FATAL_ERROR_HANDLER fatal_error_handler_;
 
 	static Logger* singleton();
 	bool logToConsole(const char* log_message_cstring);

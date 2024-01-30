@@ -277,3 +277,24 @@ int Logger::writeToFile(const char* filename, bool append, const char* format, .
 	fclose(output_file);
 	return num_chars_written;
 }
+
+
+void Logger::fatal(const char* format, ...) {
+	va_list args_list;
+	va_start(args_list, format);
+
+	// Format the message into the buffer
+	char formatted_message[MAX_LOGMSG_LENGTH];
+	vsnprintf(formatted_message, MAX_LOGMSG_LENGTH, format, args_list);
+
+	// Log the formatted message with FATAL log level
+	log(FATAL, "%s", formatted_message);
+
+	// Call the fatal error handler if it's set
+	if (singleton()->fatal_error_handler_) {
+		singleton()->fatal_error_handler_(formatted_message);
+	}
+
+	va_end(args_list);
+}
+
