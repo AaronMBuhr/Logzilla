@@ -282,6 +282,7 @@ namespace Syslog_agent {
             return false;
         }
 
+<<<<<<< HEAD
         DWORD dwStatusCode = 0;
         DWORD dwSize = sizeof(dwStatusCode);
 
@@ -321,6 +322,8 @@ namespace Syslog_agent {
             return false;
         }
 
+=======
+>>>>>>> e4b7b49 (removed non-working ssl callback)
         return true;
     }
 
