@@ -43,6 +43,7 @@ namespace Syslog_agent {
     }
 
 
+#if THIS_DIDNT_WORK
     void CALLBACK NetworkClient::StatusCallback(
         HINTERNET hInternet,
         DWORD_PTR dwContext,
@@ -99,7 +100,7 @@ namespace Syslog_agent {
         //    }
         //}
     }
-
+#endif
 
 
     bool NetworkClient::initialize(const Configuration* config, const wstring api_key, const std::wstring& url, bool use_ssl, int port)
@@ -161,6 +162,7 @@ namespace Syslog_agent {
         hConnect_ = NULL;
         hRequest_ = NULL;
 
+#if THIS_DIDNT_WORK
         if (use_ssl_) {
             // Set the callback function
             WinHttpSetStatusCallback(
@@ -191,7 +193,8 @@ namespace Syslog_agent {
                 return false;
             }
         }
-       
+#endif
+
         return true;
 
     }
@@ -371,6 +374,7 @@ namespace Syslog_agent {
             return false;
         }
 
+#if THIS_DIDNT_WORK
         if (use_ssl_) {
             if (requestCallbackStatus_ != WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID) {
                 Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpReceiveResponse.\n",
@@ -378,6 +382,7 @@ namespace Syslog_agent {
                 return false;
             }
         }
+#endif
 
         return true;
     }

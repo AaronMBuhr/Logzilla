@@ -46,9 +46,10 @@ namespace Syslog_agent {
         PCCERT_CONTEXT pCertContext_;
         HCERTSTORE hCertStore_;
         BYTE* pfxBuffer_;
-        volatile DWORD requestCallbackStatus_;
         bool server_cert_checked_;
 
+#if THIS_DIDNT_WORK
+        volatile DWORD requestCallbackStatus_;
         static void CALLBACK StatusCallback(
             HINTERNET hInternet,
             DWORD_PTR dwContext,
@@ -56,10 +57,10 @@ namespace Syslog_agent {
             LPVOID lpvStatusInformation,
             DWORD dwStatusInformationLength
         );
-
         void setRequestCallbackStatus(DWORD status) {
             requestCallbackStatus_ = status;
         }
+#endif
 
     };
 
