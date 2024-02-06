@@ -192,6 +192,7 @@ namespace SyslogAgent.Config
         public IValidatedStringView DebugLogFilename => new ValidatedTextBox(debugLogFilename);
         public IValidatedStringView TailFilename => new ValidatedTextBox(txtTailFilename);
         public IValidatedStringView TailProgramName => new ValidatedTextBox(txtTailProgramName);
+        public IValidatedStringView BatchInterval => new ValidatedTextBox(batchIntervalText);
         public string Message { set { txtBlockStatusBarLeft.Text = value; } }
         public string LogzillaFileVersion { set { tbkLogzillaVersion.Text = "LogZilla Syslog Agent version " + value; } }
 
@@ -496,6 +497,7 @@ namespace SyslogAgent.Config
             DebugLogFilename.Content = config.DebugLogFilename;
             TailFilename.Content = config.TailFilename;
             TailProgramName.Content = config.TailProgramName;
+            BatchInterval.Content = Convert.ToString(config.BatchInterval);
             presenter.RecheckEventPaths(config.SelectedEventLogPaths);
         }
 

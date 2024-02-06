@@ -55,6 +55,7 @@ namespace SyslogAgent
             public const string SelectedEventChannelsKey    =   @"SOFTWARE\LogZilla\SyslogAgent\Channels";
             public const string InitialSetupRegFileKey      =   @"InitialSetupRegFile";
             public const string ApiTestPath                 =   @"api/";
+            public const string BatchInterval               =   "BatchInterval";
         }
 
         public static class ConfigDefaults
@@ -84,6 +85,7 @@ namespace SyslogAgent
             public const string     TailFilename            =   "";
             public const string     TailProgramName         =   "";
             public const string     SyslogAgentHttpPath     =   "SyslogAgentHttpPath";
+            public const int        BatchInterval           =   1000;
         }
 
 

@@ -67,21 +67,6 @@ Copyright © 2021 LogZilla Corp.
         </StackPanel>
         <StackPanel PreviewMouseDown="UIElement_OnPreviewMouseDown" PreviewKeyDown="UIElement_OnPreviewKeyDown">
             <WrapPanel>
-                <!--
-                <GroupBox Margin="2,2,2,2" Header="Protocols">
-                    <StackPanel>
-                        <ComboBox Width="100" Name="transportCombo">
-                            <ComboBoxItem>UDP</ComboBoxItem>
-                            <ComboBoxItem>UDP after ping</ComboBoxItem>
-                            <ComboBoxItem>TCP</ComboBoxItem>
-                        </ComboBox>
-                        <ComboBox Width="100" Name="syslogProtocolCombo">
-                            <ComboBoxItem>RFC 3164</ComboBoxItem>
-                            <ComboBoxItem>RFC 5424</ComboBoxItem>
-                        </ComboBox>
-                    </StackPanel>
-                </GroupBox>
-                -->
                 <GroupBox Margin="2,2,2,2" Header="Servers">
                     <Grid Margin="10,0,0,0">
                         <!-- hosts and ports -->
@@ -139,66 +124,9 @@ Copyright © 2021 LogZilla Corp.
             </WrapPanel>
             <WrapPanel>
                 <GroupBox Margin="2,2,2,2" Header="Event Logs">
-                    <StackPanel Height="200">
+                    <StackPanel Height="Auto">
 
-                        <!--<TreeView x:Name="treeView" Height="200">
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate DataType="{x:Type local:EventLogGroupMember}" ItemsSource="{Binding ChildMembers}" >
-                                    <CheckBox Content="{Binding Name}" >
-                                        <CheckBox.Style>
-                                            <Style TargetType="{x:Type CheckBox}">
-                                                <Setter Property="Foreground" Value="Black"/>
-                                                <Setter Property="Visibility" Value="Visible"/>
-
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Path=(local:EventLogTreeViewItemHelper.IsChecked)}" Value="False" >
-                                                        <Setter Property="Foreground" Value="LightGray"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-
-                                            </Style>
-                                        </CheckBox.Style>
-                                    </CheckBox>
-                                </HierarchicalDataTemplate>
-                            </TreeView.Resources>
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="{x:Type TreeViewItem}">
-                                    <Setter Property="IsExpanded" Value="True"/>
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                        </TreeView>-->
-
-                        <!--<TreeView x:Name="treeView" Height="200">
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate
-                                    DataType="{x:Type local:EventLogTreeviewItem}" 
-                                    ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox IsChecked="{Binding IsChecked}"/>
-                                        <TextBlock Text="{Binding Name}"/>
-                                    </StackPanel>
-                                </HierarchicalDataTemplate>
-                            </TreeView.Resources>
-                        </TreeView>-->
-
-                        <!--<TreeView Name="trvMenu">
-                            <TreeView.ItemTemplate>
-                                <HierarchicalDataTemplate DataType="{x:Type MenuItem}" ItemsSource="{Binding Items}">
-                                    <TextBlock Text="{Binding Title}" />
-                                </HierarchicalDataTemplate>
-                            </TreeView.ItemTemplate>
-                        </TreeView>-->
-
-                        <!--<TreeView Name="trvMenu">
-                            <TreeView.ItemTemplate>
-                                <HierarchicalDataTemplate DataType="{x:Type MenuItem}" ItemsSource="{Binding Items}">
-                                    <TextBlock Text="{Binding Name}" />
-                                </HierarchicalDataTemplate>
-                            </TreeView.ItemTemplate>
-                        </TreeView>-->
-
-
-                        <TreeView x:Name="treeView" Height="200">
+                        <TreeView x:Name="treeView" Height="270">
                             <TreeView.Resources>
                                 <HierarchicalDataTemplate DataType="{x:Type local:EventLogTreeviewItem}" ItemsSource="{Binding Children}" >
                                     <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Content="{Binding Name}" >
@@ -225,19 +153,9 @@ Copyright © 2021 LogZilla Corp.
                             </TreeView.ItemContainerStyle>
                         </TreeView>
 
-
-                        <!--<Button Content="?" Click="Button_PrintCrew_Click" />-->
-
                         <TextBlock x:Name="textBoxCrew"/>
 
                     </StackPanel>
-                    <!--<StackPanel>
-                        <ListBox Name="logsList" ScrollViewer.VerticalScrollBarVisibility="Auto" MaxHeight="300" Margin="2"></ListBox>
-                        <WrapPanel HorizontalAlignment="Center">
-                            <Button Name="selectAllButton" Margin="5,2,5,2" Click="SelectAllButton_OnClick">Select All</Button>
-                            <Button Name="unselectAllButton" Margin="5,2,5,2" Click="UnselectAllButton_OnClick">Unselect All</Button>
-                        </WrapPanel>
-                    </StackPanel>-->
                 </GroupBox>
                 <StackPanel>
                     <GroupBox Margin="2,2,2,2" Header="Event Selection">
@@ -342,50 +260,7 @@ Copyright © 2021 LogZilla Corp.
                             <TextBox Grid.Column="1" Grid.Row="4" Margin="2,0,0,0" Width="200" Name="suffixText" ToolTip="Enter a quoted key-value pair(s) to be appended"></TextBox>
                         </Grid>
                     </GroupBox>
-                    <!-- FORWARDER_FUNCTIONALITY: 
-                    <GroupBox Margin="2,2,2,2" Header="Forwarder">
-                        <Grid Margin="10,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Use Forwarder</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">TCP Listen Port</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">UDP Listen Port</TextBlock>
-                            <CheckBox Grid.Column="1" Grid.Row="0" Margin="2,2,2,2" Name="useForwarder" />
-                            <TextBox Grid.Column="1" Grid.Row="1" Width="50" Name="tcpListenPortText" ToolTip="Enter the TCP port number for the forwarder to listen on"></TextBox>
-                            <TextBox Grid.Column="1" Grid.Row="2" Width="50" Name="udpListenPortText" ToolTip="Enter the UDP port number for the forwarder to listen on"></TextBox>
-                        </Grid>
-                    </GroupBox>
-            -->
-                    <!-- CHARACTER_SUBSTITION_FUNCTIONALITY 
-                    <GroupBox Margin="2,2,2,2" Header="Character Substitution">
-                        <Grid Margin="10,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Carriage return</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Line feed</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Tab</TextBlock>
-                            <TextBox Grid.Column="1" Grid.Row="0" Width="25" Name="carriageReturnText" ToolTip="Enter an ASCII code between 0 and 126"></TextBox>
-                            <TextBox Grid.Column="1" Grid.Row="1" Width="25" Name="lineFeedText" ToolTip="Enter an ASCII code between 0 and 126"></TextBox>
-                            <TextBox Grid.Column="1" Grid.Row="2" Width="25" Name="tabText" ToolTip="Enter an ASCII code between 0 and 126"></TextBox>
-                        </Grid>
-                    </GroupBox>
-                    -->
+
                     <GroupBox Margin="2,2,2,2" Header="Logging">
                         <Grid Margin="10,0,0,0">
                             <Grid.ColumnDefinitions>
@@ -414,6 +289,19 @@ Copyright © 2021 LogZilla Corp.
                                 <ComboBoxItem>DEBUG2</ComboBoxItem>
                             </ComboBox>
                             <TextBox Grid.Column="1" Grid.Row="1" Margin="2,0,0,0" Width="200" Name="debugLogFilename" ToolTip="Enter the path and name for the debug log file"></TextBox>
+                        </Grid>
+                    </GroupBox>
+                    <GroupBox Margin="2,2,2,2" Header="Other">
+                        <Grid Margin="10,0,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Batch Interval (msec)</TextBlock>
+                            <TextBox Grid.Column="1" Grid.Row="1" Margin="2,0,0,0" Width="200" Name="batchIntervalText" ToolTip="How often messages are sent to LogZilla, in millseconds. 0 for immediate."></TextBox>
                         </Grid>
                     </GroupBox>
 

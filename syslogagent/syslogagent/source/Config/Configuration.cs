@@ -17,6 +17,7 @@ namespace SyslogAgent.Config {
         public int Severity { get; set; }
         public bool IncludeKeyValuePairs { get; set; }
         public string Suffix { get; set; }
+        public int BatchInterval { get; set; }
         public string PrimaryHost { get; set; }
         public string PrimaryApiKey { get; set; }
         public string SecondaryHost { get; set; }

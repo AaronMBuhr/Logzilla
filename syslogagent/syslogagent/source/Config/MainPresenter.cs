@@ -169,6 +169,7 @@ namespace SyslogAgent.Config
             view.OnlyWhileRunning.IsSelected = config_.OnlyWhileRunning;
             view.CatchUp.IsSelected = !config_.OnlyWhileRunning;
             view.EventIdFilter.Content = config_.EventIdFilter;
+            view.BatchInterval.Content = config_.BatchInterval.ToString();
             view.Suffix.Content = config_.Suffix;
             view.Facility.Option = config_.Facility;
             view.LookUpAccount.IsSelected = config_.LookUpAccountIDs;
@@ -221,6 +222,7 @@ namespace SyslogAgent.Config
             config.PrimaryUseTls = view.PrimaryUseTls.IsSelected;
             config.SecondaryUseTls = view.SecondaryUseTls.IsSelected;
             config.Severity = (view.Severity.Option + 8) % 9;
+            config.BatchInterval = Convert.ToInt32(view.BatchInterval.Content);
             config.DebugLevel = view.DebugLevel.Option;
             config.DebugLogFilename = view.DebugLogFilename.Content;
             config.TailFilename = view.TailFilename.Content;
