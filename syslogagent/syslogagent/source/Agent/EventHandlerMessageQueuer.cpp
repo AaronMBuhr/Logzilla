@@ -164,13 +164,13 @@ namespace Syslog_agent {
 			<< " \"facility\": " << configuration_.facility_ << ","
 			<< " \"message\": \""
 			<< escaped_buf << "\" ";
-		pugi::xml_node event_data = event.getXmlDoc().child("Event").child("EventData");
 		json_output << ", \"extra_fields\": { "
 			<< " \"_source_tag\": \"windows_agent\","
-			<< " \"_log_type\": \"eventlog\","
+			<< " \"log_type\": \"eventlog\","
 			<< " \"event_id\": \"" << event_id_str << "\","
 			<< " \"event_log\": \"" << log_name_utf8_ << "\"";
-			for (pugi::xml_node data_item = event_data.first_child(); data_item; data_item = data_item.next_sibling()) {
+		pugi::xml_node event_data = event.getXmlDoc().child("Event").child("EventData");
+		for (pugi::xml_node data_item = event_data.first_child(); data_item; data_item = data_item.next_sibling()) {
 			auto data_name = data_item.attribute("Name").value();
 			if (data_name[0] != 0) {
 				auto value = data_item.child_value();
