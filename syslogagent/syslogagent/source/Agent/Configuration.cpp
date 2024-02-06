@@ -65,6 +65,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     secondary_use_tls_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_SECONDARY_USE_TLS, false);
     lookup_accounts_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_LOOKUP_ACCOUNTS, true);
     include_key_value_pairs_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_INCLUDE_KEY_VALUE_PAIRS, false);
+    batch_interval_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_BATCH_INTERVAL, SYSLOGAGENT_DEFAULT_BATCH_INTERVAL);
     facility_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_FACILITY, SYSLOGAGENT_DEFAULT_FACILITY);
     severity_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_SEVERITY, SYSLOGAGENT_DEFAULT_SEVERITY);
     tail_filename_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_TAIL_FILENAME, L"");

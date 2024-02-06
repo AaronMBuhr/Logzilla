@@ -37,6 +37,7 @@ namespace SyslogAgent.Config
             config.TailProgramName = mainKey.GetValue(SharedConstants.RegistryKey.TailProgramName, string.Empty).ToString();
             config.AllEventLogPaths = Registry.AllEventLogPaths;
             config.SelectedEventLogPaths = Registry.SelectedEventLogPaths;
+            config.BatchInterval = (int)mainKey.GetValue( SharedConstants.RegistryKey.BatchInterval, SharedConstants.ConfigDefaults.BatchInterval );
             }
 
         public void WriteConfigToRegistry(Configuration config) {
@@ -50,6 +51,7 @@ namespace SyslogAgent.Config
             mainKey.SetValue( SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
             mainKey.SetValue(SharedConstants.RegistryKey.Facility, config.Facility, RegistryValueKind.DWord);
             mainKey.SetValue(SharedConstants.RegistryKey.Severity, config.Severity, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.BatchInterval, config.BatchInterval, RegistryValueKind.DWord);
             //PutBool(SharedConstants.RegistryKey.IncludeKeyValuePairs, value.IncludeKeyValuePairs);
             mainKey.SetValue(SharedConstants.RegistryKey.Suffix, config.Suffix, RegistryValueKind.String);
             mainKey.SetValue(SharedConstants.RegistryKey.SecondaryHost, config.SecondaryHost, RegistryValueKind.String);
@@ -284,6 +286,7 @@ namespace SyslogAgent.Config
                 WriteRegfileKeyValue( writer, SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Facility, config.Facility);
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Severity, config.Severity);
+                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.BatchInterval, config.BatchInterval);
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Suffix, config.Suffix ?? "");
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.PrimaryHost, config.PrimaryHost ?? "");
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SecondaryHost, config.SecondaryHost ?? "");
@@ -359,6 +362,10 @@ namespace SyslogAgent.Config
 
                                 case SharedConstants.RegistryKey.EventLogPollInterval:
                                     config.PollInterval = System.Convert.ToInt32(ValuePortion(parts[1]), 16);
+                                    break;
+
+                                case SharedConstants.RegistryKey.BatchInterval:
+                                    config.BatchInterval = System.Convert.ToInt32( ValuePortion( parts[1]), 16);
                                     break;
 
                                 case SharedConstants.RegistryKey.LookupAccounts:

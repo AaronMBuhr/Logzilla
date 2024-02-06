@@ -35,6 +35,7 @@ namespace Syslog_agent {
         int facility_;
         int severity_;
         char host_name_[256];
+        int batch_interval_;
         wstring primary_host_ = SYSLOGAGENT_DEFAULT_PRIMARY_HOST;
         wstring primary_port_ = SYSLOGAGENT_DEFAULT_PRIMARY_PORT_S;
         wstring primary_tls_port_ = SYSLOGAGENT_DEFAULT_PRIMARY_TLS_PORT_S;

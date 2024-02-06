@@ -18,6 +18,7 @@ namespace SyslogAgent.Config {
         IValidatedOptionView PrimaryUseTls { get; }
         IValidatedOptionView SecondaryUseTls { get; }
         IValidatedStringView Suffix { get; }
+        IValidatedStringView BatchInterval { get; }
         string Message { set; }
         void SetFailureMessage(string message);
         void SetSuccessMessage(string message);
