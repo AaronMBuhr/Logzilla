@@ -30,7 +30,7 @@ namespace Syslog_agent {
         }
 
     private:
-        static constexpr int MAX_MESSAGE_SIZE = 8000;
+        static constexpr int MAX_MESSAGE_SIZE = 65535;
         static const char message_header_[];
         static const char message_separator_[];
         static const char message_trailer_[];
