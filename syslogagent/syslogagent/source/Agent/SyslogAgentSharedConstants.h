@@ -1,4 +1,4 @@
-/* SyslogAgentSharedContants.h
+/* SyslogAgentSharedContants.h 
 * single file to collect constants that must be shared between
 * Syslog Agent apps (such as the config app)
 * unfortunately this file still must be manually synched to

@@ -60,7 +60,7 @@ namespace Syslog_agent {
                 secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
                 secondary_message_queue_->unlock();
             }
-			SyslogSender::enqueue_event_.signal();
+			SyslogSender::enqueue_timer_.set(1000);
 #endif
 		}
 		Globals::instance()->releaseMessageBuffer("json_buffer", json_buffer);
@@ -151,25 +151,26 @@ namespace Syslog_agent {
 		OStreamBuf<char> ostream_buffer(json_buffer, buflen);
 		ostream json_output(&ostream_buffer);
 		json_output.fill('0');
-		json_output << "{"
-			<< " \"_source_type\": \"WindowsAgent\","
-			<< " \"_log_type\": \"eventlog\",";
+		json_output << "{";
 		if (timestamp != 0) {
 			json_output << " \"ts\": " << timestamp << "." << decimal_time << ",";
 		}
+		if (configuration_.host_name_[0] != 0) {
+            json_output << " \"host\": \"" << configuration_.host_name_ << "\",";
+        }
 		json_output
-			<< " \"host\": \"" << configuration_.host_name_ << "\","
 			<< " \"program\": \"" << provider << "\","
-			<< " \"event_id\": \"" << event_id_str << "\","
-			<< " \"event_log\": \"" << log_name_utf8_ << "\","
 			<< " \"severity\": " << ((char)(severity + '0')) << ","
 			<< " \"facility\": " << configuration_.facility_ << ","
 			<< " \"message\": \""
-			<< "EventID=\\\"" << event_id_str << "\\\""
-			<< " EventLog=\\\"" << log_name_utf8_ << "\\\"\\r\\n"
 			<< escaped_buf << "\" ";
 		pugi::xml_node event_data = event.getXmlDoc().child("Event").child("EventData");
-		for (pugi::xml_node data_item = event_data.first_child(); data_item; data_item = data_item.next_sibling()) {
+		json_output << ", \"extra_fields\": { "
+			<< " \"_source_tag\": \"windows_agent\","
+			<< " \"_log_type\": \"eventlog\","
+			<< " \"event_id\": \"" << event_id_str << "\","
+			<< " \"event_log\": \"" << log_name_utf8_ << "\"";
+			for (pugi::xml_node data_item = event_data.first_child(); data_item; data_item = data_item.next_sibling()) {
 			auto data_name = data_item.attribute("Name").value();
 			if (data_name[0] != 0) {
 				auto value = data_item.child_value();
@@ -178,6 +179,7 @@ namespace Syslog_agent {
 				json_output << ", \"" << data_name << "\": \"" << escaped_buf << "\"";
 			}
 		}
+		json_output << " }";
 		Globals::instance()->releaseMessageBuffer("escaped_buf", escaped_buf);
 		if (suffix_utf8_[0] != 0) {
 			json_output << "," << suffix_utf8_;

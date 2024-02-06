@@ -15,22 +15,28 @@ using namespace Syslog_agent;
 
 #define IDLE_INTERVAL 20000
 
-WindowsEvent SyslogSender::enqueue_event_(L"SyslogAgentEnqueueEvent");
+WindowsTimer SyslogSender::enqueue_timer_;
 volatile bool SyslogSender::stop_requested_ = false;
+const char SyslogSender::message_header_[] = "{ \"events\": [ ";
+const char SyslogSender::message_separator_[] = ", ";
+const char SyslogSender::message_trailer_[] = " ] }";
+
 
 SyslogSender::SyslogSender(
     Configuration& config,
     shared_ptr<MessageQueue> primary_queue,
     shared_ptr<MessageQueue> secondary_queue,
-	shared_ptr<NetworkClient> primary_network_client,
-	shared_ptr<NetworkClient> secondary_network_client
+    shared_ptr<NetworkClient> primary_network_client,
+    shared_ptr<NetworkClient> secondary_network_client
 ) :
     config_(config),
     primary_queue_(primary_queue),
     secondary_queue_(secondary_queue),
-	primary_network_client_(primary_network_client),
-	secondary_network_client_(secondary_network_client)
-{}
+    primary_network_client_(primary_network_client),
+    secondary_network_client_(secondary_network_client)
+{
+    message_buffer_ = make_unique<char[]>(MAX_MESSAGE_SIZE);
+}
 
 
 
@@ -49,7 +55,7 @@ void SyslogSender::run() const {
             }
         }
 
-        while (!SyslogSender::stop_requested_
+        while (!SyslogSender::stop_requested_ 
             && (!primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()))) {
             int msg_size;
             bool connected;
@@ -62,8 +68,8 @@ void SyslogSender::run() const {
                 primary_queue_->lock();
                 while (!primary_queue_->isEmpty()) {
                     msg_size = primary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE);
-                    const char* sep = (message_buffer_length >= sizeof(message_header_)) ? message_separator_ : "";
-                    if (msg_size + message_buffer_length + strlen(sep) + sizeof(message_trailer_) - 1 < MAX_MESSAGE_SIZE) {
+                    const char *sep = (message_buffer_length >= sizeof(message_header_)) ? message_separator_ : "";
+                    if (msg_size + message_buffer_length + strlen(sep) + sizeof(message_trailer_) -1 < MAX_MESSAGE_SIZE) {
                         memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
                         message_buffer_length += strlen(sep);
                         memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
@@ -156,8 +162,6 @@ void SyslogSender::run() const {
             }
         }
     }
-
     Globals::instance()->releaseMessageBuffer("SyslogSender::run()", buf);
     Logger::debug2("Syslog_sender::run() ending\n");
->>>>>>> 6225396 (mostly done, just config changes i.e. cert check needed)
 }

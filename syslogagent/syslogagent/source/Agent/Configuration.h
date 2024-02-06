@@ -58,10 +58,12 @@ namespace Syslog_agent {
         void loadFromRegistry(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting);
         void saveToRegistry();
         bool hasSecondaryHost() const;
+        string getHostName() const;
 
-        const int MAX_TAIL_FILE_LINE_LENGTH = 16000;
+        static const int MAX_TAIL_FILE_LINE_LENGTH = 16000;
 
     private:
+        static const int MAX_COMPUTERNAME_LENGH = 200;
         void loadFilterIds(wstring value);
         void getTimeZoneOffset();
     };

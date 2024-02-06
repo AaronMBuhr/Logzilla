@@ -141,10 +141,17 @@ void FileWatcher::processLine(const char* line_cstr) {
 	OStreamBuf<char> ostream_buffer(message_buffer_.data(), message_buffer_.size());
 	std::ostream stream_output(&ostream_buffer);
 
-	stream_output << "{ \"_source_type\": \"WindowsAgent\", \"_log_type\": \"file\", \"program\" : \""
-		<< program_name_ << "\", \"host\": \"" << host_name_ << "\", \"severity\": " << severity_
-		<< ", \"facility\": " << facility_ << ", \"file\": \"" << filename_multibyte_escaped_ 
-		<< "\", \"message\": \"" << line_cstr << "\" }" << '\n' << '\0';
+	stream_output << "{ "
+		<< "\"program\" : \"" << program_name_ << "\", "
+		<< "\"host\": \"" << host_name_ << "\", "
+		<< "\"severity\": " << severity_ << ", "
+		<< "\"facility\": " << facility_ << ", "
+		<< "\"message\": \"" << line_cstr << "\", "
+		<< "\"extra_fields\": { "
+		<< "\"_source_tag\": \"windows_agent\", "
+		<< "\"_log_type\": \"file\", "
+		<< "\"file\": \"" << filename_multibyte_escaped_ << "\" }"
+		<< " }" << '\n' << '\0';
 
 	log_message_handler_->handleJsonMessage(const_cast<char*>(message_buffer_.data()));
 }

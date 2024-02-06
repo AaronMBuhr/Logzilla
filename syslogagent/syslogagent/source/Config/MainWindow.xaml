@@ -1,443 +1,167 @@
-﻿<!-- SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
--->
-<Window x:Class="SyslogAgent.Config.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:SyslogAgent.Config"
-        mc:Ignorable="d"
-        Title="Syslog Agent Configuration" Width="Auto" Height="Auto" SizeToContent="WidthAndHeight">
+﻿/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
 
-    <DockPanel>
-        <StackPanel DockPanel.Dock="Bottom">
-            <Grid>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                    <TextBlock Margin="10" Name="tbkLogzillaVersion">LogZilla Syslog Agent version #.##</TextBlock>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="importButton" Click="ImportButton_OnClick" Height="20" Width="60" Margin="5,8" Content="Import"/>
-                    <Button x:Name="exportButton" Click="ExportButton_OnClick" Height="20" Width="60" Margin="5,8" Content="Export"/>
-                    <Button x:Name="saveButton" Click="SaveButton_OnClick" Height="20" Width="60" Margin="5,8" Content="Save"/>
-                    <Button x:Name="restartButton" Click="RestartButton_OnClick" Height="20" Width="60" Margin="5" Content="Restart"/>
-                </StackPanel>
-            </Grid>
-            <!--
-            <StatusBar>
-                <StatusBarItem>
-                    <TextBlock Name="messageText"></TextBlock>
-                </StatusBarItem>
-                <StatusBarItem HorizontalAlignment="Right">
-                    <TextBlock Name="serviceText"></TextBlock>
-                </StatusBarItem>
-            </StatusBar>
-            -->
-            <StatusBar HorizontalAlignment="Stretch">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <!-- Fixed width for the left TextBlock column -->
-                        <ColumnDefinition Width="335"/>
-                        <!-- Separator column with a fixed width -->
-                        <ColumnDefinition Width="10"/>
-                        <!-- Fixed width for the right TextBlock column -->
-                        <ColumnDefinition Width="145"/>
-                    </Grid.ColumnDefinitions>
+#include "stdafx.h"
+#include <stdio.h>
+#include <ws2tcpip.h>
+#include "Debug.h"
+#include "Globals.h"
+#include "Result.h"
+#include "SyslogSender.h"
 
-                    <!-- Left TextBlock with text wrapping enabled -->
-                    <TextBlock Name="txtBlockStatusBarLeft" 
-                   TextWrapping="Wrap" 
-                   Grid.Column="0" 
-                   Margin="0"
-                   HorizontalAlignment="Stretch" 
-                   VerticalAlignment="Center" />
+using namespace Syslog_agent;
 
-                    <!-- Separator column. It's just empty space and doesn't need a content presenter. -->
+#define IDLE_INTERVAL 20000
 
-                    <!-- Right TextBlock with right text alignment -->
-                    <TextBlock Name="txtBlockStatusBarRight" 
-                   TextAlignment="Right" 
-                   Grid.Column="2" 
-                   Margin="0"
-                   HorizontalAlignment="Stretch" 
-                   VerticalAlignment="Center" />
-                </Grid>
-            </StatusBar>
-
-        </StackPanel>
-        <StackPanel PreviewMouseDown="UIElement_OnPreviewMouseDown" PreviewKeyDown="UIElement_OnPreviewKeyDown">
-            <WrapPanel>
-                <!--
-                <GroupBox Margin="2,2,2,2" Header="Protocols">
-                    <StackPanel>
-                        <ComboBox Width="100" Name="transportCombo">
-                            <ComboBoxItem>UDP</ComboBoxItem>
-                            <ComboBoxItem>UDP after ping</ComboBoxItem>
-                            <ComboBoxItem>TCP</ComboBoxItem>
-                        </ComboBox>
-                        <ComboBox Width="100" Name="syslogProtocolCombo">
-                            <ComboBoxItem>RFC 3164</ComboBoxItem>
-                            <ComboBoxItem>RFC 5424</ComboBoxItem>
-                        </ComboBox>
-                    </StackPanel>
-                </GroupBox>
-                -->
-                <GroupBox Margin="2,2,2,2" Header="Servers">
-                    <Grid Margin="10,0,0,0">
-                        <!-- hosts and ports -->
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Primary LogZilla server</TextBlock>
-                        <TextBox Grid.Column="2" Grid.Row="0" Margin="2,2,2,2" Name="primaryHostText" Width="200" />
-                        <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Primary Use TLS</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="1" Margin="2,2,2,2" Name="primaryUseTlsCheck"/>
-                        <!--<TextBox Grid.Column="2" Grid.Row="1" Margin="2,2,2,2" Name="primaryTlsCertFileText" Width="200" />-->
-                        <Button Grid.Column="2" Grid.Row="1" Name="choosePrimaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
-                            Select Primary Cert
-                            <Button.Resources>
-                                <Style TargetType="Border">
-                                    <Setter Property="CornerRadius" Value="5"/>
-                                </Style>
-                            </Button.Resources>
-                        </Button>
-                        <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Secondary LogZilla server</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="2" Margin="2,2,2,2" Name="sendToSecondaryCheck" 
-                                  Checked="sendToSecondaryCheck_Checked" Unchecked="sendToSecondaryCheck_Unchecked"/>
-                        <TextBox Grid.Column="2" Grid.Row="2" Margin="2,2,2,2" Name="secondaryHostText" Width="200"/>
-                        <TextBlock Grid.Column="0" Grid.Row="3" Margin="2,2,2,2">Secondary Use TLS</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="3" Margin="2,2,2,2" Name="secondaryUseTlsCheck"/>
-                        <!--<TextBox Grid.Column="2" Grid.Row="3" Margin="2,2,2,2" Name="secondaryTlsCertFile" Width="200" />-->
-                        <Button Grid.Column="2" Grid.Row="3" Name="chooseSecondaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
-                            Select Secondary Cert
-                            <Button.Resources>
-                                <Style TargetType="Border">
-                                    <Setter Property="CornerRadius" Value="5"/>
-                                </Style>
-                            </Button.Resources>
-                        </Button>
-                    </Grid>
-                </GroupBox>
-            </WrapPanel>
-            <WrapPanel>
-                <GroupBox Margin="2,2,2,2" Header="Event Logs">
-                    <StackPanel Height="200">
-
-                        <!--<TreeView x:Name="treeView" Height="200">
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate DataType="{x:Type local:EventLogGroupMember}" ItemsSource="{Binding ChildMembers}" >
-                                    <CheckBox Content="{Binding Name}" >
-                                        <CheckBox.Style>
-                                            <Style TargetType="{x:Type CheckBox}">
-                                                <Setter Property="Foreground" Value="Black"/>
-                                                <Setter Property="Visibility" Value="Visible"/>
-
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Path=(local:EventLogTreeViewItemHelper.IsChecked)}" Value="False" >
-                                                        <Setter Property="Foreground" Value="LightGray"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-
-                                            </Style>
-                                        </CheckBox.Style>
-                                    </CheckBox>
-                                </HierarchicalDataTemplate>
-                            </TreeView.Resources>
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="{x:Type TreeViewItem}">
-                                    <Setter Property="IsExpanded" Value="True"/>
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                        </TreeView>-->
-
-                        <!--<TreeView x:Name="treeView" Height="200">
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate
-                                    DataType="{x:Type local:EventLogTreeviewItem}" 
-                                    ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <CheckBox IsChecked="{Binding IsChecked}"/>
-                                        <TextBlock Text="{Binding Name}"/>
-                                    </StackPanel>
-                                </HierarchicalDataTemplate>
-                            </TreeView.Resources>
-                        </TreeView>-->
-
-                        <!--<TreeView Name="trvMenu">
-                            <TreeView.ItemTemplate>
-                                <HierarchicalDataTemplate DataType="{x:Type MenuItem}" ItemsSource="{Binding Items}">
-                                    <TextBlock Text="{Binding Title}" />
-                                </HierarchicalDataTemplate>
-                            </TreeView.ItemTemplate>
-                        </TreeView>-->
-
-                        <!--<TreeView Name="trvMenu">
-                            <TreeView.ItemTemplate>
-                                <HierarchicalDataTemplate DataType="{x:Type MenuItem}" ItemsSource="{Binding Items}">
-                                    <TextBlock Text="{Binding Name}" />
-                                </HierarchicalDataTemplate>
-                            </TreeView.ItemTemplate>
-                        </TreeView>-->
+WindowsTimer SyslogSender::enqueue_timer_;
+volatile bool SyslogSender::stop_requested_ = false;
+const char SyslogSender::message_header_[] = "{ \"events\": [ ";
+const char SyslogSender::message_separator_[] = ", ";
+const char SyslogSender::message_trailer_[] = " ] }";
 
 
-                        <TreeView x:Name="treeView" Height="200">
-                            <TreeView.Resources>
-                                <HierarchicalDataTemplate DataType="{x:Type local:EventLogTreeviewItem}" ItemsSource="{Binding Children}" >
-                                    <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" Content="{Binding Name}" >
-                                        <!--<CheckBox.Style>
-                                            <Style TargetType="{x:Type CheckBox}">
-                                                <Setter Property="Foreground" Value="Black"/>
-                                                <Setter Property="Visibility" Value="Visible"/>
-
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding Path=(local:EventLogTreeViewItemHelper.IsChecked)}" Value="False" >
-                                                        <Setter Property="Foreground" Value="LightGray"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-
-                                            </Style>
-                                        </CheckBox.Style>-->
-                                    </CheckBox>
-                                </HierarchicalDataTemplate>
-                            </TreeView.Resources>
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="{x:Type TreeViewItem}">
-                                    <Setter Property="IsExpanded" Value="False"/>
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                        </TreeView>
+SyslogSender::SyslogSender(
+    Configuration& config,
+    shared_ptr<MessageQueue> primary_queue,
+    shared_ptr<MessageQueue> secondary_queue,
+    shared_ptr<NetworkClient> primary_network_client,
+    shared_ptr<NetworkClient> secondary_network_client
+) :
+    config_(config),
+    primary_queue_(primary_queue),
+    secondary_queue_(secondary_queue),
+    primary_network_client_(primary_network_client),
+    secondary_network_client_(secondary_network_client)
+{
+    message_buffer_ = make_unique<char[]>(MAX_MESSAGE_SIZE);
+}
 
 
-                        <!--<Button Content="?" Click="Button_PrintCrew_Click" />-->
 
-                        <TextBlock x:Name="textBoxCrew"/>
+void SyslogSender::run() const {
 
-                    </StackPanel>
-                    <!--<StackPanel>
-                        <ListBox Name="logsList" ScrollViewer.VerticalScrollBarVisibility="Auto" MaxHeight="300" Margin="2"></ListBox>
-                        <WrapPanel HorizontalAlignment="Center">
-                            <Button Name="selectAllButton" Margin="5,2,5,2" Click="SelectAllButton_OnClick">Select All</Button>
-                            <Button Name="unselectAllButton" Margin="5,2,5,2" Click="UnselectAllButton_OnClick">Unselect All</Button>
-                        </WrapPanel>
-                    </StackPanel>-->
-                </GroupBox>
-                <StackPanel>
-                    <GroupBox Margin="2,2,2,2" Header="Event Selection">
-                        <Grid Margin="10,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <!-- New row for 'Catch-up' and 'Only while running' RadioButtons -->
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+    Logger::debug2("Syslog_sender::run() starting\n");
+    char* buf = Globals::instance()->getMessageBuffer("SyslogSender::run()");
+    while (!SyslogSender::stop_requested_) {
 
-                            <!-- StackPanel for Radio Buttons 'Include' and 'Ignore' on the first row, first column -->
-                            <StackPanel Grid.Column="0" Grid.Row="0" Orientation="Horizontal" Margin="2">
-                                <RadioButton Content="Ignore" Name="radioIgnore" Margin="0,0,20,0" />
-                                <RadioButton Content="Include" Name="radioInclude" />
-                            </StackPanel>
+        Debug::senderHeartbeat();
+        bool shouldWait = !primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty());
+        if (shouldWait) {
+            // Wait for the timer or until the SYSLOGAGENT_MAINLOOP_WAIT_INTERVAL elapses
+            if (enqueue_timer_.wait(SYSLOGAGENT_MAINLOOP_WAIT_INTERVAL)) {
+                enqueue_timer_.reset();
+            }
+        }
 
-                            <!-- 'Event ids' Label on the second row, first column -->
-                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2" VerticalAlignment="Center">Event ids</TextBlock>
+        while (!SyslogSender::stop_requested_ 
+            && (!primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()))) {
+            int msg_size;
+            bool connected;
+            bool posted;
+            string response;
+            memcpy(message_buffer_.get(), message_header_, sizeof(message_header_));
+            int message_buffer_length = sizeof(message_header_) - 1;
+            Debug::senderHeartbeat();
+            if (!primary_queue_->isEmpty()) {
+                primary_queue_->lock();
+                while (!primary_queue_->isEmpty()) {
+                    msg_size = primary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE);
+                    const char *sep = (message_buffer_length >= sizeof(message_header_)) ? message_separator_ : "";
+                    if (msg_size + message_buffer_length + strlen(sep) + sizeof(message_trailer_) -1 < MAX_MESSAGE_SIZE) {
+                        memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
+                        message_buffer_length += strlen(sep);
+                        memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
+                        message_buffer_length += msg_size;
+                        primary_queue_->removeFront();
+                    }
+                    else {
+                        break;
+                    }
+                }
+                memcpy(message_buffer_.get() + message_buffer_length, message_trailer_, sizeof(message_trailer_));
+                message_buffer_length = message_buffer_length + sizeof(message_trailer_);
+                Logger::debug2("SyslogSender::run() sending msg %d bytes to primary\n", message_buffer_length);
 
-                            <!-- 'Event ids' Input TextBox on the second row, second column -->
-                            <TextBox Grid.Column="1" Grid.Row="1" Margin="2,0,0,0" Width="200" Name="eventIdFilterText" ToolTip="Enter a comma-separated list of event ids to ignore" />
+                connected = primary_network_client_->connect();
+                posted = false;
+                if (!connected) {
+                    Logger::recoverable_error("SyslogSender::run() primary server not connected, error: %u\n", GetLastError());
+                    // queue_.unlock();
+                }
+                else {
+                    posted = primary_network_client_->post((wchar_t*)(message_buffer_.get()), message_buffer_length - 1);
+                    if (posted) {
+                        Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
+                        primary_queue_->removeFront();
+                    }
+                    else {
+                        Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, GetLastError());
+                    }
+                    primary_network_client_->readResponse(response);
+                    primary_network_client_->close();
+                }
+                //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
+                primary_queue_->unlock();
+            }
+            if (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()) {
+                message_buffer_length = 0;
+                secondary_queue_->lock();
+                while (!secondary_queue_->isEmpty()) {
+                    msg_size = secondary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE);
+                    if (msg_size + message_buffer_length < MAX_MESSAGE_SIZE) {
+                        memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
+                        message_buffer_length += msg_size;
+                        secondary_queue_->removeFront();
+                    }
+                    else {
+                        break;
+                    }
+                }
+                Logger::debug2("SyslogSender::run() sending msg %d bytes to secondary\n", message_buffer_length);
 
-                            <!-- StackPanel for Radio Buttons 'Catch-up' and 'Only while running' on the third row, spanned across both columns -->
-                            <StackPanel Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="2" HorizontalAlignment="Left">
-                                <RadioButton Content="Catch-up" Name="radioCatchUp" Margin="0,0,20,0" GroupName="EventMode" />
-                                <RadioButton Content="Only while running" Name="radioOnlyWhileRunning" GroupName="EventMode" />
-                            </StackPanel>
-                        </Grid>
-                    </GroupBox>
-
-                    <GroupBox Margin="2,2,2,2" Header="Message Content">
-                        <Grid Margin="10,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <!--
-                                <RowDefinition Height="Auto" />
-                                -->
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Look up account IDs</TextBlock>
-                            <!--
-                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Include key-value pairs</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Use JSON message</TextBlock>
-                            -->
-                            <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Facility</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="3" Margin="2,2,2,2">Severity</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="4" Margin="2,2,2,2">Extra key-values</TextBlock>
-                            <CheckBox Grid.Column="1" Grid.Row="0" Margin="2,2,2,2" Name="lookUpAccountCheck"/>
-                            <!--
-                            <CheckBox Grid.Column="1" Grid.Row="1" Margin="2,2,2,2" Name="includeKeyValueCheck"/>
-                            -->
-                            <ComboBox Grid.Column="1" Grid.Row="2" Margin="2,0,0,0" Width="100" HorizontalAlignment="Left" Name="facilityCombo">
-                                <ComboBoxItem>Kernel</ComboBoxItem>
-                                <ComboBoxItem>User</ComboBoxItem>
-                                <ComboBoxItem>Mail</ComboBoxItem>
-                                <ComboBoxItem>System</ComboBoxItem>
-                                <ComboBoxItem>Security 1</ComboBoxItem>
-                                <ComboBoxItem>Syslog</ComboBoxItem>
-                                <ComboBoxItem>Printer</ComboBoxItem>
-                                <ComboBoxItem>News</ComboBoxItem>
-                                <ComboBoxItem>UUCP</ComboBoxItem>
-                                <ComboBoxItem>Clock 1</ComboBoxItem>
-                                <ComboBoxItem>Security 2</ComboBoxItem>
-                                <ComboBoxItem>FTP</ComboBoxItem>
-                                <ComboBoxItem>NTP</ComboBoxItem>
-                                <ComboBoxItem>Log audit</ComboBoxItem>
-                                <ComboBoxItem>Log alert</ComboBoxItem>
-                                <ComboBoxItem>Clock 2</ComboBoxItem>
-                                <ComboBoxItem>Local 0</ComboBoxItem>
-                                <ComboBoxItem>Local 1</ComboBoxItem>
-                                <ComboBoxItem>Local 2</ComboBoxItem>
-                                <ComboBoxItem>Local 3</ComboBoxItem>
-                                <ComboBoxItem>Local 4</ComboBoxItem>
-                                <ComboBoxItem>Local 5</ComboBoxItem>
-                                <ComboBoxItem>Local 6</ComboBoxItem>
-                                <ComboBoxItem>Local 7</ComboBoxItem>
-                            </ComboBox>
-                            <ComboBox Grid.Column="1" Grid.Row="3" Margin="2,0,0,0" Width="100" HorizontalAlignment="Left" Name="severityCombo">
-                                <ComboBoxItem>Dynamic</ComboBoxItem>
-                                <ComboBoxItem>Emergency</ComboBoxItem>
-                                <ComboBoxItem>Alert</ComboBoxItem>
-                                <ComboBoxItem>Critical</ComboBoxItem>
-                                <ComboBoxItem>Error</ComboBoxItem>
-                                <ComboBoxItem>Warning</ComboBoxItem>
-                                <ComboBoxItem>Notice</ComboBoxItem>
-                                <ComboBoxItem>Information</ComboBoxItem>
-                                <ComboBoxItem>Debug</ComboBoxItem>
-                            </ComboBox>
-                            <TextBox Grid.Column="1" Grid.Row="4" Margin="2,0,0,0" Width="200" Name="suffixText" ToolTip="Enter a quoted key-value pair(s) to be appended"></TextBox>
-                        </Grid>
-                    </GroupBox>
-                    <!-- FORWARDER_FUNCTIONALITY: 
-                    <GroupBox Margin="2,2,2,2" Header="Forwarder">
-                        <Grid Margin="10,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Use Forwarder</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">TCP Listen Port</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">UDP Listen Port</TextBlock>
-                            <CheckBox Grid.Column="1" Grid.Row="0" Margin="2,2,2,2" Name="useForwarder" />
-                            <TextBox Grid.Column="1" Grid.Row="1" Width="50" Name="tcpListenPortText" ToolTip="Enter the TCP port number for the forwarder to listen on"></TextBox>
-                            <TextBox Grid.Column="1" Grid.Row="2" Width="50" Name="udpListenPortText" ToolTip="Enter the UDP port number for the forwarder to listen on"></TextBox>
-                        </Grid>
-                    </GroupBox>
-            -->
-                    <!-- CHARACTER_SUBSTITION_FUNCTIONALITY 
-                    <GroupBox Margin="2,2,2,2" Header="Character Substitution">
-                        <Grid Margin="10,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="120" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Carriage return</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Line feed</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Tab</TextBlock>
-                            <TextBox Grid.Column="1" Grid.Row="0" Width="25" Name="carriageReturnText" ToolTip="Enter an ASCII code between 0 and 126"></TextBox>
-                            <TextBox Grid.Column="1" Grid.Row="1" Width="25" Name="lineFeedText" ToolTip="Enter an ASCII code between 0 and 126"></TextBox>
-                            <TextBox Grid.Column="1" Grid.Row="2" Width="25" Name="tabText" ToolTip="Enter an ASCII code between 0 and 126"></TextBox>
-                        </Grid>
-                    </GroupBox>
-                    -->
-                    <GroupBox Margin="2,2,2,2" Header="Logging">
-                        <Grid Margin="10,0,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Log Level</TextBlock>
-                            <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Log File Name</TextBlock>
-                            <ComboBox  SelectionChanged="DebugLevelChangedEventHandler" Grid.Column="1" Grid.Row="0" Margin="2,0,0,0" Width="120" HorizontalAlignment="Left" Name="debugLevelCombo">
-                                <ComboBoxItem>None</ComboBoxItem>
-                                <ComboBoxItem>FATAL</ComboBoxItem>
-                                <ComboBoxItem>CRITICAL</ComboBoxItem>
-                                <ComboBoxItem>RECOVERABLE</ComboBoxItem>
-                                <ComboBoxItem>WARNING</ComboBoxItem>
-                                <ComboBoxItem>INFO</ComboBoxItem>
-                                <ComboBoxItem>VERBOSE</ComboBoxItem>
-                                <ComboBoxItem>DEBUG</ComboBoxItem>
-                                <ComboBoxItem>DEBUG2</ComboBoxItem>
-                            </ComboBox>
-                            <TextBox Grid.Column="1" Grid.Row="1" Margin="2,0,0,0" Width="200" Name="debugLogFilename" ToolTip="Enter the path and name for the debug log file"></TextBox>
-                        </Grid>
-                    </GroupBox>
-
-
-                </StackPanel>
-
-
-            </WrapPanel>
-
-            <GroupBox Margin="2,2,2,2" Header="File Watcher (tail)">
-                <Grid Width="480">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="90" />
-                        <ColumnDefinition Width="310"/>
-                        <ColumnDefinition Width="80" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <!-- <RowDefinition Height="Auto" /> -->
-                    </Grid.RowDefinitions>
-                    <Label Grid.Row="0" Grid.Column="0">File Name</Label>
-                    <TextBox x:Name="txtTailFilename" Grid.Row="0" Grid.Column="1" Width="290" HorizontalAlignment="Left" Margin="2,2" TextChanged="txtTailFilename_TextChanged"/>
-                    <Button Name="btnChooseTailFile" Grid.Row="0" Grid.Column="2" Content="Choose File" Width="80" HorizontalAlignment="Center" Click="TailFilename_OnClick"/>
-                    <Label Grid.Column="0" Grid.Row="1">Program Name</Label>
-                    <TextBox x:Name="txtTailProgramName" Grid.Row="1" Grid.Column="1" Width="160" HorizontalAlignment="Left" Margin="2,2" />
-                    <!--
-                    <Label Grid.Column="0" Grid.Row="2">Poll interval</Label>
-                    <TextBox Grid.Column="1" Grid.Row="2" HorizontalAlignment="Left" Margin="2,0,0,0" Width="25" Name="pollIntervalText" ToolTip="Enter number of seconds greater than zero"></TextBox>
-                    -->
-                </Grid>
-            </GroupBox>
-
-        </StackPanel>
-    </DockPanel>
-</Window>
+                connected = secondary_network_client_->connect();
+                posted = false;
+                if (!connected) {
+                    Logger::recoverable_error("SyslogSender::run() secondary server not connected, error: %u\n", GetLastError());
+                    // queue_.unlock();
+                }
+                else {
+                    posted = secondary_network_client_->post((wchar_t*)(message_buffer_.get()), message_buffer_length);
+                    if (posted) {
+                        Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
+                        secondary_queue_->removeFront();
+                    }
+                    else {
+                        Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, GetLastError());
+                    }
+                    secondary_network_client_->readResponse(response);
+                    secondary_network_client_->close();
+                }
+                if (secondary_network_client_) {
+                    connected = secondary_network_client_->connect();
+                    if (!connected) {
+                        Logger::recoverable_error("SyslogSender::run() secondary server not connected, error: %u\n", GetLastError());
+                        // queue_.unlock();
+                    }
+                    else {
+                        posted = secondary_network_client_->post(reinterpret_cast<wchar_t*>(buf), msg_size);
+                        if (posted) {
+                            Logger::debug2("SyslogSender::run() message sent to secondary server (bytes %d)\n", msg_size);
+                        }
+                        else {
+                            Logger::debug("SyslogSender::run() error: message not sent to secondary server (bytes %d), error: %u\n", msg_size, GetLastError());
+                        }
+                    }
+                    secondary_network_client_->close();
+                }
+                //Logger::force("Syslog_sender::run() queue size before: %d\n", queue_.length());
+                //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
+                secondary_queue_->unlock();
+            }
+        }
+    }
+    Globals::instance()->releaseMessageBuffer("SyslogSender::run()", buf);
+    Logger::debug2("Syslog_sender::run() ending\n");
+}
