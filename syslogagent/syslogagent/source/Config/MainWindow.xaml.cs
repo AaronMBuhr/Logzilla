@@ -428,7 +428,7 @@ namespace SyslogAgent.Config
             txtTailProgramName.IsEnabled = !string.IsNullOrEmpty(txtTailFilename.Text);
         }
 
-        private void txtTailFilename_TextChanged(object sender, TextChangedEventArgs e)
+        private void txtTailFilename_LostFocus(object sender, RoutedEventArgs e)
         {
             txtTailFilename.Text = txtTailFilename.Text.Trim();
             if (txtTailFilename.Text == "")
@@ -498,6 +498,118 @@ namespace SyslogAgent.Config
             TailProgramName.Content = config.TailProgramName;
             presenter.RecheckEventPaths(config.SelectedEventLogPaths);
         }
+
+        private void primaryHost_LostFocus( object sender, RoutedEventArgs e )
+        {
+            // Your logic here
+            // For example, you can retrieve the current text of the TextBox like this:
+            var textBox = sender as System.Windows.Controls.TextBox;
+            if( textBox != null )
+            {
+                string currentText = textBox.Text;
+                if (currentText.StartsWith("http:"))
+                {
+                    primaryUseTlsCheck.IsChecked = false;
+                }
+                else if (currentText.StartsWith("https:"))
+                {
+                    primaryUseTlsCheck.IsChecked = true;
+                }
+                else
+                {
+                    if (primaryUseTlsCheck.IsChecked == true)
+                    {
+                        textBox.Text = "https://" + currentText;
+                    }
+                    else
+                    {
+                        textBox.Text = "http://" + currentText;
+                    }
+                }
+            }
+        }
+
+        private void secondaryHost_LostFocus( object sender, RoutedEventArgs e )
+        {
+            // Your logic here
+            // For example, you can retrieve the current text of the TextBox like this:
+            var textBox = sender as System.Windows.Controls.TextBox;
+            if( textBox != null )
+            {
+                string currentText = textBox.Text;
+                if( currentText.StartsWith( "http:" ) )
+                {
+                    secondaryUseTlsCheck.IsChecked = false;
+                }
+                else if( currentText.StartsWith( "https:" ) )
+                {
+                    secondaryUseTlsCheck.IsChecked = true;
+                }
+                else
+                {
+                    if( secondaryUseTlsCheck.IsChecked == true )
+                    {
+                        textBox.Text = "https://" + currentText;
+                    }
+                    else
+                    {
+                        textBox.Text = "http://" + currentText;
+                    }
+                }
+            }
+        }
+
+
+        private void primaryUseTlsCheck_Checked( object sender, RoutedEventArgs e )
+        {
+            // Logic for when the CheckBox is checked
+            if (primaryHostText.Text.StartsWith("http://"))
+            {
+                primaryHostText.Text = "https://" + primaryHostText.Text.Substring(7);
+            }
+            else if (!primaryHostText.Text.StartsWith("https://"))
+            {
+                primaryHostText.Text = "https://" + primaryHostText.Text;
+            }
+        }
+
+        private void primaryUseTlsCheck_Unchecked( object sender, RoutedEventArgs e )
+        {
+            // Logic for when the CheckBox is unchecked
+            if (primaryHostText.Text.StartsWith("https://"))
+            {
+                primaryHostText.Text = "http://" + primaryHostText.Text.Substring(8);
+            }
+            else if (!primaryHostText.Text.StartsWith("http://"))
+            {
+                primaryHostText.Text = "http://" + primaryHostText.Text;
+            }
+        }
+
+        private void secondaryUseTlsCheck_Checked(object sender, RoutedEventArgs e)
+        {
+            if (secondaryHostText.Text.StartsWith("http://"))
+            {
+                secondaryHostText.Text = "https://" + secondaryHostText.Text.Substring(7);
+            }
+            else if (!secondaryHostText.Text.StartsWith("https://"))
+            {
+                secondaryHostText.Text = "https://" + secondaryHostText.Text;
+            }
+        }
+
+        private void secondaryUseTlsCheck_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (secondaryHostText.Text.StartsWith("https://"))
+            {
+                secondaryHostText.Text = "http://" + secondaryHostText.Text.Substring(8);
+            }
+            else if (!secondaryHostText.Text.StartsWith("http://"))
+            {
+                secondaryHostText.Text = "http://" + secondaryHostText.Text;
+            }
+        }
+
     }
 
 

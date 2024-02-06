@@ -99,11 +99,13 @@ Copyright © 2021 LogZilla Corp.
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Primary LogZilla server</TextBlock>
-                        <TextBox Grid.Column="2" Grid.Row="0" Margin="2,2,2,2" Name="primaryHostText" Width="200" />
+                        <TextBox Grid.Column="2" Grid.Row="0" Margin="2,2,2,2" Name="primaryHostText" Width="200" LostFocus="primaryHost_LostFocus"/>
                         <TextBlock Grid.Column="0" Grid.Row="1" Margin="2,2,2,2">Primary LogZilla API Key</TextBlock>
                         <TextBox Grid.Column="2" Grid.Row="1" Margin="2,2,2,2" Name="primaryApiKeyText" Width="200"/>
                         <TextBlock Grid.Column="0" Grid.Row="2" Margin="2,2,2,2">Primary Use TLS</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="2" Margin="2,2,2,2" Name="primaryUseTlsCheck"/>
+                        <CheckBox Grid.Column="1" Grid.Row="2" Margin="2,2,2,2" Name="primaryUseTlsCheck"
+                                  Checked="primaryUseTlsCheck_Checked"
+                                  Unchecked="primaryUseTlsCheck_Unchecked"/>
                         <!--<TextBox Grid.Column="2" Grid.Row="1" Margin="2,2,2,2" Name="primaryTlsCertFileText" Width="200" />-->
                         <Button Grid.Column="2" Grid.Row="2" Name="choosePrimaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
                             Select Primary Cert
@@ -116,11 +118,13 @@ Copyright © 2021 LogZilla Corp.
                         <TextBlock Grid.Column="0" Grid.Row="3" Margin="2,2,2,2">Secondary LogZilla server</TextBlock>
                         <CheckBox Grid.Column="1" Grid.Row="3" Margin="2,2,2,2" Name="sendToSecondaryCheck" 
                                   Checked="sendToSecondaryCheck_Checked" Unchecked="sendToSecondaryCheck_Unchecked"/>
-                        <TextBox Grid.Column="2" Grid.Row="3" Margin="2,2,2,2" Name="secondaryHostText" Width="200"/>
-                        <TextBlock Grid.Column="0" Grid.Row="4" Margin="2,2,2,2">Secondary API Key</TextBlock>
+                        <TextBox Grid.Column="2" Grid.Row="3" Margin="2,2,2,2" Name="secondaryHostText" Width="200" LostFocus="secondaryHost_LostFocus"/>
+                        <TextBlock Grid.Column="0" Grid.Row="4" Margin="2,2,2,2">Secondary LogZilla API Key</TextBlock>
                         <TextBox  Grid.Column="2" Grid.Row="4" Margin="2,2,2,2" Name="secondaryApiKeyText" Width="200" />
                         <TextBlock Grid.Column="0" Grid.Row="5" Margin="2,2,2,2">Secondary Use TLS</TextBlock>
-                        <CheckBox Grid.Column="1" Grid.Row="5" Margin="2,2,2,2" Name="secondaryUseTlsCheck"/>
+                        <CheckBox Grid.Column="1" Grid.Row="5" Margin="2,2,2,2" Name="secondaryUseTlsCheck"
+                                  Checked="secondaryUseTlsCheck_Checked"
+                                  Unchecked="secondaryUseTlsCheck_Unchecked"/>
                         <!--<TextBox Grid.Column="2" Grid.Row="3" Margin="2,2,2,2" Name="secondaryTlsCertFile" Width="200" />-->
                         <Button Grid.Column="2" Grid.Row="5" Name="chooseSecondaryCertFileButton" Width="124" Click="ChooseCertFileButton_Click">
                             Select Secondary Cert
@@ -432,7 +436,7 @@ Copyright © 2021 LogZilla Corp.
                         <!-- <RowDefinition Height="Auto" /> -->
                     </Grid.RowDefinitions>
                     <Label Grid.Row="0" Grid.Column="0">File Name</Label>
-                    <TextBox x:Name="txtTailFilename" Grid.Row="0" Grid.Column="1" Width="290" HorizontalAlignment="Left" Margin="2,2" TextChanged="txtTailFilename_TextChanged"/>
+                    <TextBox x:Name="txtTailFilename" Grid.Row="0" Grid.Column="1" Width="290" HorizontalAlignment="Left" Margin="2,2" LostFocus="txtTailFilename_LostFocus"/>
                     <Button Name="btnChooseTailFile" Grid.Row="0" Grid.Column="2" Content="Choose File" Width="80" HorizontalAlignment="Center" Click="TailFilename_OnClick"/>
                     <Label Grid.Column="0" Grid.Row="1">Program Name</Label>
                     <TextBox x:Name="txtTailProgramName" Grid.Row="1" Grid.Column="1" Width="160" HorizontalAlignment="Left" Margin="2,2" />

@@ -9,6 +9,7 @@ namespace Syslog_agent {
     class NetworkClient
     {
     public:
+        const int MESSAGE_BUFFER_SIZE = 64 * 1024 * 1024;
         NetworkClient::NetworkClient()
             : use_ssl_(false),
             url_(L""),
@@ -47,7 +48,6 @@ namespace Syslog_agent {
         HCERTSTORE hCertStore_;
         BYTE* pfxBuffer_;
         bool server_cert_checked_;
-
     };
 
 }

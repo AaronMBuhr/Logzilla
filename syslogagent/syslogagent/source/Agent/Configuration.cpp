@@ -25,6 +25,8 @@ bool Configuration::hasSecondaryHost() const {
 }
 
 void Configuration::loadFromRegistry(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting) {
+
+    strcpy(host_name_, getHostName().c_str());
     Registry registry;
     registry.open();
 
@@ -124,4 +126,19 @@ void Configuration::getTimeZoneOffset() {
     TIME_ZONE_INFORMATION time_zone_info;
     auto result = GetTimeZoneInformation(&time_zone_info);
     utc_offset_minutes_ = (int) time_zone_info.Bias;
+}
+
+string Configuration::getHostName() const {
+    TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
+    DWORD size = sizeof(computerName) / sizeof(computerName[0]);
+
+    if (!GetComputerName(computerName, &size)) {
+        return string("");
+    }
+    if (sizeof(TCHAR) == sizeof(wchar_t)) {
+        return Util::wstr2str(wstring(computerName));
+    }
+    else {
+        return string((char*)computerName);
+    }
 }

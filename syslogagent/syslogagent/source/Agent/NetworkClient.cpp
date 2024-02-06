@@ -14,6 +14,7 @@
 
 
 namespace Syslog_agent {
+
     NetworkClient::~NetworkClient()
     {
         if (hConnect_) {
@@ -230,11 +231,11 @@ namespace Syslog_agent {
         // Additional steps for HTTPS connection
         if (use_ssl_)
         {
-            //DWORD dwFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
-            //    SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE |
-            //    SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
-            //    SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-            DWORD dwFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
+            DWORD dwFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |
+                SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE |
+                SECURITY_FLAG_IGNORE_CERT_CN_INVALID |
+                SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
+            // DWORD dwFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
             // DWORD dwFlags = SECURITY_FLAG_IGNORE_CERT_CN_INVALID;
 
             // This is an example; adjust the flags based on your security requirements

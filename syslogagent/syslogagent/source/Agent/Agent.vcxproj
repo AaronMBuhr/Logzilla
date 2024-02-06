@@ -162,6 +162,7 @@
     <ClInclude Include="TLS.h" />
     <ClInclude Include="Util.h" />
     <ClInclude Include="WindowsEvent.h" />
+    <ClInclude Include="WindowsTimer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Agent.cpp" />
@@ -195,6 +196,7 @@
     <ClCompile Include="TLS.cpp" />
     <ClCompile Include="Util.cpp" />
     <ClCompile Include="WindowsEvent.cpp" />
+    <ClCompile Include="WindowsTimer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="message.mc" />

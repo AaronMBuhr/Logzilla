@@ -9,13 +9,12 @@ Copyright © 2021 Logzilla Corp.
 #include "Configuration.h"
 #include "MessageQueue.h"
 #include "NetworkClient.h"
-#include "WindowsEvent.h"
+#include "WindowsTimer.h"
 
 namespace Syslog_agent {
 
     class SyslogSender {
     public:
-        static const int MAX_MESSAGE_SIZE = 65535;
         SyslogSender(
             Configuration& config,
             shared_ptr<MessageQueue> primary_queue,
@@ -23,7 +22,7 @@ namespace Syslog_agent {
             shared_ptr<NetworkClient> primary_network_client,
             shared_ptr<NetworkClient> secondary_network_client
         );
-        static WindowsEvent enqueue_event_; // TODO : this probably shouldn't be static
+        static WindowsTimer enqueue_timer_; // TODO : this probably shouldn't be static
         void run() const;
         static void stop() { 
             Logger::log(Logger::DEBUG2, "SyslogSender::stop() stop requested\n");
@@ -31,11 +30,16 @@ namespace Syslog_agent {
         }
 
     private:
+        static constexpr int MAX_MESSAGE_SIZE = 8000;
+        static const char message_header_[];
+        static const char message_separator_[];
+        static const char message_trailer_[];
         Configuration& config_;
         shared_ptr<MessageQueue> primary_queue_;
         shared_ptr<MessageQueue> secondary_queue_;
         shared_ptr<NetworkClient> primary_network_client_;
         shared_ptr<NetworkClient> secondary_network_client_;
         volatile static bool stop_requested_;
+        unique_ptr<char[]> message_buffer_;
     };
 }
