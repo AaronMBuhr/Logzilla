@@ -153,11 +153,11 @@ namespace Syslog_agent {
         }
 
         pCertContext_ = CertFindCertificateInStore(
-            hCertStore_,
-            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
-            0,
-            CERT_FIND_ANY,
-            NULL,
+            hCertStore_, 
+            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 
+            0, 
+            CERT_FIND_ANY, 
+            NULL, 
             NULL);
         if (!pCertContext_) {
             Logger::critical("NetworkClient::LoadCertificate()> Error %u in CertFindCertificateInStore.\n",
@@ -389,7 +389,7 @@ namespace Syslog_agent {
         }
     }
 
-
+    
     bool NetworkClient::checkServerCert() {
 
         if (use_ssl_ == false) {

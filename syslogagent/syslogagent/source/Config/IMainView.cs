@@ -13,9 +13,11 @@ namespace SyslogAgent.Config {
         IValidatedStringView EventIdFilter { get; }
         IValidatedOptionView OnlyWhileRunning { get; }
         IValidatedOptionView CatchUp { get; }
-        IValidatedStringView SecondaryHost { get; }
         IValidatedStringView PrimaryHost { get; }
+        IValidatedStringView PrimaryApiKey { get; }
         IValidatedOptionView PrimaryUseTls { get; }
+        IValidatedStringView SecondaryHost { get; }
+        IValidatedStringView SecondaryApiKey { get; }
         IValidatedOptionView SecondaryUseTls { get; }
         IValidatedStringView Suffix { get; }
         IValidatedStringView BatchInterval { get; }

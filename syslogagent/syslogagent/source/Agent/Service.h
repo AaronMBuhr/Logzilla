@@ -12,8 +12,8 @@ Copyright © 2021 Logzilla Corp.
 #include "Logger.h"
 #include "MessageQueue.h"
 #include "MessageQueueLogMessageSender.h"
+#include "NetworkClient.h"
 #include "WindowsEvent.h"
-#include "WinsockNetworkClient.h"
 
 namespace Syslog_agent {
 

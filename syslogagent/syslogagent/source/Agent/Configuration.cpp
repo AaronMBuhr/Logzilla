@@ -56,9 +56,13 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
         Logger::setLogLevel(Logger::NOLOG);
     }
 
+    only_while_running_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_ONLY_WHILE_RUNNING, false);
+    api_path = SYSLOGAGENT_HTTP_API_PATH;
     event_log_poll_interval_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_EVENT_LOG_POLL_INTERVAL, 10);
     primary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_HOST, L"localhost");
+    primary_api_key = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGZILLA_API_KEY, L"");
     secondary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_HOST, L"");
+    secondary_api_key = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGZILLA_API_KEY, L"");
     suffix_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SUFFIX, L"");
     forward_to_secondary_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_FORWARD_TO_SECONDARY, false);
     primary_use_tls_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_PRIMARY_USE_TLS, false);

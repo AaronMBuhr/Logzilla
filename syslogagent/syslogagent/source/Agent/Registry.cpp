@@ -220,48 +220,11 @@ void Registry::loadSetupFile() {
     size = sizeof setup_filename;
     status = RegQueryValueEx(main_key, SYSLOGAGENT_REGISTRYKEY_INITIAL_SETUP_FILE, nullptr, nullptr, (LPBYTE)&setup_filename, &size);
     RegCloseKey(main_key);
-
-#if TRY1
-    ifstream file(setup_filename);
-    if (!file) {
-        // can't open designated setup file, just return
+    if (status != ERROR_SUCCESS) {
+        // can't read setup filename, just return
         return;
     }
 
-    // Read the file into a string
-    string contents((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
-
-    // Close the file
-    file.close();
-
-    // Create a key and set the value to the contents of the .reg file
-
-  // Open the registry key where the values will be imported.
-    HKEY key;
-    LONG result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, SYSLOGAGENT_REGISTRYKEY_MAIN, 0, KEY_SET_VALUE, &key);
-    if (result != ERROR_SUCCESS) {
-        // Error: Could not open registry key
-        return;
-    }
-
-    // Import the values from the .reg file into the registry key.
-    result = RegSetValueEx(key, NULL, 0, REG_MULTI_SZ, (const BYTE*)contents.c_str(), contents.size());
-    if (result != ERROR_SUCCESS) {
-        // Error: Could not import values into registry key
-        return;
-    }
-
-    // Close the registry key.
-    RegCloseKey(key);
-
-#elseif TRY2
-    // Import the key and value into the registry
-    result = RegRestoreKey(HKEY_CURRENT_USER, "Software\\TempKey", REG_WHOLE_HIVE_VOLATILE);
-    if (result != ERROR_SUCCESS) {
-        cout << "Error: Unable to restore key." << endl;
-        return 1;
-    }
-#else
 
     // Acquiring required privileges	
     HANDLE hToken;
@@ -293,11 +256,10 @@ void Registry::loadSetupFile() {
 
     status = RegRestoreKey(HKEY_LOCAL_MACHINE, setup_filename, 0);
 
-#endif
 
     // load cert files
     wchar_t cert_filename[1024];
-    size = sizeof setup_filename;
+    size = sizeof cert_filename;
     status = RegQueryValueEx(main_key, SYSLOGAGENT_REGISTRYKEY_SETUP_PRIMARY_TLS_FILENAME, nullptr, nullptr, (LPBYTE)&cert_filename, &size);
     if (status == ERROR_SUCCESS) {
         wstring primary_cert_path = Util::getThisPath(true) + SYSLOGAGENT_CERT_FILENAME_PRIMARY;
@@ -312,9 +274,8 @@ void Registry::loadSetupFile() {
 
     RegCloseKey(main_key);
 
-#if DISABLED
     // delete setup regkey
-    swprintf(keyname_buf, (size_t)sizeof keyname_buf, L"%s\\%s", SYSLOGAGENT_REGISTRYKEY_MAIN, SYSLOGAGENT_REGISTRYKEY_INITIAL_SETUP_FILE);
+    wchar_t keyname_buf[1024];
+    swprintf_s(keyname_buf, _countof(keyname_buf), L"%s\\%s", SYSLOGAGENT_REGISTRYKEY_MAIN, SYSLOGAGENT_REGISTRYKEY_INITIAL_SETUP_FILE);
     status = RegDeleteKey(HKEY_LOCAL_MACHINE, keyname_buf);
-#endif
 }
