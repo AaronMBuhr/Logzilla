@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using Microsoft.Win32;
 using System.Linq;
+using System;
 
 namespace SyslogAgent.Config
 {
@@ -21,7 +22,15 @@ namespace SyslogAgent.Config
             config.LookUpAccountIDs = GetBinary(SharedConstants.RegistryKey.LookupAccounts, SharedConstants.ConfigDefaults.LookupAccountsB) != 0;
             config.IncludeVsIgnoreEventIds = GetBinary(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, SharedConstants.ConfigDefaults.IncludeVsIgnoreEventIdsB) != 0;
             config.EventIdFilter = mainKey.GetValue(SharedConstants.RegistryKey.EventIdFilter, SharedConstants.ConfigDefaults.EventIdFilter).ToString();
-            config.OnlyWhileRunning = GetBinary( SharedConstants.RegistryKey.OnlyWhileRunning, SharedConstants.ConfigDefaults.OnlyWhileRunning ) != 0;
+            try
+            {
+                // need this because at some point this got saved as a string instead of binary
+                config.OnlyWhileRunning = GetBinary( SharedConstants.RegistryKey.OnlyWhileRunning, SharedConstants.ConfigDefaults.OnlyWhileRunning ) != 0;
+            }
+            catch (System.InvalidCastException ice)
+            {
+                config.OnlyWhileRunning = Convert.ToBoolean( mainKey.GetValue( SharedConstants.RegistryKey.OnlyWhileRunning, Convert.ToString( SharedConstants.ConfigDefaults.OnlyWhileRunning ) ) );
+            }
             config.Facility = (int)mainKey.GetValue(SharedConstants.RegistryKey.Facility, (int)SharedConstants.ConfigDefaults.Facility);
             config.Severity = (int)mainKey.GetValue(SharedConstants.RegistryKey.Severity, (int)SharedConstants.ConfigDefaults.Severity);
             //IncludeKeyValuePairs = GetBinary(SharedConstants.RegistryKey.IncludeKeyValuePairs, SharedConstants.ConfigDefaults.IncludeKeyValuePairsB) != 0,
@@ -47,7 +56,7 @@ namespace SyslogAgent.Config
             PutBool(SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
             PutBool(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds);
             mainKey.SetValue(SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter, RegistryValueKind.String);
-            mainKey.SetValue( SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
+            PutBool(SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
             mainKey.SetValue(SharedConstants.RegistryKey.Facility, config.Facility, RegistryValueKind.DWord);
             mainKey.SetValue(SharedConstants.RegistryKey.Severity, config.Severity, RegistryValueKind.DWord);
             //PutBool(SharedConstants.RegistryKey.IncludeKeyValuePairs, value.IncludeKeyValuePairs);
