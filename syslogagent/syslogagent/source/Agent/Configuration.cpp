@@ -54,6 +54,26 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
         Logger::setLogLevel(Logger::NOLOG);
     }
 
+    // need this because originally only_while_running_ was a string
+    try {
+        only_while_running_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_ONLY_WHILE_RUNNING, false);
+    }
+    catch (const std::exception& e) {
+        try {
+            wstring bad_reg_string = registry.readString(SYSLOGAGENT_REGISTRYKEY_ONLY_WHILE_RUNNING, L"");
+            if ((Util::toLowercase(bad_reg_string) == L"true")
+                || (Util::toLowercase(bad_reg_string) == L"yes")
+                || (bad_reg_string == L"1")) {
+                only_while_running_ = true;
+            }
+            else {
+                only_while_running_ = false;
+            }
+        }
+        catch (const std::exception& e) {
+            only_while_running_ = false;
+        }
+    }
     event_log_poll_interval_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_EVENT_LOG_POLL_INTERVAL, 10);
     primary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_HOST, L"localhost");
     secondary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_HOST, L"");

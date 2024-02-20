@@ -1,7 +1,10 @@
 #include "stdafx.h"
 #include <algorithm>
+#include <cctype>
+#include <cwctype>
 #include <clocale>
 #include <codecvt>
+#include <cwctype>
 #include <fstream>
 #include <iostream>
 #include <locale>
@@ -339,3 +342,19 @@ void EnumerateOpenTcpSockets(DWORD processId)
 	free(pTcpTable);
 }
 #endif
+
+
+std::wstring Util::toLowercase(const std::wstring& input) {
+	std::wstring result = input;
+	std::transform(result.begin(), result.end(), result.begin(),
+		[](wchar_t c) { return std::towlower(c); });
+	return result;
+}
+
+std::string Util::toLowercase(const std::string& input) {
+	std::string result = input;
+	std::transform(result.begin(), result.end(), result.begin(),
+		[](unsigned char c) { return std::tolower(c); });
+	return result;
+}
+

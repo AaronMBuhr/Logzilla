@@ -17,7 +17,7 @@ namespace Syslog_agent {
         if (source.subscription_active_) {
             source.cancelSubscription();
             auto bookmark = source.getBookmark();
-            subscribe(bookmark.c_str());
+//            subscribe(bookmark.c_str());
         }
     }
 
@@ -27,22 +27,32 @@ namespace Syslog_agent {
         }
     }
 
-    void EventLogSubscription::subscribe(const wchar_t* bookmark_xml) {
-        if (bookmark_xml != NULL) {
-            bookmark_xml_ = wstring(bookmark_xml);
-        }
+    void EventLogSubscription::subscribe(const wchar_t* bookmark_xml, bool catch_up) {
+        EVT_HANDLE new_subscription;
+
         if (bookmark_xml == NULL || wcslen(bookmark_xml) == 0) {
             bookmark_ = EvtCreateBookmark(NULL);
+            new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), query_.c_str(), NULL, this,
+                EventLogSubscription::handleSubscriptionEvent, EvtSubscribeToFutureEvents);
         }
         else {
-            bookmark_ = EvtCreateBookmark(bookmark_xml);
+            bookmark_ = EvtCreateBookmark(wstring(bookmark_xml).c_str());
+            if (catch_up) {
+                new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), query_.c_str(), bookmark_, this,
+                    EventLogSubscription::handleSubscriptionEvent, EvtSubscribeStartAfterBookmark);
+            }
+            else {
+                new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), query_.c_str(), NULL, this,
+                    EventLogSubscription::handleSubscriptionEvent, EvtSubscribeToFutureEvents);
+            }
         }
-        if (bookmark_ == NULL) {
-            Logger::fatal("EventLogSubscription::subscribe()> could not create bookmark for %s\n", channel_.c_str());
+
+        if (new_subscription == NULL) {
+            Logger::fatal("EventLogSubscription::subscribe()> could not subscribe to event log: %d\n", GetLastError());
             exit(1);
         }
-        EVT_HANDLE new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), query_.c_str(), bookmark_, this,
-            EventLogSubscription::handleSubscriptionEvent, EvtSubscribeStartAfterBookmark);
+
+        subscription_handle_ = new_subscription;
         subscription_active_ = true;
     }
 

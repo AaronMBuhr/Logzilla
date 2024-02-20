@@ -29,7 +29,7 @@ namespace Syslog_agent {
 			subscription_active_(false) { }
 		EventLogSubscription(EventLogSubscription&& source) noexcept;
 		~EventLogSubscription();
-		void subscribe(const wchar_t* bookmark_xml);
+		void subscribe(const wchar_t* bookmark_xml, bool catch_up);
 		void cancelSubscription();
 		void saveBookmark();
 		wstring getBookmark() { return bookmark_xml_; }

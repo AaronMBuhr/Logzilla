@@ -38,9 +38,9 @@ void Registry::open() {
         status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, SYSLOGAGENT_REGISTRYKEY_CHANNELS, 0, KEY_READ | KEY_ENUMERATE_SUB_KEYS, &channels_key_);
         if (status != ERROR_SUCCESS) {
             channels_key_ = nullptr;
-//            throw Result(status, "Registry::open()", "RegOpenKeyEx for channels key");
+            // throw Result(status, "Registry::open()", "RegOpenKeyEx for channels key");
         }
-    is_open_ = true;
+        is_open_ = true;
     }
 }
 
@@ -175,7 +175,7 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
         Logger::recoverable_error("Registry::readBookmark()", "could not open channel");
         return wstring();
     }
-    wchar_t xml[32000];
+    wchar_t xml[32000] = { 0 };
     DWORD xml_size = sizeof xml;
     status = RegQueryValueEx(channel_key, SYSLOGAGENT_REGISTRYKEY_CHANNEL_BOOKMARK, nullptr, nullptr, (LPBYTE)&xml, &xml_size);
     if (status != ERROR_SUCCESS) {
@@ -219,49 +219,11 @@ void Registry::loadSetupFile() {
     wchar_t setup_filename[1024];
     size = sizeof setup_filename;
     status = RegQueryValueEx(main_key, SYSLOGAGENT_REGISTRYKEY_INITIAL_SETUP_FILE, nullptr, nullptr, (LPBYTE)&setup_filename, &size);
-    RegCloseKey(main_key);
-
-#if TRY1
-    ifstream file(setup_filename);
-    if (!file) {
-        // can't open designated setup file, just return
+    if (status != ERROR_SUCCESS) {
+        RegCloseKey(main_key);
         return;
     }
 
-    // Read the file into a string
-    string contents((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
-
-    // Close the file
-    file.close();
-
-    // Create a key and set the value to the contents of the .reg file
-
-  // Open the registry key where the values will be imported.
-    HKEY key;
-    LONG result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, SYSLOGAGENT_REGISTRYKEY_MAIN, 0, KEY_SET_VALUE, &key);
-    if (result != ERROR_SUCCESS) {
-        // Error: Could not open registry key
-        return;
-    }
-
-    // Import the values from the .reg file into the registry key.
-    result = RegSetValueEx(key, NULL, 0, REG_MULTI_SZ, (const BYTE*)contents.c_str(), contents.size());
-    if (result != ERROR_SUCCESS) {
-        // Error: Could not import values into registry key
-        return;
-    }
-
-    // Close the registry key.
-    RegCloseKey(key);
-
-#elseif TRY2
-    // Import the key and value into the registry
-    result = RegRestoreKey(HKEY_CURRENT_USER, "Software\\TempKey", REG_WHOLE_HIVE_VOLATILE);
-    if (result != ERROR_SUCCESS) {
-        cout << "Error: Unable to restore key." << endl;
-        return 1;
-    }
-#else
 
     // Acquiring required privileges	
     HANDLE hToken;
@@ -292,8 +254,6 @@ void Registry::loadSetupFile() {
     }
 
     status = RegRestoreKey(HKEY_LOCAL_MACHINE, setup_filename, 0);
-
-#endif
 
     // load cert files
     wchar_t cert_filename[1024];

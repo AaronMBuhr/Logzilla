@@ -43,7 +43,6 @@ namespace Syslog_agent {
 		event.renderEvent();
 		char* json_buffer = Globals::instance()->getMessageBuffer("json_buffer");
 		if (generateLogMessage(event, json_buffer, Globals::MESSAGE_BUFFER_SIZE)) {
-#if !DEBUG_SETTINGS_SKIP_MESSAGEQUEUE
 			message_queue_.lock();
 			if (message_queue_.isFull()) {
 				message_queue_.removeFront();
@@ -51,7 +50,6 @@ namespace Syslog_agent {
 			message_queue_.enqueue(json_buffer, (const int)strlen(json_buffer));
 			message_queue_.unlock();
 			SyslogSender::enqueue_event_.signal();
-#endif
 		}
 		Globals::instance()->releaseMessageBuffer("json_buffer", json_buffer);
 		return Result((DWORD)ERROR_SUCCESS);
@@ -119,7 +117,7 @@ namespace Syslog_agent {
 		auto time_field = event.getXmlDoc().child("Event").child("System").child("TimeCreated").attribute("SystemTime").value();
 		time_t timestamp = 0;
 		unsigned int decimal_time = 0;
-#if !DEBUG_SETTINGS_SKIP_TIMESTAMP
+#if DEBUG_SETTINGS_SKIP_TIMESTAMP
 		std::tm t = {};
 		std::istringstream ss(time_field);
 		if (ss >> std::get_time(&t, "%Y-%m-%dT%H:%M:%S"))
