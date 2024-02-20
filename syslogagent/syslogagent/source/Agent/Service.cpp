@@ -42,7 +42,7 @@ volatile bool Service::shutdown_requested_ = false;
 volatile bool Service::service_shutdown_requested_ = false;
 WindowsEvent Service::shutdown_event_{ L"LogZilla_SyslogAgent_Service_Shutdown" };
 shared_ptr<FileWatcher> Service::filewatcher_ = nullptr;
-vector<EventLogSubscription> Service::subscriptions_;
+vector<shared_ptr<EventLogSubscription>> Service::subscriptions_;
 
 void sendMessagesThread() {
 	try {
@@ -158,15 +158,15 @@ void Service::run(bool running_as_console) {
 					config_,
 					message_queue_,
 					const_cast<const wchar_t*>(log.name_.c_str()));
-			EventLogSubscription subscription(
+			shared_ptr<EventLogSubscription> subscription = make_shared<EventLogSubscription>(
 				log.name_,
 				log.channel_,
 				wstring(L"*"),
-				(config_.only_while_running_ ? NULL : log.bookmark_),
+				log.bookmark_,
 				std::move(handler));
 			subscriptions_.push_back(std::move(subscription));
 			auto bookmark = Registry::readBookmark(log.channel_.c_str());
-			subscriptions_.back().subscribe(bookmark.c_str(), !config_.only_while_running_);
+			subscriptions_.back()->subscribe(bookmark.c_str(), !config_.only_while_running_);
 		}
 	}
 
@@ -214,9 +214,9 @@ void Service::run(bool running_as_console) {
 	}
 
 	for (auto& sub : subscriptions_) {
-		sub.cancelSubscription();
-		auto channel = sub.getChannel();
-		auto bookmark = sub.getBookmark();
+		sub->cancelSubscription();
+		auto channel = sub->getChannel();
+		auto bookmark = sub->getBookmark();
 		Registry::writeBookmark(channel.c_str(), bookmark.c_str());
 	}
 

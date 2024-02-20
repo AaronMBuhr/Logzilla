@@ -37,11 +37,9 @@ void SyslogSender::run() const {
 	Logger::debug2("Syslog_sender::run() starting\n");
 	char* buf = Globals::instance()->getMessageBuffer("SyslogSender::run()");
 	while (!SyslogSender::stop_requested_) {
-		printf("while loop\n");
 
 		Debug::senderHeartbeat();
 		if (!SyslogSender::stop_requested_) {
-			printf("waiting for event\n");
 			if (enqueue_event_.wait(5000)) {
 				enqueue_event_.reset();
 			}

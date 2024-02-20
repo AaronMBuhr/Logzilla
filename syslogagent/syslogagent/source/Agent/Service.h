@@ -51,6 +51,6 @@ namespace Syslog_agent {
         static bool restart(); // returns false for failure
         static bool setForRestart(); // returns false for failure
         static bool setForNoRestart(); // returns false for failure
-        static vector<EventLogSubscription> subscriptions_;
+        static vector<shared_ptr<EventLogSubscription>> subscriptions_;
     };
 }
