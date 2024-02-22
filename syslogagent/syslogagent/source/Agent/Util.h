@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cctype>
+#include <cwctype>
 #include <string>
 #include <vector>
 #include <wchar.h>
@@ -18,5 +20,8 @@ public:
 	static int jsonEscape(char* input_buffer, char* output_buffer, int output_buffer_length);
 	static std::vector<std::wstring> wstringSplit(const std::wstring& delimited_string, const wchar_t delimiter);
 	static bool copyFile(const wchar_t const* source_filename, const wchar_t const* dest_filename);
+	static std::wstring toLowercase(const std::wstring& input);
+	static std::string toLowercase(const std::string& input);
+
 };
 

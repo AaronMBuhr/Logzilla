@@ -1,8 +1,8 @@
 #pragma once
 #include "Heartbeat.h"
 
-#define DEBUG_SETTINGS_SKIP_TIMESTAMP false
-#define DEBUG_SETTINGS_SKIP_MESSAGEQUEUE false
+#define DEBUG_SETTINGS_SKIP_TIMESTAMP 0
+#define DEBUG_SETTINGS_SKIP_MESSAGEQUEUE 0
 
 class Debug
 {
