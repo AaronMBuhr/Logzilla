@@ -14,22 +14,24 @@ namespace Syslog_agent {
 	class EventLogSubscription {
 	public:
 		EventLogSubscription(
-			wstring subscription_name, 
-			wstring channel, 
-			wstring query, 
-			wstring bookmark_xml,
+			const wstring& subscription_name, 
+			const wstring& channel, 
+			const wstring& query, 
+			const wstring& bookmark_xml,
 			unique_ptr<ChannelEventHandlerBase> event_handler) :
-			subscription_name_(subscription_name),
-			channel_(channel),
-			query_(query),
+			subscription_name_(wstring(subscription_name)),
+			channel_(wstring(channel)),
+			query_(wstring(query)),
 			bookmark_(NULL),
-			bookmark_xml_(bookmark_xml),
+			bookmark_xml_(wstring(bookmark_xml)),
 			event_handler_(std::move(event_handler)),
 			subscription_handle_(NULL),
-			subscription_active_(false) { }
+			subscription_active_(false) {
+			printf("test\n");
+		}
 		EventLogSubscription(EventLogSubscription&& source) noexcept;
 		~EventLogSubscription();
-		void subscribe(const wchar_t* bookmark_xml);
+		void subscribe(const wstring& bookmark_xml);
 		void cancelSubscription();
 		void saveBookmark();
 		wstring getBookmark() { return bookmark_xml_; }

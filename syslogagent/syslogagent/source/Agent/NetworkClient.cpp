@@ -7,6 +7,7 @@
 #include "Logger.h"
 #include "NetworkClient.h"
 #include "SyslogAgentSharedConstants.h"
+#include "Util.h"
 
 #pragma comment(lib, "winhttp.lib")
 #pragma comment (lib, "crypt32")
@@ -199,7 +200,7 @@ namespace Syslog_agent {
     }
 
 
-    bool NetworkClient::post(const wchar_t* buf, size_t length)
+    bool NetworkClient::post(const char* buf, size_t length)
     {
         //WINHTTP_CONNECTION_INFO connectionInfo;
         //DWORD dwSize = sizeof(connectionInfo);
@@ -208,7 +209,20 @@ namespace Syslog_agent {
         //    Logger::debug("NetworkClient::Post()> got connection Info");
         //}
 
+        // if buf ends in a trailing zero we'll assume that's not intended to
+        // be sent and we'll decrement the length. if you really want a
+        // trailing zero then have two at the end
+        if (buf[length - 1] == 0) {
+            length--;
+        }
 
+        FILE* f = fopen("C:\\temp\\syslogagent_post.log", "w");
+        if (f) {
+            //string s = Util::wstr2str(wstring(buf));
+            //fprintf(f, "%s\n", s.c_str());
+            fprintf(f, "%s\n", buf);
+            fclose(f);
+        }
         if (use_ssl_) {
             hRequest_ = WinHttpOpenRequest(hConnect_, L"POST", config_->api_path.c_str(),
                 NULL, WINHTTP_NO_REFERER,
@@ -303,6 +317,17 @@ namespace Syslog_agent {
         {
             return true;
         }
+        else if (dwStatusCode == 400) {
+            FILE* f = fopen("C:\\temp\\syslogagent.log", "w");
+            if (f) {
+                //string s = Util::wstr2str(wstring(buf));
+                //fprintf(f, "%s\n", s.c_str());
+                fprintf(f, "%s\n", buf);
+                fclose(f);
+            }
+            Logger::recoverable_error("NetworkClient::Post()> Bad request (HTTP status code %u).\n", dwStatusCode);
+            return false;
+        }
         else if (dwStatusCode == 401)
         {
             Logger::fatal("NetworkClient::Post()> Wrong API key (HTTP status code %u).\n", dwStatusCode);
@@ -325,9 +350,14 @@ namespace Syslog_agent {
     }
 
 
-    bool NetworkClient::post(const std::wstring& data)
+    bool NetworkClient::post(const std::string& data)
     {
         return post(data.c_str(), data.length());
+    }
+
+    bool NetworkClient::post(const std::wstring& data) {
+        string s = Util::wstr2str(data);
+        return post(s);
     }
 
 

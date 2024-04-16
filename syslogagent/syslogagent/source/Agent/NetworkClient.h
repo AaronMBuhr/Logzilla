@@ -29,8 +29,9 @@ namespace Syslog_agent {
         bool initialize(const Configuration* config, const wstring api_key, const std::wstring& url);
         bool loadCertificate(const std::wstring& cert_path);
         bool connect();
-        bool post(const wchar_t* buf, size_t length);
+        bool post(const char* buf, size_t length);
         bool post(const std::wstring& data);
+        bool post(const std::string & data);
         bool checkServerCert();
         bool readResponse(std::string& response);
         void close();

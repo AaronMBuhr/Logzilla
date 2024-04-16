@@ -172,16 +172,20 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
     swprintf_s(full_channel_path, 4096, L"%s\\%s", SYSLOGAGENT_REGISTRYKEY_CHANNELS, channel);
     status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, full_channel_path, 0, KEY_READ, &channel_key);
     if (status != ERROR_SUCCESS) {
-        Logger::recoverable_error("Registry::readBookmark()", "could not open channel");
+        DWORD error = GetLastError();
+        char warnbuf[1024];
+        Util::toPrintableAscii(warnbuf, sizeof(warnbuf), channel, ' ');
+        Logger::recoverable_error("Registry::readBookmark()> error %d, could not open channel %s\n", error, warnbuf);
         return wstring();
     }
     wchar_t xml[32000];
     DWORD xml_size = sizeof xml;
     status = RegQueryValueEx(channel_key, SYSLOGAGENT_REGISTRYKEY_CHANNEL_BOOKMARK, nullptr, nullptr, (LPBYTE)&xml, &xml_size);
     if (status != ERROR_SUCCESS) {
+        DWORD error = GetLastError();
         char warnbuf[1024];
         Util::toPrintableAscii(warnbuf, sizeof(warnbuf), channel, ' ');
-        Logger::warn("Registry::readBookmark()", "could not read bookmark for %s\n", warnbuf);
+        Logger::warn("Registry::readBookmark()> error %d, could not read bookmark for %s\n", error, warnbuf);
         xml[0] = 0;
         // fall through to close channel
     }

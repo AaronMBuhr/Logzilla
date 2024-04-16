@@ -20,27 +20,27 @@ Debug::Debug() {
 }
 
 void Debug::startHeartbeatMonitoring() {
-	Logger::debug("Debug::Debug() starting heartbeat monitoring\n");
+	Logger::debug("Debug::startHeartbeatMonitoring() starting heartbeat monitoring\n");
 	singleton()->heartbeat_->startMonitor();
 }
 
 void Debug::stopHeartbeatMonitoring() {
-	Logger::debug("Debug::Debug() stopping heartbeat monitoring\n");
+	Logger::debug("Debug::stopHeartbeatMonitoring() stopping heartbeat monitoring\n");
 	singleton()->heartbeat_->stopMonitor();
 }
 
 void Debug::senderHeartbeat() {
-	Logger::debug2("Debug::Debug() sender heart beating\n");
+	Logger::debug2("Debug::senderHeartbeat() sender heart beating\n");
 	singleton()->heartbeat_->heartbeat(SENDER_HEARTNAME);
 }
 
 void Debug::readerHeartbeat() {
-	Logger::debug2("Debug::Debug() reader heart beating\n");
+	Logger::debug2("Debug::readerHeartbeat() reader heart beating\n");
 	singleton()->heartbeat_->heartbeat(READER_HEARTNAME);
 }
 
 void Debug::heartbeatFailure(const char* heartname) {
-	Logger::fatal("Debug::Debug() %s heart has stopped\n", heartname);
+	Logger::fatal("Debug::heartbeatFailure() %s heart has stopped\n", heartname);
 	Logger::fatal("Exiting with error code 1\n", heartname);
 	exit(1);
 }

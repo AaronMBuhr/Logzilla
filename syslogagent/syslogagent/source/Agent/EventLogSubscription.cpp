@@ -27,15 +27,13 @@ namespace Syslog_agent {
         }
     }
 
-    void EventLogSubscription::subscribe(const wchar_t* bookmark_xml) {
-        if (bookmark_xml != NULL) {
-            bookmark_xml_ = wstring(bookmark_xml);
-        }
-        if (bookmark_xml == NULL || wcslen(bookmark_xml) == 0) {
+    void EventLogSubscription::subscribe(const wstring& bookmark_xml) {
+        bookmark_xml_ = wstring(bookmark_xml);
+        if (bookmark_xml_.empty()) {
             bookmark_ = EvtCreateBookmark(NULL);
         }
         else {
-            bookmark_ = EvtCreateBookmark(bookmark_xml);
+            bookmark_ = EvtCreateBookmark(bookmark_xml_.c_str());
             if (bookmark_ == NULL) {
                 bookmark_ = EvtCreateBookmark(NULL);
             }

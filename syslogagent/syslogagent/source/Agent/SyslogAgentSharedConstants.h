@@ -6,7 +6,7 @@
 * reduces the chances of mismatch
 */
 
-#define SYSLOGAGENT_CURRENT_VERSION                 L"6.30"
+#define SYSLOGAGENT_CURRENT_VERSION                 L"6.30.0.1"
 #define SYSLOGAGENT_CURRENT_CONFIG_VERSION		    L"6.30.0.0"
 
 #define SYSLOGAGENT_DEFAULT_FACILITY				20

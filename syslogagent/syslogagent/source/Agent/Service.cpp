@@ -46,6 +46,7 @@ shared_ptr<FileWatcher> Service::filewatcher_ = nullptr;
 vector<EventLogSubscription> Service::subscriptions_;
 
 void sendMessagesThread() {
+	Logger::debug2("sendMessagesThread()> starting\n");
 	try {
 		SyslogSender sender(
 			Service::config_,
@@ -53,11 +54,13 @@ void sendMessagesThread() {
 			Service::secondary_message_queue_,
 			Service::primary_network_client_,
 			Service::secondary_network_client_);
+		Logger::debug2("sendMessagesThread()> sender running\n");
 		sender.run();
 	}
 	catch (std::exception& exception) {
 		Logger::critical("%s\n", exception.what());
 	}
+	Logger::debug2("sendMessagesThread()> exiting\n");
 }
 
 
@@ -65,6 +68,7 @@ void Service::run(bool running_as_console) {
 
 	Logger::setFatalErrorHandler(Service::fatalErrorHandler);
 
+	Logger::debug("Service::run()> loading setup file (if present)\n");
 	Registry::loadSetupFile();
 
 	config_.use_log_agent_ = true;
@@ -72,6 +76,7 @@ void Service::run(bool running_as_console) {
 	if (config_.tail_filename_ != L"") {
 		string program_name = Util::wstr2str(config_.tail_program_name_);
 		log_msg_sender_ = make_shared<MessageQueueLogMessageSender>(primary_message_queue_, secondary_message_queue_);
+		Logger::debug("Service::run()> starting file watcher for %s\n", Util::wstr2str(config_.tail_filename_).c_str());
 		filewatcher_ = make_shared<FileWatcher>(
 			static_cast<shared_ptr<JsonLogMessageHandler>>(log_msg_sender_),
 			config_.tail_filename_.c_str(),
@@ -83,15 +88,21 @@ void Service::run(bool running_as_console) {
 			);
 	}
 
+	Logger::debug("Service::run()> starting message queue\n");
 	Service::primary_message_queue_ = make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 
+	Logger::debug("Service::run()> starting network clients\n");
 	Service::primary_network_client_ = make_shared<NetworkClient>();
+	Logger::debug2("Service::run()> initializing primary_network_client\n");
+
+
 	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key, config_.primary_host_)) {
 		Logger::fatal("Could not initialize primary network client\n");
 		exit(1); // shouldn't be necessary
 	}
 
 	// read primary cert file
+	Logger::debug2("Service::run()> checking for primary tls\n");
 	if (config_.primary_use_tls_) {
 		wstring primary_cert_path = Util::getThisPath(true) + config_.PRIMARY_CERT_FILENAME;
 		if (!primary_network_client_->loadCertificate(primary_cert_path)) {
@@ -100,14 +111,19 @@ void Service::run(bool running_as_console) {
 		}
 	}
 
+	Logger::debug2("Service::run()> checking for secondary host\n");
 	if (config_.hasSecondaryHost()) {
+		Logger::debug2("Service::run()> has secondary host, making message queue and client\n");
 		Service::secondary_message_queue_ = make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 		Service::secondary_network_client_ = make_shared<NetworkClient>();
-		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key, config_.secondary_host_))
+		Logger::debug2("Service::run()> initializing secondary_network_client\n");
+		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key, config_.secondary_host_)) {
 			Logger::fatal("Could not initialize secondary network client\n");
-		exit(1); // shouldn't be necessary
+			exit(1); // shouldn't be necessary
+		}
 
 		// read secondary cert file
+		Logger::debug2("Service::run()> checking for secondary tls\n");
 		if (config_.secondary_use_tls_) {
 			wstring secondary_cert_path = Util::getThisPath(true) + config_.SECONDARY_CERT_FILENAME;
 			if (!secondary_network_client_->loadCertificate(secondary_cert_path)) {
@@ -121,17 +137,22 @@ void Service::run(bool running_as_console) {
 		Service::secondary_network_client_ = nullptr;
 	}
 
+	Logger::debug2("Service::run()> pushing network clients\n");
+
 	vector<shared_ptr<NetworkClient>> clients;
 	clients.push_back(primary_network_client_);
 	if (secondary_network_client_) {
 		clients.push_back(secondary_network_client_);
 	}
 
+	Logger::debug2("Service::run()> starting sender thread\n");
 	thread sender(sendMessagesThread);
 	bool first_loop = true;
 	int restart_needed = 0;
+	Logger::debug2("Service::run()> starting heartbeat monitoring\n");
 	Debug::startHeartbeatMonitoring();
 
+	Logger::debug("Service::run()> starting event log subscriptions\n");
 	if (config_.use_log_agent_) {
 		subscriptions_.reserve(config_.logs_.size());
 		for (auto& log : config_.logs_) {
@@ -145,13 +166,15 @@ void Service::run(bool running_as_console) {
 				log.name_,
 				log.channel_,
 				wstring(L"*"),
-				(config_.only_while_running_ ? NULL : log.bookmark_),
+				(config_.only_while_running_ ? L"" : log.bookmark_),
 				std::move(handler));
 			subscriptions_.push_back(std::move(subscription));
 			auto bookmark = Registry::readBookmark(log.channel_.c_str());
-			subscriptions_.back().subscribe(bookmark.c_str());
+			subscriptions_.back().subscribe(bookmark);
 		}
 	}
+
+	Logger::debug("Service::run()> starting main loop\n");
 
 	while (!shutdown_requested_) {
 		Logger::debug2("service run first !shutdown_requested\n");
