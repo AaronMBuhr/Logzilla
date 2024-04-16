@@ -272,7 +272,7 @@ void Service::fatalErrorHandler(const char* msg) {
 	catch (...) {
 		// Catch all exceptions to avoid any throw from leaving the fatal handler
 	}
-	Sleep(30000); // Wait for 30 seconds to allow the graceful shutdown to complete
+	Sleep(5000); // Wait for 5 seconds to allow the graceful shutdown to complete
 
 	// Forcefully exit the application if the graceful shutdown didn't work or isn't possible
 	// Use _exit instead of exit to avoid calling static destructors or atexit handlers

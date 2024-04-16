@@ -44,18 +44,21 @@ void SyslogSender::run() const {
 
     Logger::debug2("Syslog_sender::run() starting\n");
     char* buf = Globals::instance()->getMessageBuffer("SyslogSender::run()");
+    int msg_count = 0;
+    int queue_length = 0;
+    int total_primary_message_count = 0;
+    int total_secondary_message_count = 0;
+
     while (!SyslogSender::stop_requested_) {
 
         Debug::senderHeartbeat();
-        bool shouldWait = !primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty());
+        bool shouldWait = true; /* !primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()); */
         if (shouldWait) {
             // Wait for the timer or until the SYSLOGAGENT_MAINLOOP_WAIT_INTERVAL elapses
             if (enqueue_timer_.wait(SYSLOGAGENT_MAINLOOP_WAIT_INTERVAL)) {
                 enqueue_timer_.reset();
             }
         }
-        int last;
-        int secondlast;
 
         while (!SyslogSender::stop_requested_ 
             && (!primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()))) {
@@ -72,16 +75,14 @@ void SyslogSender::run() const {
                 sep = "";
                 while (!primary_queue_->isEmpty()) {
                     msg_size = primary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE);
-                    last = buf[msg_size - 1];
-                    secondlast = buf[msg_size - 2];
                     if (msg_size + message_buffer_length + strlen(sep) + strlen(message_trailer_) < MAX_MESSAGE_SIZE) {
                         memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
                         message_buffer_length += strlen(sep);
-                        last = message_buffer_[message_buffer_length - 1];
-                        secondlast = message_buffer_[message_buffer_length - 2];
                         memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
                         message_buffer_length += msg_size;
                         primary_queue_->removeFront();
+                        msg_count++;
+                        total_primary_message_count++;
                     }
                     else {
                         break;
@@ -89,13 +90,8 @@ void SyslogSender::run() const {
                     sep = const_cast<char*>(message_separator_);
                     // break;
                 }
-                last = message_buffer_[message_buffer_length - 1];
-                secondlast = message_buffer_[message_buffer_length - 2];
-                int thesize = strlen(message_trailer_);
                 memcpy(message_buffer_.get() + message_buffer_length, message_trailer_, strlen(message_trailer_));
                 message_buffer_length += strlen(message_trailer_);
-                last = message_buffer_[message_buffer_length - 1];
-                secondlast = message_buffer_[message_buffer_length - 2];
                 Logger::debug2("SyslogSender::run() sending msg %d bytes to primary\n", message_buffer_length);
 
                 connected = primary_network_client_->connect();
@@ -105,13 +101,10 @@ void SyslogSender::run() const {
                     // queue_.unlock();
                 }
                 else {
-                    last = message_buffer_[message_buffer_length - 1];
-                    secondlast = message_buffer_[message_buffer_length - 2];
 
                     posted = primary_network_client_->post(message_buffer_.get(), message_buffer_length);
                     if (posted) {
                         Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
-                        primary_queue_->removeFront();
                     }
                     else {
                         Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, GetLastError());
@@ -122,27 +115,23 @@ void SyslogSender::run() const {
                 //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
                 primary_queue_->unlock();
             }
+            queue_length = primary_queue_->length();
+            msg_count = 0;
             if (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()) {
                 memcpy(message_buffer_.get(), message_header_, strlen(message_header_));
                 int message_buffer_length = strlen(message_header_);
-                last = message_buffer_[message_buffer_length - 1];
-                secondlast = message_buffer_[message_buffer_length - 2];
                 sep = "";
                 secondary_queue_->lock();
                 while (!secondary_queue_->isEmpty()) {
                     msg_size = secondary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE);
-                    last = buf[msg_size - 1];
-                    secondlast = buf[msg_size - 2];
                     if (msg_size + message_buffer_length + strlen(sep) + strlen(message_trailer_) - 1 < MAX_MESSAGE_SIZE) {
                         memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
                         message_buffer_length += strlen(sep);
-                        last = message_buffer_[message_buffer_length - 1];
-                        secondlast = message_buffer_[message_buffer_length - 2];
                         memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
                         message_buffer_length += msg_size;
-                        last = message_buffer_[message_buffer_length - 1];
-                        secondlast = message_buffer_[message_buffer_length - 2];
                         secondary_queue_->removeFront();
+                        msg_count++;
+                        total_secondary_message_count++;
                     }
                     else {
                         break;
@@ -150,8 +139,6 @@ void SyslogSender::run() const {
                     sep = const_cast<char*>(message_separator_);
                     // break;
                 }
-                last = message_buffer_[message_buffer_length - 1];
-                secondlast = message_buffer_[message_buffer_length - 2];
                 memcpy(message_buffer_.get() + message_buffer_length, message_trailer_, strlen(message_trailer_));
                 message_buffer_length += strlen(message_trailer_);
                 Logger::debug2("SyslogSender::run() sending msg %d bytes to secondary\n", message_buffer_length);
@@ -163,12 +150,9 @@ void SyslogSender::run() const {
                     // queue_.unlock();
                 }
                 else {
-                    last = message_buffer_[message_buffer_length - 1];
-                    secondlast = message_buffer_[message_buffer_length - 2];
                     posted = secondary_network_client_->post(message_buffer_.get(), message_buffer_length);
                     if (posted) {
                         Logger::debug2("SyslogSender::run() message sent to secondary server (bytes %d)\n", msg_size);
-                        secondary_queue_->removeFront();
                     }
                     else {
                         Logger::debug("SyslogSender::run() error: message not sent to secondary server (bytes %d), error: %u\n", msg_size, GetLastError());
@@ -180,6 +164,15 @@ void SyslogSender::run() const {
                 //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
                 secondary_queue_->unlock();
             }
+            queue_length = secondary_queue_->length();
+            msg_count = 0;
+
+            int temp1 = total_primary_message_count;
+            int temp2 = total_secondary_message_count;
+            int temp3 = 1 + 1;
+            temp1 = primary_queue_->length();
+            temp2 = secondary_queue_->length();
+            temp3 = 2 + 2;
         }
     }
     Globals::instance()->releaseMessageBuffer("SyslogSender::run()", buf);

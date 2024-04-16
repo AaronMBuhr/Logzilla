@@ -209,13 +209,6 @@ namespace Syslog_agent {
         //    Logger::debug("NetworkClient::Post()> got connection Info");
         //}
 
-        // if buf ends in a trailing zero we'll assume that's not intended to
-        // be sent and we'll decrement the length. if you really want a
-        // trailing zero then have two at the end
-        if (buf[length - 1] == 0) {
-            length--;
-        }
-
         FILE* f = fopen("C:\\temp\\syslogagent_post.log", "w");
         if (f) {
             //string s = Util::wstr2str(wstring(buf));

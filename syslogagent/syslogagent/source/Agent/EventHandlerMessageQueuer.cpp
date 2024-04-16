@@ -60,7 +60,7 @@ namespace Syslog_agent {
                 secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
                 secondary_message_queue_->unlock();
             }
-			SyslogSender::enqueue_timer_.set(configuration_.batch_interval_);
+			// SyslogSender::enqueue_timer_.set(configuration_.batch_interval_);
 #endif
 		}
 		Globals::instance()->releaseMessageBuffer("json_buffer", json_buffer);
