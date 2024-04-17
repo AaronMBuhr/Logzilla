@@ -74,13 +74,13 @@ int MessageQueue::dequeue(char* message_content, const int max_len) {
 }
 
 
-int MessageQueue::peek(char* message_content, const int max_len) {
+int MessageQueue::peek(char* message_content, const int max_len, const int item_index) {
 	Message message;
 	bool error = false;
 	if (send_buffers_queue_->isEmpty()) {
 		return -1;
 	}
-	if (!send_buffers_queue_->peek(message)) {
+	if (!send_buffers_queue_->peek(message, item_index)) {
 		Logger::critical("MessageQueue::dequeue() : could not peek queue\n");
 		error = true;
 	}
@@ -97,7 +97,6 @@ int MessageQueue::peek(char* message_content, const int max_len) {
 	for (int c = 0; c < num_chunks; ++c) {
 		int copy_size = (leftover == 0 || c < num_chunks - 1) ? MESSAGE_BUFFER_SIZE : leftover;
 		memcpy(bufptr, message.message_buffers[c]->buffer, copy_size);
-		send_buffers_->markUnused(message.message_buffers[c]);
 		bufptr += MESSAGE_BUFFER_SIZE;
 	}
 	return message.data_length;

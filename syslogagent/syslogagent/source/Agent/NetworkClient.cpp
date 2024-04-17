@@ -200,7 +200,7 @@ namespace Syslog_agent {
     }
 
 
-    bool NetworkClient::post(const char* buf, size_t length)
+    NetworkClient::RESULT_TYPE NetworkClient::post(const char* buf, size_t length)
     {
         //WINHTTP_CONNECTION_INFO connectionInfo;
         //DWORD dwSize = sizeof(connectionInfo);
@@ -209,13 +209,6 @@ namespace Syslog_agent {
         //    Logger::debug("NetworkClient::Post()> got connection Info");
         //}
 
-        FILE* f = fopen("C:\\temp\\syslogagent_post.log", "w");
-        if (f) {
-            //string s = Util::wstr2str(wstring(buf));
-            //fprintf(f, "%s\n", s.c_str());
-            fprintf(f, "%s\n", buf);
-            fclose(f);
-        }
         if (use_ssl_) {
             hRequest_ = WinHttpOpenRequest(hConnect_, L"POST", config_->api_path.c_str(),
                 NULL, WINHTTP_NO_REFERER,
@@ -230,9 +223,10 @@ namespace Syslog_agent {
         }
         if (!hRequest_)
         {
+            DWORD error = GetLastError();
             Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpOpenRequest.\n",
-                GetLastError());
-            return false;
+                error);
+            return error;
         }
 
         // Additional steps for HTTPS connection
@@ -250,12 +244,13 @@ namespace Syslog_agent {
 
             if (!WinHttpSetOption(hRequest_, WINHTTP_OPTION_SECURITY_FLAGS, &dwFlags, sizeof(dwFlags)))
             {
-                Logger::recoverable_error("NetworkClient::post()> Error %u in WinHttpSetOption.\n", GetLastError());
+                DWORD error = GetLastError();
+                Logger::recoverable_error("NetworkClient::post()> Error %u in WinHttpSetOption.\n", error);
                 WinHttpCloseHandle(hRequest_);
                 WinHttpCloseHandle(hConnect_);
                 hRequest_ = NULL;
                 hConnect_ = NULL;
-                return false;
+                return error;
             }
         }
 
@@ -269,24 +264,27 @@ namespace Syslog_agent {
             L"Content-Type: application/json\r\n";
         if (!WinHttpAddRequestHeaders(hRequest_, headers.c_str(), (DWORD)-1, WINHTTP_ADDREQ_FLAG_ADD))
         {
+            DWORD error = GetLastError();
             Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpAddRequestHeaders.\n",
-                GetLastError());
-            return false;
+                error);
+            return error;
         }
 
         if (!WinHttpSendRequest(hRequest_,
             WINHTTP_NO_ADDITIONAL_HEADERS, 0,
             (LPVOID)buf, length, length, 0))
         {
+            DWORD error = GetLastError();
             Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpSendRequest.\n",
-                GetLastError());
-            return false;
+                error);
+            return error;
         }
         if (!WinHttpReceiveResponse(hRequest_, NULL))
         {
+            DWORD error = GetLastError();
             Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpReceiveResponse.\n",
-                GetLastError());
-            return false;
+                error);
+            return error;
         }
 
         DWORD dwStatusCode = 0;
@@ -301,54 +299,48 @@ namespace Syslog_agent {
             WINHTTP_NO_HEADER_INDEX))
         {
             // Handle the error
+            DWORD error = GetLastError();
             Logger::recoverable_error("NetworkClient::Post()> Error %u in WinHttpQueryHeaders.\n",
-                GetLastError());
-            return false;
+                error);
+            return error;
         }
 
         if (dwStatusCode >= 200 && dwStatusCode <= 299)
         {
-            return true;
+            return RESULT_SUCCESS;
         }
         else if (dwStatusCode == 400) {
-            FILE* f = fopen("C:\\temp\\syslogagent.log", "w");
-            if (f) {
-                //string s = Util::wstr2str(wstring(buf));
-                //fprintf(f, "%s\n", s.c_str());
-                fprintf(f, "%s\n", buf);
-                fclose(f);
-            }
             Logger::recoverable_error("NetworkClient::Post()> Bad request (HTTP status code %u).\n", dwStatusCode);
-            return false;
+            return dwStatusCode;
         }
         else if (dwStatusCode == 401)
         {
             Logger::fatal("NetworkClient::Post()> Wrong API key (HTTP status code %u).\n", dwStatusCode);
-            return false;
+            return dwStatusCode;
         }
         else if (dwStatusCode == 403)
         {
             // Handle forbidden case
             Logger::fatal("NetworkClient::Post()> Access forbidden, check API key (HTTP status code %u).\n", dwStatusCode);
-            return false;
+            return dwStatusCode;
         }
         else
         {
             // Error, you can handle specific status codes as needed
             Logger::recoverable_error("NetworkClient::Post()> Error: received HTTP status code %u.\n", dwStatusCode);
-            return false;
+            return dwStatusCode;
         }
 
-        return true;
+        return RESULT_SUCCESS;
     }
 
 
-    bool NetworkClient::post(const std::string& data)
+    NetworkClient::RESULT_TYPE NetworkClient::post(const std::string& data)
     {
         return post(data.c_str(), data.length());
     }
 
-    bool NetworkClient::post(const std::wstring& data) {
+    NetworkClient::RESULT_TYPE NetworkClient::post(const std::wstring& data) {
         string s = Util::wstr2str(data);
         return post(s);
     }

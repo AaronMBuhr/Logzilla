@@ -19,8 +19,8 @@ namespace Syslog_agent {
 
 #define VERSION_MAJOR	    	"6"
 #define VERSION_MINOR			"30"
-#define VERSION_FIXVERSION      "0"
-#define VERSION_MINORFIXVERSION "1"
+#define VERSION_FIXVERSION      "1"
+#define VERSION_MINORFIXVERSION "0"
 #define APP_NAME    			"LZ Syslog Agent"
 #define SERVICE_NAME			L"LZ Syslog Agent"
 
@@ -46,6 +46,7 @@ namespace Syslog_agent {
         static void loadConfiguration(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting)
         {
             config_.loadFromRegistry(running_from_console, override_log_level, override_log_level_setting);
+            Logger::setLogLevel(Logger::FATAL); // DEBUGGING
         }
 
     private:

@@ -19,7 +19,7 @@ public:
 	bool isFull() { return send_buffers_queue_->isFull(); }
 	bool enqueue(const char* message_content, const int message_len);
 	int dequeue(char* message_content, const int max_len);
-	int peek(char* message_content, const int max_len);
+	int peek(char* message_content, const int max_len, const int item_index = 0);
 	bool removeFront();
 	int length() { return (int) send_buffers_queue_->length(); }
 	void lock() { /* Logger::debug2("MessageQueue::lock() called with in_use_counter_==%d\n", in_use_counter_++); */ in_use_.lock(); }

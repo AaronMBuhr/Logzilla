@@ -13,7 +13,7 @@ public:
 	inline bool isFull() { return next_pos_ == head_pos_; }
 	bool enqueue(T&& item);
 	bool dequeue(T& item);
-	bool peek(T& item);
+	bool peek(T& item, const int item_index = 0);
 	bool removeFront(T& item);
 	bool removeFront();
 	size_t length();
@@ -69,11 +69,11 @@ bool ArrayQueue<T>::dequeue(T& item) {
 }
 
 template<class T>
-bool ArrayQueue<T>::peek(T& item) {
+bool ArrayQueue<T>::peek(T& item, const int item_index) {
 	if (isEmpty()) {
 		return false;
 	}
-	item = data_[head_pos_];
+	item = data_[(head_pos_ + item_index) % data_.size()];
 	return true;
 }
 

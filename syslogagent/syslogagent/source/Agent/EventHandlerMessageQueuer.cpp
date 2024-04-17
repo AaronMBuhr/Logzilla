@@ -50,6 +50,7 @@ namespace Syslog_agent {
 			if (primary_message_queue_->isFull()) {
 				primary_message_queue_->removeFront();
 			}
+			Logger::always("Handling win event, primary message queue length before: %d\n", primary_message_queue_->length());  // DEBUGGING
 			primary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
 			primary_message_queue_->unlock();
 			if (secondary_message_queue_ != nullptr) {
@@ -57,10 +58,11 @@ namespace Syslog_agent {
 				if (secondary_message_queue_->isFull()) {
                     secondary_message_queue_->removeFront();
                 }
-                secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
+				Logger::always("Handling win event, secondary message queue length before: %d\n", primary_message_queue_->length());  // DEBUGGING
+				secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
                 secondary_message_queue_->unlock();
             }
-			// SyslogSender::enqueue_timer_.set(configuration_.batch_interval_);
+			//SyslogSender::enqueue_timer_.set(configuration_.batch_interval_);
 #endif
 		}
 		Globals::instance()->releaseMessageBuffer("json_buffer", json_buffer);

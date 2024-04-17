@@ -8,6 +8,7 @@
 #include <fstream>
 #include <iostream>
 #include <locale>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sstream>
@@ -358,3 +359,18 @@ std::string Util::toLowercase(const std::string& input) {
 	return result;
 }
 
+
+int64_t Util::GetUnixTimeMilliseconds() {
+	FILETIME ft;
+	GetSystemTimeAsFileTime(&ft);  // Retrieves the current system time in UTC
+
+	// Combine high and low parts to form a 64-bit value
+	ULARGE_INTEGER li;
+	li.LowPart = ft.dwLowDateTime;
+	li.HighPart = ft.dwHighDateTime;
+
+	// Convert FILETIME (100-nanoseconds since January 1, 1601) to Unix epoch time in milliseconds
+	int64_t unixTimeMilliseconds = (li.QuadPart - 116444736000000000LL) / 10000;
+
+	return unixTimeMilliseconds;
+}

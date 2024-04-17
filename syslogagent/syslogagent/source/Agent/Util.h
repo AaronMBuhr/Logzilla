@@ -22,6 +22,7 @@ public:
 	static bool copyFile(const wchar_t const* source_filename, const wchar_t const* dest_filename);
 	static std::wstring toLowercase(const std::wstring& input);
 	static std::string toLowercase(const std::string& input);
+	static int64_t GetUnixTimeMilliseconds();
 
 };
 
