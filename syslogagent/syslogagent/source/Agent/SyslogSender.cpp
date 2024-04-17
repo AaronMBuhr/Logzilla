@@ -45,8 +45,6 @@ void SyslogSender::run() const {
 
     Logger::debug2("Syslog_sender::run() starting\n");
     char* buf = Globals::instance()->getMessageBuffer("SyslogSender::run()");
-    int primary_total = 0; // DEBUGGING
-    int secondary_total = 0; // DEBUGGING
     int batch_count;
     int64_t last_start_loop_time = Util::GetUnixTimeMilliseconds();
 
@@ -62,128 +60,115 @@ void SyslogSender::run() const {
         //}
         int64_t current_time = Util::GetUnixTimeMilliseconds();
         int elapsed_time = current_time - last_start_loop_time;
-        if (elapsed_time < 0) { // DEBUGGING 
-            Logger::always("Elapsed time < 0\n");
-            exit(1);
+        if (elapsed_time < 0) { 
+            Logger::warn("SyslogSender::run() elapsed time < 0\n");
+            elapsed_time = 0;
         }
-        Logger::always("SyslogSender::run() loop elapsed time: %d\n", elapsed_time); // DEBUGGING
         int wait_time = SYSLOGAGENT_SENDER_MAINLOOP_DURATION - elapsed_time;
-        Logger::always("SyslogSender::run() loop sleeping for (ms): %d\n", wait_time); // DEBUGGING
         Sleep(wait_time);
 
         last_start_loop_time = Util::GetUnixTimeMilliseconds();
-        while (!SyslogSender::stop_requested_ 
-            && (!primary_queue_->isEmpty() || (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()))) {
-            Logger::always("SyslogSender::run() start message loop (queue len %d/%d)...\n", primary_queue_->length(), secondary_queue_->length()); // DEBUGGING
-            int msg_size;
-            bool connected;
-            bool posted;
-            char* sep;
-            string response;
-            Debug::senderHeartbeat();
-            if (!primary_queue_->isEmpty()) {
-                batch_count = 0;
-                memcpy(message_buffer_.get(), message_header_, strlen(message_header_));
-                int message_buffer_length = strlen(message_header_);
-                sep = "";
-                while (batch_count < primary_queue_->length()) {
-                    msg_size = primary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE, batch_count);
-                    if (msg_size + message_buffer_length + strlen(sep) + strlen(message_trailer_) < MAX_MESSAGE_SIZE) {
-                        memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
-                        message_buffer_length += strlen(sep);
-                        memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
-                        message_buffer_length += msg_size;
-                        batch_count++;
-                        if (++primary_total % 10 == 0) Logger::always("Incrementing batch/primary total, now: %d/%d\n", batch_count, primary_total); // DEBUGGING
-                    }
-                    else {
-                        break;
-                    }
-                    sep = const_cast<char*>(message_separator_);
-                }
-                memcpy(message_buffer_.get() + message_buffer_length, message_trailer_, strlen(message_trailer_));
-                message_buffer_length += strlen(message_trailer_);
-                Logger::debug2("SyslogSender::run() sending msg %d bytes to primary\n", message_buffer_length);
 
-                connected = primary_network_client_->connect();
-                if (!connected) {
-                    Logger::recoverable_error("SyslogSender::run() primary server not connected, error: %u\n", GetLastError());
+        int msg_size;
+        bool connected;
+        bool posted;
+        char* sep;
+        string response;
+        Debug::senderHeartbeat();
+        if (!primary_queue_->isEmpty()) {
+            batch_count = 0;
+            memcpy(message_buffer_.get(), message_header_, strlen(message_header_));
+            int message_buffer_length = strlen(message_header_);
+            sep = "";
+            while (batch_count < primary_queue_->length()) {
+                msg_size = primary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE, batch_count);
+                if (msg_size + message_buffer_length + strlen(sep) + strlen(message_trailer_) < MAX_MESSAGE_SIZE) {
+                    memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
+                    message_buffer_length += strlen(sep);
+                    memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
+                    message_buffer_length += msg_size;
+                    batch_count++;
                 }
                 else {
-                    Logger::always("SyslogSender::run() primary posting (queue length %d, total %d)...\n", primary_queue_->length(), primary_total); // DEBUGGING
-                    posted = primary_network_client_->post(message_buffer_.get(), message_buffer_length);
-                    Logger::always("SyslogSender::run() primary posted (queue length %d, total %d)...\n", primary_queue_->length(), primary_total); // DEBUGGING
-                    if (posted == NetworkClient::RESULT_SUCCESS) {
-                        Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
-                        primary_queue_->lock();
-                        for (int i = 0; i < batch_count; i++) {
-                            primary_queue_->removeFront();
-                        }
-                        primary_queue_->unlock();
-
-                    }
-                    else {
-                        Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, posted);
-                    }
-                    primary_network_client_->readResponse(response);
-                    primary_network_client_->close();
+                    break;
                 }
-                //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
+                sep = const_cast<char*>(message_separator_);
             }
+            memcpy(message_buffer_.get() + message_buffer_length, message_trailer_, strlen(message_trailer_));
+            message_buffer_length += strlen(message_trailer_);
+            Logger::debug2("SyslogSender::run() sending msg %d bytes to primary\n", message_buffer_length);
 
-            if (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()) {
-                batch_count = 0;
-                memcpy(message_buffer_.get(), message_header_, strlen(message_header_));
-                int message_buffer_length = strlen(message_header_);
-                sep = "";
-                while (batch_count < secondary_queue_->length()) {
-                    msg_size = secondary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE, batch_count);
-                    if (msg_size + message_buffer_length + strlen(sep) + strlen(message_trailer_) - 1 < MAX_MESSAGE_SIZE) {
-                        memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
-                        message_buffer_length += strlen(sep);
-                        memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
-                        message_buffer_length += msg_size;
-                        batch_count++;
-                        if (++secondary_total % 10 == 0) Logger::always("Incrementing batch/secondary total, now: %d/%d\n", batch_count, secondary_total); // DEBUGGING
+            connected = primary_network_client_->connect();
+            if (!connected) {
+                Logger::recoverable_error("SyslogSender::run() primary server not connected, error: %u\n", GetLastError());
+            }
+            else {
+                posted = primary_network_client_->post(message_buffer_.get(), message_buffer_length);
+                if (posted == NetworkClient::RESULT_SUCCESS) {
+                    Logger::debug2("SyslogSender::run() message sent to primary server (bytes %d)\n", msg_size);
+                    primary_queue_->lock();
+                    for (int i = 0; i < batch_count; i++) {
+                        primary_queue_->removeFront();
                     }
-                    else {
-                        break;
-                    }
-                    sep = const_cast<char*>(message_separator_);
-                    // break;
-                }
-                memcpy(message_buffer_.get() + message_buffer_length, message_trailer_, strlen(message_trailer_));
-                message_buffer_length += strlen(message_trailer_);
-                Logger::debug2("SyslogSender::run() sending msg %d bytes to secondary\n", message_buffer_length);
+                    primary_queue_->unlock();
 
-                connected = secondary_network_client_->connect();
-                posted = false;
-                if (!connected) {
-                    Logger::recoverable_error("SyslogSender::run() secondary server not connected, error: %u\n", GetLastError());
                 }
                 else {
-                    Logger::always("SyslogSender::run() secondary posting (queue length %d, total %d)...\n", secondary_queue_->length(), secondary_total); // DEBUGGING
-                    posted = secondary_network_client_->post(message_buffer_.get(), message_buffer_length);
-                    Logger::always("SyslogSender::run() secondary posted (queue length %d, total %d)...\n", secondary_queue_->length(), secondary_total); // DEBUGGING
-                    if (posted == NetworkClient::RESULT_SUCCESS) {
-                        Logger::debug2("SyslogSender::run() message sent to secondary server (bytes %d)\n", msg_size);
-                        secondary_queue_->lock();
-                        for (int i = 0; i < batch_count; i++) {
-                            secondary_queue_->removeFront();
-                        }
-                        secondary_queue_->unlock();
-                    }
-                    else {
-                        Logger::debug("SyslogSender::run() error: message not sent to secondary server (bytes %d), error: %u\n", msg_size, posted);
-                    }
-                    secondary_network_client_->readResponse(response);
-                    secondary_network_client_->close();
+                    Logger::debug("SyslogSender::run() error: message not sent to primary server (bytes %d), error: %u\n", msg_size, posted);
                 }
-                //Logger::force("Syslog_sender::run() queue size before: %d\n", queue_.length());
-                //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
+                primary_network_client_->readResponse(response);
+                primary_network_client_->close();
             }
-            Logger::always("SyslogSender::run() end message loop (queue len %d/%d)...\n", primary_queue_->length(), secondary_queue_->length()); // DEBUGGING
-            break;  // DEBUGGING
+            //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
+        }
+
+        if (secondary_queue_ != nullptr && !secondary_queue_->isEmpty()) {
+            batch_count = 0;
+            memcpy(message_buffer_.get(), message_header_, strlen(message_header_));
+            int message_buffer_length = strlen(message_header_);
+            sep = "";
+            while (batch_count < secondary_queue_->length()) {
+                msg_size = secondary_queue_->peek(buf, Globals::MESSAGE_BUFFER_SIZE, batch_count);
+                if (msg_size + message_buffer_length + strlen(sep) + strlen(message_trailer_) - 1 < MAX_MESSAGE_SIZE) {
+                    memcpy(message_buffer_.get() + message_buffer_length, sep, strlen(sep));
+                    message_buffer_length += strlen(sep);
+                    memcpy(message_buffer_.get() + message_buffer_length, buf, msg_size);
+                    message_buffer_length += msg_size;
+                    batch_count++;
+                }
+                else {
+                    break;
+                }
+                sep = const_cast<char*>(message_separator_);
+                // break;
+            }
+            memcpy(message_buffer_.get() + message_buffer_length, message_trailer_, strlen(message_trailer_));
+            message_buffer_length += strlen(message_trailer_);
+            Logger::debug2("SyslogSender::run() sending msg %d bytes to secondary\n", message_buffer_length);
+
+            connected = secondary_network_client_->connect();
+            posted = false;
+            if (!connected) {
+                Logger::recoverable_error("SyslogSender::run() secondary server not connected, error: %u\n", GetLastError());
+            }
+            else {
+                posted = secondary_network_client_->post(message_buffer_.get(), message_buffer_length);
+                if (posted == NetworkClient::RESULT_SUCCESS) {
+                    Logger::debug2("SyslogSender::run() message sent to secondary server (bytes %d)\n", msg_size);
+                    secondary_queue_->lock();
+                    for (int i = 0; i < batch_count; i++) {
+                        secondary_queue_->removeFront();
+                    }
+                    secondary_queue_->unlock();
+                }
+                else {
+                    Logger::debug("SyslogSender::run() error: message not sent to secondary server (bytes %d), error: %u\n", msg_size, posted);
+                }
+                secondary_network_client_->readResponse(response);
+                secondary_network_client_->close();
+            }
+            //Logger::force("Syslog_sender::run() queue size before: %d\n", queue_.length());
+            //Logger::force("Syslog_sender::run() queue size after: %d\n", queue_.length());
         }
     }
     Globals::instance()->releaseMessageBuffer("SyslogSender::run()", buf);
