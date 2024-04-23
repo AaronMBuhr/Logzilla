@@ -36,5 +36,9 @@ namespace SyslogAgent.Config {
         IValidatedStringView DebugLogFilename { get; }
         IValidatedStringView TailFilename { get; }
         IValidatedStringView TailProgramName { get; }
+
+        IThreeStateOptionView PrimaryBackwardsCompatible { get; }
+
+        IThreeStateOptionView SecondaryBackwardsCompatible { get; }
     }
 }

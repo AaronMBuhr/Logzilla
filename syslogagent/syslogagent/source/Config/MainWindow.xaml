@@ -81,6 +81,7 @@ Copyright © 2021 LogZilla Corp.
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Primary LogZilla server</TextBlock>
@@ -119,6 +120,19 @@ Copyright © 2021 LogZilla Corp.
                                 </Style>
                             </Button.Resources>
                         </Button>
+                        <TextBlock Grid.Column="0" Grid.Row="6" Margin="2,2,2,2">API Backwards Compatible</TextBlock>
+                        <StackPanel Orientation="Horizontal" Grid.Column="2" Grid.Row="6" Margin="2,2,2,2">
+                            <TextBlock Text="Primary" VerticalAlignment="Center" Margin="20,0,5,0"/>
+                            <CheckBox Name="primaryBackwardsCompatCheck"
+                                IsThreeState="True"
+                                VerticalAlignment="Center"/>
+                            <TextBlock Text=" " Width="20"/>
+                            <!-- Small blank space -->
+                            <TextBlock Text="Secondary" VerticalAlignment="Center" Margin="5,0,5,0"/>
+                            <CheckBox Name="secondaryBackwardsCompatCheck"
+                                IsThreeState="True"
+                                VerticalAlignment="Center"/>
+                        </StackPanel>
                     </Grid>
                 </GroupBox>
             </WrapPanel>

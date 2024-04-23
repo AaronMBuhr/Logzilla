@@ -29,6 +29,8 @@ namespace SyslogAgent.Config {
         public string DebugLogFilename { get; set; }
         public string TailFilename { get; set; }
         public string TailProgramName { get; set; }
+        public SharedConstants.BackwardsCompatSetting PrimaryBackwardsCompatible { get; set; }
+        public SharedConstants.BackwardsCompatSetting SecondaryBackwardsCompatible { get; set; }
         public List<EventLogCandidate> EventLogs = new List<EventLogCandidate>();
         public List<string> AllEventLogPaths;
         public IEnumerable<string> SelectedEventLogPaths;

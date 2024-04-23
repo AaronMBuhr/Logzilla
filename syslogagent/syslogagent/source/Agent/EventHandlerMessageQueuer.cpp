@@ -99,7 +99,7 @@ namespace Syslog_agent {
 	}
 
 
-	bool EventHandlerMessageQueuer::generateLogMessage(EventLogEvent& event, char* json_buffer, size_t buflen) {
+	bool EventHandlerMessageQueuer::generateLogMessage(EventLogEvent& event, const int logformat, char* json_buffer, size_t buflen) {
 
 		// figure out some message details
 		auto event_id_str = event.getXmlDoc().child("Event").child("System").child("EventID").child_value();
@@ -161,14 +161,39 @@ namespace Syslog_agent {
 		json_output
 			<< " \"program\": \"" << provider << "\","
 			<< " \"severity\": " << ((char)(severity + '0')) << ","
-			<< " \"facility\": " << configuration_.facility_ << ","
-			<< " \"message\": \""
-			<< escaped_buf << "\" ";
+			<< " \"facility\": " << configuration_.facility_;
+		switch (logformat) {
+			case SYSLOGAGENT_LOGFORMAT_HTTPPORT:
+				json_output << ", \"message\": \"" << escaped_buf << "\" ";
+				break;
+
+			case SYSLOGAGENT_LOGFORMAT_JSONPORT:
+				json_output << ", \"message\": \"JSON log event\" ";
+				break;
+
+			default:
+				Logger::fatal("EventHandlerMessageQueuer::generateLogMessage()> Unknown logformat: %d", logformat);
+				exit(1); // shouldn't be needed
+		}
 		json_output << ", \"extra_fields\": { "
 			<< " \"_source_tag\": \"windows_agent\","
 			<< " \"log_type\": \"eventlog\","
 			<< " \"event_id\": \"" << event_id_str << "\","
 			<< " \"event_log\": \"" << log_name_utf8_ << "\"";
+		if (logformat == SYSLOGAGENT_LOGFORMAT_JSONPORT) {
+			json_output
+				<< ", \"_source_type\": \"WindowsAgent\","
+				<< " \"program\": \"" << provider << "\","
+				<< " \"severity\": " << ((char)(severity + '0')) << ","
+				<< " \"facility\": " << configuration_.facility_;
+			if (timestamp != 0) {
+				json_output << ", \"ts\": " << timestamp << "." << decimal_time;
+			}
+			if (configuration_.host_name_[0] != 0) {
+				json_output << ", \"host\": \"" << configuration_.host_name_ << "\" ";
+			}
+			json_output << ", \"message\": \"" << escaped_buf << "\" ";
+		}
 		pugi::xml_node event_data = event.getXmlDoc().child("Event").child("EventData");
 		for (pugi::xml_node data_item = event_data.first_child(); data_item; data_item = data_item.next_sibling()) {
 			auto data_name = data_item.attribute("Name").value();

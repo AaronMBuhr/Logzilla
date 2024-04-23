@@ -88,6 +88,7 @@
     <Compile Include="Globals.cs" />
     <Compile Include="HttpFetcher.cs" />
     <Compile Include="ICheckedTreeView.cs" />
+    <Compile Include="IThreeStateOptionView.cs" />
     <Compile Include="OptionListCombo.cs" />
     <Compile Include="MainPresenter.cs" />
     <Compile Include="IMainView.cs" />

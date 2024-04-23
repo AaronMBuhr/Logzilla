@@ -99,3 +99,6 @@
 
 #define SYSLOGAGENT_MAX_SUFFIX_LENGTH							1000
 #define SYSLOGAGENT_SENDER_MAINLOOP_DURATION                    1000
+
+#define SYSLOGAGENT_LOGFORMAT_JSONPORT                          0
+#define SYSLOGAGENT_LOGFORMAT_HTTPPORT                          1

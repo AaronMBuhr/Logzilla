@@ -14,6 +14,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Security.Policy;
+using System.Windows.Forms;
 
 namespace SyslogAgent.Config
 {
@@ -189,6 +190,19 @@ namespace SyslogAgent.Config
             view.DebugLogFilename.Content = config_.DebugLogFilename;
             view.TailFilename.Content = config_.TailFilename;
             view.TailProgramName.Content = config_.TailProgramName;
+            switch( config_.PrimaryBackwardsCompatible )
+            {
+                case SharedConstants.BackwardsCompatSetting.DetectedOn:
+                case SharedConstants.BackwardsCompatSetting.DetectedOff:
+                    view.PrimaryBackwardsCompatible.IsSelected = null;
+                    break;
+                case SharedConstants.BackwardsCompatSetting.SetOn:
+                    view.PrimaryBackwardsCompatible.IsSelected = true;
+                    break;
+                case SharedConstants.BackwardsCompatSetting.SetOff:
+                    view.PrimaryBackwardsCompatible.IsSelected = false;
+                    break;
+}
             view.LogzillaFileVersion = GetLogzillaFileVersion();
 
             //foreach (var log in config.EventLogs) view.Logs.Add(log.DisplayName, log.IsChosen);
@@ -227,6 +241,20 @@ namespace SyslogAgent.Config
             config.DebugLogFilename = view.DebugLogFilename.Content;
             config.TailFilename = view.TailFilename.Content;
             config.TailProgramName = view.TailProgramName.Content;
+            SharedConstants.BackwardsCompatSetting backwards_compat_setting;
+            GetBackwardsCompatSetting( view.PrimaryBackwardsCompatible, config.PrimaryHost, config.PrimaryApiKey, 
+                out backwards_compat_setting );
+            config.PrimaryBackwardsCompatible = backwards_compat_setting;
+            if (config.SendToSecondary)
+            {
+                GetBackwardsCompatSetting( view.SecondaryBackwardsCompatible, config.SecondaryHost, config.SecondaryApiKey, 
+                                       out backwards_compat_setting );
+                config.SecondaryBackwardsCompatible = backwards_compat_setting;
+            }
+            else
+            {
+                config.SecondaryBackwardsCompatible = (SharedConstants.BackwardsCompatSetting) SharedConstants.ConfigDefaults.BackwardsCompatible;
+            }
 
             var selected_logs = GetSelectedLogPaths(this.eventLogTreeviewRoot);
             config.SelectedEventLogPaths = selected_logs;
@@ -297,6 +325,77 @@ namespace SyslogAgent.Config
             view.Status = "Agent service is " + status;
         }
 
+        static string GetLogzillaServerVersion( string logzilla_server_url, string apiKey)
+        {
+            var fetcher = new HttpFetcher();
+            string url = logzilla_server_url;
+            if( !url.Contains( "://" ) )
+            {
+                url = "http://" + url; // Prepend with default scheme (http) if no scheme is specified
+            }
+            string result = fetcher.GetSynchronous( url + SharedConstants.ApiPath, apiKey.Content );
+            if( result == null )
+            {
+                return failureMsg;
+            }
+            return null;
+        }
+
+        static int CompareLogzillaServerVersion(string version_a, string version_b)
+        {
+            
+            // Split the versions by '.' to get the individual parts
+            var parts_a = version_a.Split( '.' );
+            var parts_b = version_b.Split( '.' );
+
+            // Find the maximum length of version parts
+            int maxLength = Math.Max( parts_a.Length, parts_b.Length );
+
+            for( int i = 0; i < maxLength; i++ )
+            {
+                // Get the current part for each version.
+                // If the version doesn't have this part, treat it as '0'
+                int part_a = i < parts_a.Length ? int.Parse( parts_a[i] ) : 0;
+                int part_b = i < parts_b.Length ? int.Parse( parts_b[i] ) : 0;
+
+                // Compare the current parts
+                if( part_a < part_b )
+                    return -1;
+                if( part_a > part_b )
+                    return 1;
+            }
+
+            // If all parts are equal
+            return 0;
+        }
+
+
+    void GetBackwardsCompatSetting( IThreeStateOptionView ui_setting, string server_url, 
+        string api_key, out SharedConstants.BackwardsCompatSetting config_setting)
+        {
+            if( ui_setting.IsSelected == null )
+            {
+                string server_version = GetLogzillaServerVersion( server_url, api_key );
+                if( server_version == null 
+                    || CompareLogzillaServerVersion( server_version, SharedConstants.HttpFormatVersion ) < 0 )
+                {
+                    config_setting = SharedConstants.BackwardsCompatSetting.DetectedOn;
+                }
+                else
+                {
+                    config_setting = SharedConstants.BackwardsCompatSetting.DetectedOff;
+                }
+            }
+            else if( ui_setting.IsSelected == true )
+            {
+                config_setting = SharedConstants.BackwardsCompatSetting.SetOn;
+            }
+            else
+            {
+                config_setting = SharedConstants.BackwardsCompatSetting.SetOff;
+            }
+        }
+        
         bool Validate()
         {
 

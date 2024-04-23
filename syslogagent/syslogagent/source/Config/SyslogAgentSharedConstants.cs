@@ -56,6 +56,8 @@ namespace SyslogAgent
             public const string InitialSetupRegFileKey      =   @"InitialSetupRegFile";
             public const string ApiTestPath                 =   @"api/";
             public const string BatchInterval               =   "BatchInterval";
+            public const string PrimaryBackwardsCompatible  =   "PrimaryBackwardsCompatible";
+            public const string SecondaryBackwardsCompatible=   "SecondaryBackwardsCompatible";
         }
 
         public static class ConfigDefaults
@@ -86,6 +88,7 @@ namespace SyslogAgent
             public const string     TailProgramName         =   "";
             public const string     SyslogAgentHttpPath     =   "SyslogAgentHttpPath";
             public const int        BatchInterval           =   1000;
+            public const byte       BackwardsCompatible     =   (byte) BackwardsCompatSetting.DetectedOff;
         }
 
 
@@ -94,6 +97,16 @@ namespace SyslogAgent
         public const string PrimaryCertFilename         =   "primary.pfx";
         public const string SecondaryCertFilename       =   "secondary.pfx";
         public const string ApiPath                     =   "/api/";
+        public const string LogzillaVersionPath         =   "/api/";
+        public const string HttpFormatVersion           =   "1.0";
+
+        public enum BackwardsCompatSetting
+        {
+            SetOff = 0,
+            SetOn = 1,
+            DetectedOff = 2,
+            DetectedOn = 3
+        }
 
     }
 }

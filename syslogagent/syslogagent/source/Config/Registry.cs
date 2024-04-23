@@ -40,7 +40,11 @@ namespace SyslogAgent.Config
             config.AllEventLogPaths = Registry.AllEventLogPaths;
             config.SelectedEventLogPaths = Registry.SelectedEventLogPaths;
             config.BatchInterval = (int)mainKey.GetValue( SharedConstants.RegistryKey.BatchInterval, SharedConstants.ConfigDefaults.BatchInterval );
-            }
+            config.PrimaryBackwardsCompatible = (SharedConstants.BackwardsCompatSetting) 
+                mainKey.GetValue( SharedConstants.RegistryKey.PrimaryBackwardsCompatible, SharedConstants.ConfigDefaults.BackwardsCompatible);
+            config.PrimaryBackwardsCompatible = (SharedConstants.BackwardsCompatSetting)
+                mainKey.GetValue( SharedConstants.RegistryKey.SecondaryBackwardsCompatible, SharedConstants.ConfigDefaults.BackwardsCompatible );
+        }
 
         public void WriteConfigToRegistry(Configuration config) {
             openRegistryKey();
@@ -67,6 +71,8 @@ namespace SyslogAgent.Config
             mainKey.SetValue(SharedConstants.RegistryKey.DebugLogFile, config.DebugLogFilename, RegistryValueKind.String);
             mainKey.SetValue(SharedConstants.RegistryKey.TailFilename, config.TailFilename, RegistryValueKind.String);
             mainKey.SetValue(SharedConstants.RegistryKey.TailProgramName, config.TailProgramName, RegistryValueKind.String);
+            mainKey.SetValue(SharedConstants.RegistryKey.PrimaryBackwardsCompatible, (int)config.PrimaryBackwardsCompatible, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.SecondaryBackwardsCompatible, (int)config.SecondaryBackwardsCompatible, RegistryValueKind.DWord);
 
                 //foreach (var log in value.EventLogs)
                 //{
@@ -303,6 +309,8 @@ namespace SyslogAgent.Config
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.TailProgramName, config.TailProgramName ?? "");
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.PrimaryTlsFileName, Globals.PrimaryTlsFilename ?? "");
                 WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SecondaryTlsFileName, Globals.SecondaryTlsFilename ?? "");
+                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.PrimaryBackwardsCompatible, (int)config.PrimaryBackwardsCompatible);
+                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SecondaryBackwardsCompatible, (int)config.SecondaryBackwardsCompatible);
 
                 writer.WriteLine("");
                 writer.WriteLine(@"[HKEY_LOCAL_MACHINE\SOFTWARE\LogZilla\SyslogAgent\Channels]");
@@ -434,6 +442,14 @@ namespace SyslogAgent.Config
 
                                 case SharedConstants.RegistryKey.TailProgramName:
                                     config.TailProgramName = DeQuote(parts[1]);
+                                    break;
+
+                                case SharedConstants.RegistryKey.PrimaryBackwardsCompatible:
+                                    config.PrimaryBackwardsCompatible = (SharedConstants.BackwardsCompatSetting)System.Convert.ToInt32( ValuePortion( parts[1]), 16);
+                                    break;
+
+                                case SharedConstants.RegistryKey.SecondaryBackwardsCompatible:
+                                    config.SecondaryBackwardsCompatible = (SharedConstants.BackwardsCompatSetting)System.Convert.ToInt32( ValuePortion( parts[1]), 16);
                                     break;
 
                                 // we're not going to do anything with the tls
