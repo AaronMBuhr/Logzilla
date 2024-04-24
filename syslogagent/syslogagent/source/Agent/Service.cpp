@@ -96,7 +96,7 @@ void Service::run(bool running_as_console) {
 	Logger::debug2("Service::run()> initializing primary_network_client\n");
 
 
-	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key, config_.primary_host_)) {
+	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key_, config_.primary_host_)) {
 		Logger::fatal("Could not initialize primary network client\n");
 		exit(1); // shouldn't be necessary
 	}
@@ -111,13 +111,24 @@ void Service::run(bool running_as_console) {
 		}
 	}
 
+	string logzilla_version;
+
+	Logger::debug2("Service::run()> getting primary LogZilla version\n");
+	logzilla_version = primary_network_client_->getLogzillaVersion();
+	if (logzilla_version == "") {
+        Logger::critical("Could not get primary LogZilla version\n");
+    }
+	else {
+		config_.setPrimaryLogzillaVersion(logzilla_version);
+	}
+
 	Logger::debug2("Service::run()> checking for secondary host\n");
 	if (config_.hasSecondaryHost()) {
 		Logger::debug2("Service::run()> has secondary host, making message queue and client\n");
 		Service::secondary_message_queue_ = make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 		Service::secondary_network_client_ = make_shared<NetworkClient>();
 		Logger::debug2("Service::run()> initializing secondary_network_client\n");
-		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key, config_.secondary_host_)) {
+		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key_, config_.secondary_host_)) {
 			Logger::fatal("Could not initialize secondary network client\n");
 			exit(1); // shouldn't be necessary
 		}
@@ -131,6 +142,16 @@ void Service::run(bool running_as_console) {
                 exit(1); // shouldn't be necessary
             }
 		}
+
+		Logger::debug2("Service::run()> getting secondary LogZilla version\n");
+		logzilla_version = secondary_network_client_->getLogzillaVersion();
+		if (logzilla_version == "") {
+			Logger::critical("Could not get secondary LogZilla version\n");
+		}
+		else {
+			config_.setSecondaryLogzillaVersion(logzilla_version);
+		}
+
 	}
 	else {
 		Service::secondary_message_queue_ = nullptr;

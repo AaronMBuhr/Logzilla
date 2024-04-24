@@ -46,7 +46,7 @@ void SyslogSender::run() const {
     Logger::debug2("Syslog_sender::run() starting\n");
     char* buf = Globals::instance()->getMessageBuffer("SyslogSender::run()");
     int batch_count;
-    int64_t last_start_loop_time = Util::GetUnixTimeMilliseconds();
+    int64_t last_start_loop_time = Util::getUnixTimeMilliseconds();
 
     while (!SyslogSender::stop_requested_) {
 
@@ -58,7 +58,7 @@ void SyslogSender::run() const {
         //        enqueue_timer_.reset();
         //    }
         //}
-        int64_t current_time = Util::GetUnixTimeMilliseconds();
+        int64_t current_time = Util::getUnixTimeMilliseconds();
         int elapsed_time = current_time - last_start_loop_time;
         if (elapsed_time < 0) { 
             Logger::warn("SyslogSender::run() elapsed time < 0\n");
@@ -67,7 +67,7 @@ void SyslogSender::run() const {
         int wait_time = SYSLOGAGENT_SENDER_MAINLOOP_DURATION - elapsed_time;
         Sleep(wait_time);
 
-        last_start_loop_time = Util::GetUnixTimeMilliseconds();
+        last_start_loop_time = Util::getUnixTimeMilliseconds();
 
         int msg_size;
         bool connected;
@@ -75,7 +75,33 @@ void SyslogSender::run() const {
         char* sep;
         string response;
         Debug::senderHeartbeat();
+
+        if (config_.primary_logzilla_version_ == "") {
+            Logger::debug2("SyslogSender::run() detecting primary LogZilla version\n");
+            string version = primary_network_client_->getLogzillaVersion();
+            if (version == "") {
+                Logger::recoverable_error("SyslogSender::run() need primary LogZilla version and could not get, error: %u\n", GetLastError());
+            }
+            else {
+                Logger::debug2("SyslogSender::run() primary server LogZilla version: %s\n", version.c_str());
+                config_.setPrimaryLogzillaVersion(version);
+            }
+        }
+
+        if (config_.hasSecondaryHost() && config_.secondary_logzilla_version_ == "") {
+            Logger::debug2("SyslogSender::run() detecting secondary LogZilla version\n");
+            string version = secondary_network_client_->getLogzillaVersion();
+            if (version == "") {
+                Logger::recoverable_error("SyslogSender::run() need secondary LogZilla version and could not get, error: %u\n", GetLastError());
+            }
+            else {
+                Logger::debug2("SyslogSender::run() secondary server LogZilla version: %s\n", version.c_str());
+                config_.setSecondaryLogzillaVersion(version);
+            }
+        }
+
         if (!primary_queue_->isEmpty()) {
+
             batch_count = 0;
             memcpy(message_buffer_.get(), message_header_, strlen(message_header_));
             int message_buffer_length = strlen(message_header_);

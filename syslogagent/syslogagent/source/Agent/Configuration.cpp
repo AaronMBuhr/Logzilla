@@ -76,12 +76,12 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
             only_while_running_ = false;
         }
     }
-    api_path = SYSLOGAGENT_HTTP_API_PATH;
+    api_path_ = SYSLOGAGENT_HTTP_API_PATH;
     event_log_poll_interval_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_EVENT_LOG_POLL_INTERVAL, 10);
     primary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_HOST, L"localhost");
-    primary_api_key = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGZILLA_API_KEY, L"");
+    primary_api_key_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGZILLA_API_KEY, L"");
     secondary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_HOST, L"");
-    secondary_api_key = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGZILLA_API_KEY, L"");
+    secondary_api_key_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGZILLA_API_KEY, L"");
     suffix_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SUFFIX, L"");
     forward_to_secondary_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_FORWARD_TO_SECONDARY, false);
     primary_use_tls_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_PRIMARY_USE_TLS, false);
@@ -93,6 +93,8 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     severity_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_SEVERITY, SYSLOGAGENT_DEFAULT_SEVERITY);
     tail_filename_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_TAIL_FILENAME, L"");
     tail_program_name_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_TAIL_PROGRAM_NAME, L"");
+    primary_logformat_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGFORMAT, SYSLOGAGENT_LOGFORMAT_DETECT);
+    secondary_logformat_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGFORMAT, SYSLOGAGENT_LOGFORMAT_DETECT);
     string tail_file = Util::wstr2str(tail_filename_);
     Logger::debug("Tail requested for file %s\n", tail_file.c_str());
 
@@ -162,3 +164,36 @@ string Configuration::getHostName() const {
         return string((char*)computerName);
     }
 }
+
+void Configuration::setPrimaryLogzillaVersion(const string& version) {
+    primary_logzilla_version_ = version;
+    if (Util::compareSoftwareVersions(version, SYSLOGAGENT_LOGFORMAT_LZ_VERSION_HTTP) < 0) {
+        primary_logformat_ = SYSLOGAGENT_LOGFORMAT_JSONPORT;
+    }
+    else {
+        primary_logformat_ = SYSLOGAGENT_LOGFORMAT_HTTPPORT;
+    }
+}
+
+void Configuration::setSecondaryLogzillaVersion(const string& version) {
+    secondary_logzilla_version_ = version;
+    if (Util::compareSoftwareVersions(version, SYSLOGAGENT_LOGFORMAT_LZ_VERSION_HTTP) < 0) {
+        secondary_logformat_ = SYSLOGAGENT_LOGFORMAT_JSONPORT;
+    }
+    else {
+        secondary_logformat_ = SYSLOGAGENT_LOGFORMAT_HTTPPORT;
+    }
+}
+
+int Configuration::getPrimaryLogformat() const {
+    if (primary_logformat_ == SYSLOGAGENT_LOGFORMAT_DETECT)
+        return SYSLOGAGENT_LOGFORMAT_JSONPORT;
+    return primary_logformat_;
+}
+
+int Configuration::getSecondaryLogformat() const {
+    if (secondary_logformat_ == SYSLOGAGENT_LOGFORMAT_DETECT)
+        return SYSLOGAGENT_LOGFORMAT_JSONPORT;
+    return secondary_logformat_;
+}
+

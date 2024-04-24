@@ -360,7 +360,7 @@ std::string Util::toLowercase(const std::string& input) {
 }
 
 
-int64_t Util::GetUnixTimeMilliseconds() {
+int64_t Util::getUnixTimeMilliseconds() {
 	FILETIME ft;
 	GetSystemTimeAsFileTime(&ft);  // Retrieves the current system time in UTC
 
@@ -374,3 +374,73 @@ int64_t Util::GetUnixTimeMilliseconds() {
 
 	return unixTimeMilliseconds;
 }
+
+
+
+int Util::compareSoftwareVersions(const std::string& version_a, const std::string& version_b) {
+	std::vector<int> parts_a = splitVersion(version_a);
+	std::vector<int> parts_b = splitVersion(version_b);
+
+	// Find the maximum length of version parts
+	size_t maxLength = (std::max)(parts_a.size(), parts_b.size());
+
+	for (size_t i = 0; i < maxLength; i++) {
+		// Get the current part for each version.
+		// If the version doesn't have this part, treat it as '0'
+		int part_a = i < parts_a.size() ? parts_a[i] : 0;
+		int part_b = i < parts_b.size() ? parts_b[i] : 0;
+
+		// Compare the current parts
+		if (part_a < part_b)
+			return -1;
+		if (part_a > part_b)
+			return 1;
+	}
+
+	// If all parts are equal
+	return 0;
+}
+
+
+std::vector<int> Util::splitVersion(const std::string& version) {
+	std::vector<int> parts;
+	std::istringstream ss(version);
+	std::string token;
+	std::string numericPart;
+
+	while (std::getline(ss, token, '.')) {
+		if (!token.empty()) {
+			numericPart.clear(); // Clear previous numeric part
+			// Extract only the numeric part from the token
+			for (char ch : token) {
+				if (std::isdigit(ch)) {
+					numericPart += ch;
+				}
+				else {
+					// Break on first non-digit character
+					break;
+				}
+			}
+
+			if (!numericPart.empty()) {
+				try {
+					parts.push_back(std::stoi(numericPart));
+				}
+				catch (const std::invalid_argument& ia) {
+					parts.push_back(0); // Default to zero if conversion fails
+				}
+			}
+			else {
+				// If no digits were found, treat it as zero
+				parts.push_back(0);
+			}
+		}
+		else {
+			// If token is empty, treat it as zero
+			parts.push_back(0);
+		}
+	}
+
+	return parts;
+}
+

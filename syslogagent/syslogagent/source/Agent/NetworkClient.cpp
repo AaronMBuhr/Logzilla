@@ -210,13 +210,13 @@ namespace Syslog_agent {
         //}
 
         if (use_ssl_) {
-            hRequest_ = WinHttpOpenRequest(hConnect_, L"POST", config_->api_path.c_str(),
+            hRequest_ = WinHttpOpenRequest(hConnect_, L"POST", config_->api_path_.c_str(),
                 NULL, WINHTTP_NO_REFERER,
                 WINHTTP_DEFAULT_ACCEPT_TYPES,
                 WINHTTP_FLAG_SECURE);
         }
         else {
-            hRequest_ = WinHttpOpenRequest(hConnect_, L"POST", config_->api_path.c_str(),
+            hRequest_ = WinHttpOpenRequest(hConnect_, L"POST", config_->api_path_.c_str(),
                 NULL, WINHTTP_NO_REFERER,
                 WINHTTP_DEFAULT_ACCEPT_TYPES,
                 0);
@@ -493,6 +493,123 @@ namespace Syslog_agent {
         }
 
         return true;
+    }
+
+    NetworkClient::RESULT_TYPE NetworkClient::get(const std::wstring& path, char* buf, size_t length) {
+
+        HINTERNET hSession = nullptr, hConnect = nullptr, hRequest = nullptr;
+        DWORD dwSize = 0;
+        DWORD dwDownloaded = 0;
+        BOOL bResults = FALSE;
+        RESULT_TYPE result = RESULT_SUCCESS;
+
+        // Use WinHttpOpen to obtain a session handle.
+        hSession = WinHttpOpen(SYSLOGAGENT_USER_AGENT, WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+            WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        if (!hSession) {
+            Logger::recoverable_error("NetworkClient::get()> Error in WinHttpOpen: %u.\n", GetLastError());
+            return GetLastError();
+        }
+
+        // Specify an HTTP server.
+        if (use_ssl_)
+        {
+            hConnect = WinHttpConnect(hSession, url_.c_str(), port_, 0);
+        }
+        else
+        {
+            hConnect = WinHttpConnect(hSession, url_.c_str(), port_, 0);
+        }
+
+        if (!hConnect) {
+            Logger::recoverable_error("NetworkClient::get()> Error in WinHttpConnect: %u.\n", GetLastError());
+            WinHttpCloseHandle(hSession);
+            return GetLastError();
+        }
+
+        // Create an HTTP request handle.
+        hRequest = WinHttpOpenRequest(hConnect, L"GET", path.c_str(),
+            NULL, WINHTTP_NO_REFERER,
+            WINHTTP_DEFAULT_ACCEPT_TYPES,
+            0);
+        if (!hRequest) {
+            Logger::recoverable_error("NetworkClient::get()> Error in WinHttpOpenRequest: %u.\n", GetLastError());
+            WinHttpCloseHandle(hConnect);
+            WinHttpCloseHandle(hSession);
+            return GetLastError();
+        }
+
+        // Send a request.
+        bResults = WinHttpSendRequest(hRequest,
+            WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+            WINHTTP_NO_REQUEST_DATA, 0,
+            0, 0);
+        if (!bResults) {
+            Logger::recoverable_error("NetworkClient::get()> Error in WinHttpSendRequest: %u.\n", GetLastError());
+            result = GetLastError();
+            goto cleanup;
+        }
+
+        // End the request.
+        bResults = WinHttpReceiveResponse(hRequest, NULL);
+        if (!bResults) {
+            Logger::recoverable_error("NetworkClient::get()> Error in WinHttpReceiveResponse: %u.\n", GetLastError());
+            result = GetLastError();
+            goto cleanup;
+        }
+
+        // Keep checking for data until there is nothing left.
+        do {
+            // Check for available data.
+            dwSize = 0;
+            if (!WinHttpQueryDataAvailable(hRequest, &dwSize)) {
+                Logger::recoverable_error("NetworkClient::get()> Error in WinHttpQueryDataAvailable: %u.\n", GetLastError());
+                result = GetLastError();
+                break;
+            }
+
+            // No more available data.
+            if (!dwSize)
+                break;
+
+            // Ensure that the size does not exceed the buffer.
+            if (dwSize > length)
+                dwSize = length;
+
+            // Read the Data.
+            ZeroMemory(buf, length);
+            if (!WinHttpReadData(hRequest, (LPVOID)buf, dwSize, &dwDownloaded)) {
+                Logger::recoverable_error("NetworkClient::get()> Error in WinHttpReadData: %u.\n", GetLastError());
+                result = GetLastError();
+                break;
+            }
+
+            // This example assumes that no more than "length" bytes are read.
+            if (dwDownloaded != dwSize) {
+                Logger::recoverable_error("NetworkClient::get()> Error: buffer size mismatch.\n");
+                result = GetLastError();
+                break;
+            }
+        } while (dwSize > 0);
+
+    cleanup:
+        // Close open handles.
+        if (hRequest) WinHttpCloseHandle(hRequest);
+        if (hConnect) WinHttpCloseHandle(hConnect);
+        if (hSession) WinHttpCloseHandle(hSession);
+
+        return result;
+    }
+
+    string NetworkClient::getLogzillaVersion() {
+        char recv_buffer[100];
+        RESULT_TYPE result = get(config_->version_path_.c_str(), recv_buffer, sizeof(recv_buffer));
+        if (result != RESULT_SUCCESS) {
+            Logger::recoverable_error("NetworkClient::getLogzillaVersion()> Error %u in get.\n", result);
+            return "";
+        }
+        return string(recv_buffer);
+
     }
 
 }

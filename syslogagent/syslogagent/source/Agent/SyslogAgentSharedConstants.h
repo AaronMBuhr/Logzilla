@@ -23,7 +23,8 @@
 #define SYSLOGAGENT_DEFAULT_TAIL_PROGRAMNAME		L""
 #define SYSLOGAGENT_DEFAULT_POLL_INTERVAL			2
 #define SYSLOGAGENT_USER_AGENT	        			L"LZ Syslog Agent/" SYSLOGAGENT_CURRENT_VERSION
-#define SYSLOGAGENT_HTTP_API_PATH                   L"/incoming"  
+#define SYSLOGAGENT_HTTP_API_PATH                   L"/incoming"
+#define SYSLOGAGENT_LOGZILLA_VERSION_PATH           L"/version"
 #define SYSLOGAGENT_DEFAULT_BATCH_INTERVAL          1000
 
 
@@ -93,12 +94,15 @@
 #define SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGZILLA_API_KEY        L"PrimaryLogZillaApiKey"
 #define SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGZILLA_API_KEY      L"SecondaryLogZillaApiKey"
 #define SYSLOGAGENT_REGISTRYKEY_BATCH_INTERVAL                  L"BatchInterval"
-
+#define SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGFORMAT               L"PrimaryLogFormat"
+#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGFORMAT             L"SecondaryLogFormat"
 #define SYSLOGAGENT_CERT_FILENAME_PRIMARY						L"primary.pfx"
 #define SYSLOGAGENT_CERT_FILENAME_SECONDARY						L"secondary.pfx"
 
 #define SYSLOGAGENT_MAX_SUFFIX_LENGTH							1000
 #define SYSLOGAGENT_SENDER_MAINLOOP_DURATION                    1000
 
-#define SYSLOGAGENT_LOGFORMAT_JSONPORT                          0
-#define SYSLOGAGENT_LOGFORMAT_HTTPPORT                          1
+#define SYSLOGAGENT_LOGFORMAT_DETECT                            0
+#define SYSLOGAGENT_LOGFORMAT_JSONPORT                          1
+#define SYSLOGAGENT_LOGFORMAT_HTTPPORT                          2
+#define SYSLOGAGENT_LOGFORMAT_LZ_VERSION_HTTP                   "6.34"

@@ -5,6 +5,7 @@
 #include "Debug.h"
 #include "EventHandlerMessageQueuer.h"
 #include "Globals.h"
+#include "Logger.h"
 #include "OStreamBuf.h"
 #include "pugixml.hpp"
 #include "SyslogSender.h"
@@ -44,7 +45,8 @@ namespace Syslog_agent {
 		// TODO maybe different return results?
 		event.renderEvent();
 		char* json_buffer = Globals::instance()->getMessageBuffer("json_buffer");
-		if (generateLogMessage(event, json_buffer, Globals::MESSAGE_BUFFER_SIZE)) {
+		int primary_logformat = configuration_.getPrimaryLogformat();
+		if (generateLogMessage(event, primary_logformat, json_buffer, Globals::MESSAGE_BUFFER_SIZE)) {
 #if !DEBUG_SETTINGS_SKIP_MESSAGEQUEUE
 			primary_message_queue_->lock();
 			if (primary_message_queue_->isFull()) {
@@ -53,16 +55,29 @@ namespace Syslog_agent {
 			primary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
 			primary_message_queue_->unlock();
 			if (secondary_message_queue_ != nullptr) {
-                secondary_message_queue_->lock();
-				if (secondary_message_queue_->isFull()) {
-                    secondary_message_queue_->removeFront();
-                }
-				secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
-                secondary_message_queue_->unlock();
+				bool have_secondary_message = true;
+				int secondary_logformat = configuration_.getSecondaryLogformat();
+				if (primary_logformat != secondary_logformat) {
+					have_secondary_message = generateLogMessage(event, secondary_logformat, json_buffer, Globals::MESSAGE_BUFFER_SIZE);
+				}
+				if (have_secondary_message) {
+					secondary_message_queue_->lock();
+					if (secondary_message_queue_->isFull()) {
+						secondary_message_queue_->removeFront();
+					}
+					secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
+					secondary_message_queue_->unlock();
+				}
+				else {
+					Logger::warn("EventHandlerMessageQueuer::handleEvent()> secondary generateLogMessage() failed");
+				}
             }
 			//SyslogSender::enqueue_timer_.set(configuration_.batch_interval_);
 #endif
 		}
+		else {
+            Logger::warn("EventHandlerMessageQueuer::handleEvent()> primary generateLogMessage() failed");
+        }
 		Globals::instance()->releaseMessageBuffer("json_buffer", json_buffer);
 		return Result((DWORD)ERROR_SUCCESS);
 	}

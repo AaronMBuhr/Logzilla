@@ -15,7 +15,7 @@ namespace Syslog_agent {
 			const wchar_t* log_name);
 		Result handleEvent(const wchar_t* subscription_name, EventLogEvent& event) override;
 	private:
-		bool generateLogMessage(EventLogEvent& event, char* json_buffer, size_t buflen); // returns true if generated
+		bool generateLogMessage(EventLogEvent& event, int logformat, char* json_buffer, size_t buflen); // returns true if generated
 		unsigned char unixSeverityFromWindowsSeverity(char windows_severity_num);
 		Configuration& configuration_;
 		shared_ptr<MessageQueue> primary_message_queue_;

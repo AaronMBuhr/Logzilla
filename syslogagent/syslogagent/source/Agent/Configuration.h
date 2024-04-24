@@ -20,7 +20,8 @@ namespace Syslog_agent {
         static const wstring PRIMARY_CERT_FILENAME;
         static const wstring SECONDARY_CERT_FILENAME;
 
-        wstring api_path = SYSLOGAGENT_HTTP_API_PATH;
+        wstring api_path_ = SYSLOGAGENT_HTTP_API_PATH;
+        wstring version_path_ = SYSLOGAGENT_LOGZILLA_VERSION_PATH;
         bool lookup_accounts_ = false;
         bool include_key_value_pairs_ = false;
         bool forward_to_secondary_ = false;
@@ -38,9 +39,9 @@ namespace Syslog_agent {
         char host_name_[256];
         int batch_interval_;
         wstring primary_host_ = SYSLOGAGENT_DEFAULT_PRIMARY_HOST;
-        wstring primary_api_key = L"";
+        wstring primary_api_key_ = L"";
         wstring secondary_host_ = SYSLOGAGENT_DEFAULT_SECONDARY_HOST;
-        wstring secondary_api_key = L"";
+        wstring secondary_api_key_ = L"";
         wstring suffix_ = SYSLOGAGENT_DEFAULT_SUFFIX;
         wstring debug_log_file_ = SYSLOGAGENT_DEFAULT_DEBUG_LOG_FILENAME;
         vector<LogConfiguration> logs_;
@@ -50,11 +51,20 @@ namespace Syslog_agent {
         int utc_offset_minutes_;
         bool include_vs_ignore_eventids_;
         bool only_while_running_;
+        string primary_logzilla_version_ = "";
+        string secondary_logzilla_version_ = "";
+        int primary_logformat_ = SYSLOGAGENT_LOGFORMAT_DETECT;
+        int secondary_logformat_ = SYSLOGAGENT_LOGFORMAT_DETECT;
+
 
         void loadFromRegistry(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting);
         void saveToRegistry();
         bool hasSecondaryHost() const;
         string getHostName() const;
+        void setPrimaryLogzillaVersion(const string& version);
+        void setSecondaryLogzillaVersion(const string& version);
+        int getPrimaryLogformat() const;
+        int getSecondaryLogformat() const;
 
         static const int MAX_TAIL_FILE_LINE_LENGTH = 16000;
 

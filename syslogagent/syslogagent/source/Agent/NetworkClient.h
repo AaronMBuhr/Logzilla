@@ -34,9 +34,11 @@ namespace Syslog_agent {
         RESULT_TYPE post(const char* buf, size_t length);
         RESULT_TYPE post(const std::wstring& data);
         RESULT_TYPE post(const std::string & data);
+        RESULT_TYPE get(const std::wstring& url, char* buf, size_t length);
         bool checkServerCert();
         bool readResponse(std::string& response);
         void close();
+        string getLogzillaVersion();
 
     private:
         wstring api_key_;
