@@ -61,108 +61,9 @@ namespace SyslogAgent.Config
             presenter.Load();
             SetSecondaryUseTLSAvailable(secondaryUseTlsCheck.IsChecked ?? false);
             SetTailProgramAvailable();
+            primaryBackwardsCompatVerCombo.ItemsSource = SharedConstants.BackwardsCompatVersions;
+            secondaryBackwardsCompatVerCombo.ItemsSource = SharedConstants.BackwardsCompatVersions;
 
-#if EXPERIMENTING
-            // for testing:
-
-            //MenuItem root = new MenuItem() { Name = "Top" };
-            //MenuItem childItem1 = new MenuItem() { Name = "Child item #1" };
-            //childItem1.Items.Add(new MenuItem() { Name = "Child item #1.1" });
-            //childItem1.Items.Add(new MenuItem() { Name = "Child item #1.2" });
-            //root.Items.Add(childItem1);
-            //root.Items.Add(new MenuItem() { Name = "Child item #2" });
-            ////trvMenu.Items.Add(root);
-            //menuItems = new List<MenuItem>();
-            //menuItems.Add(root);
-            ////itemCollection = trvMenu.Items;
-            ////itemCollection.Add(new MenuItem() { Name = "Test number two" });
-
-            //// trvMenu.ItemsSource = menuItems;
-
-            var root = new EventLogTreeviewItem() { Name = "(root)" };
-            var groupOne = root.AddChild("groupOne");
-            var groupOneOne = groupOne.AddChild("groupOneOne");
-            groupOneOne.AddChild("nodeOneOneOne");
-            groupOneOne.AddChild("nodeOneOneTwo");
-            var groupOneTwo = groupOne.AddChild("groupOneTwo");
-            groupOneTwo.AddChild("nodeOneTwoOne");
-            groupOneTwo.AddChild("nodeOneTwoTwo");
-            var groupTwo = root.AddChild("groupTwo");
-            var groupTwoOne = groupTwo.AddChild("groupTwoOne");
-            groupTwoOne.AddChild("nodeTwoOneOne");
-            groupTwoOne.AddChild("nodeTwoOneTwo");
-            var groupTwoTwo = groupTwo.AddChild("groupTwoTwo");
-            groupTwoTwo.AddChild("nodeTwoTwoOne");
-            groupTwoTwo.AddChild("nodeTwoTwoTwo");
-
-            treeviewItems = new ObservableCollection<EventLogTreeviewItem>();
-            treeviewItems.Add(new EventLogTreeviewItem() { Name = "nodeOne" });
-            treeviewItems.Add(new EventLogTreeviewItem() { Name = "nodeTwo" });
-            treeviewItems.Add(new EventLogTreeviewItem() { Name = "nodeThree" });
-            treeviewItems[0].Children = new ObservableCollection<EventLogTreeviewItem>();
-            treeviewItems[0].Children.Add(new EventLogTreeviewItem() { Name = "childOne" });
-            treeviewItems[0].Children.Add(new EventLogTreeviewItem() { Name = "childTwo" });
-
-            //EventLogGroupMember groupOneOne = new EventLogGroupMember()
-            //{
-            //    Name = "groupOneOne",
-            //    ChildMembers = new List<EventLogGroupMember>()
-            //    {
-            //        new EventLogGroupMember() { Name = "memberOneOneOne"},
-            //        new EventLogGroupMember() { Name = "memberOneOneTwo"}
-            //    }
-            //};
-            //EventLogGroupMember groupOneTwo = new EventLogGroupMember()
-            //{
-            //    Name = "groupOneTwo",
-            //    ChildMembers = new List<EventLogGroupMember>()
-            //    {
-            //        new EventLogGroupMember() { Name = "memberOneTwoOne"},
-            //        new EventLogGroupMember() { Name = "memberOneTwoTwo"}
-            //    }
-            //};
-            //EventLogGroupMember groupTwoOne = new EventLogGroupMember()
-            //{
-            //    Name = "groupTwoOne",
-            //    ChildMembers = new List<EventLogGroupMember>()
-            //    {
-            //        new EventLogGroupMember() { Name = "memberTwoOneOne"},
-            //        new EventLogGroupMember() { Name = "memberTwoOneTwo"}
-            //    }
-            //};
-            //EventLogGroupMember groupTwoTwo = new EventLogGroupMember()
-            //{
-            //    Name = "groupTwoTwo",
-            //    ChildMembers = new List<EventLogGroupMember>()
-            //    {
-            //        new EventLogGroupMember() { Name = "memberTwoTwoOne"},
-            //        new EventLogGroupMember() { Name = "memberTwoTwoTwo"}
-            //    }
-            //};
-            //EventLogGroupMember groupOne = new EventLogGroupMember()
-            //{
-            //    Name = "groupOne",
-            //    ChildMembers = new List<EventLogGroupMember>() { groupOneOne, groupOneTwo }
-            //};
-            //EventLogGroupMember groupTwo = new EventLogGroupMember()
-            //{
-            //    Name = "groupTwo",
-            //    ChildMembers = new List<EventLogGroupMember>() { groupTwoOne, groupTwoTwo }
-            //};
-
-            //Globals.EventLogTop = new EventLogGroupMember()
-            //{
-            //    Name = "(root)",
-            //    ChildMembers = new List<EventLogGroupMember>() { groupOne, groupTwo }
-            //};
-
-
-            //SetParents(Globals.EventLogTop, Globals.EventLogTop.ObservableChildren);
-            //logMembers = Globals.EventLogTop.ObservableChildren;
-            //member = Globals.EventLogTop;
-            // treeView.ItemsSource = logMembers;
-            // treeView.ItemsSource = treeviewItems;
-#endif
             var root = presenter.eventLogTreeviewRoot;
             //root.SetIsCheckedAll(false);
             treeView.ItemsSource = root.Children;
@@ -193,8 +94,11 @@ namespace SyslogAgent.Config
         public IValidatedStringView TailFilename => new ValidatedTextBox(txtTailFilename);
         public IValidatedStringView TailProgramName => new ValidatedTextBox(txtTailProgramName);
         public IValidatedStringView BatchInterval => new ValidatedTextBox(batchIntervalText);
+        public IOptionListView PrimaryBackwardsCompatVer => new OptionListCombo(primaryBackwardsCompatVerCombo);
+        public IOptionListView SecondaryBackwardsCompatVer => new OptionListCombo(secondaryBackwardsCompatVerCombo);
         public string Message { set { txtBlockStatusBarLeft.Text = value; } }
         public string LogzillaFileVersion { set { tbkLogzillaVersion.Text = "LogZilla Syslog Agent version " + value; } }
+
 
         public string Status
         {

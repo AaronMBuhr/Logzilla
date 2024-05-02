@@ -120,18 +120,16 @@ Copyright © 2021 LogZilla Corp.
                                 </Style>
                             </Button.Resources>
                         </Button>
-                        <TextBlock Grid.Column="0" Grid.Row="6" Margin="2,2,2,2">API Backwards Compatible</TextBlock>
+                        <TextBlock Grid.Column="0" Grid.Row="6" Margin="2,2,2,2">LogZilla Compatible Version</TextBlock>
                         <StackPanel Orientation="Horizontal" Grid.Column="2" Grid.Row="6" Margin="2,2,2,2">
                             <TextBlock Text="Primary" VerticalAlignment="Center" Margin="20,0,5,0"/>
-                            <CheckBox Name="primaryBackwardsCompatCheck"
-                                IsThreeState="True"
-                                VerticalAlignment="Center"/>
+                            <!-- Replaced CheckBox with ComboBox for Primary Version Selection -->
+                            <ComboBox Name="primaryBackwardsCompatVerCombo" Width="Auto" VerticalAlignment="Center" />
                             <TextBlock Text=" " Width="20"/>
                             <!-- Small blank space -->
                             <TextBlock Text="Secondary" VerticalAlignment="Center" Margin="5,0,5,0"/>
-                            <CheckBox Name="secondaryBackwardsCompatCheck"
-                                IsThreeState="True"
-                                VerticalAlignment="Center"/>
+                            <!-- Replaced CheckBox with ComboBox for Secondary Version Selection -->
+                            <ComboBox Name="secondaryBackwardsCompatVerCombo" Width="Auto" VerticalAlignment="Center" />
                         </StackPanel>
                     </Grid>
                 </GroupBox>

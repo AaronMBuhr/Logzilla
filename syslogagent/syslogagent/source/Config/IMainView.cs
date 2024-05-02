@@ -37,8 +37,8 @@ namespace SyslogAgent.Config {
         IValidatedStringView TailFilename { get; }
         IValidatedStringView TailProgramName { get; }
 
-        IThreeStateOptionView PrimaryBackwardsCompatible { get; }
+        IOptionListView PrimaryBackwardsCompatVer { get; }
 
-        IThreeStateOptionView SecondaryBackwardsCompatible { get; }
+        IOptionListView SecondaryBackwardsCompatVer { get; }
     }
 }
