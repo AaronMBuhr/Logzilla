@@ -64,8 +64,13 @@ void SyslogSender::run() const {
             Logger::warn("SyslogSender::run() elapsed time < 0\n");
             elapsed_time = 0;
         }
-        int wait_time = SYSLOGAGENT_SENDER_MAINLOOP_DURATION - elapsed_time;
-        Sleep(wait_time);
+        if (elapsed_time > SYSLOGAGENT_SENDER_MAINLOOP_DURATION) {
+            elapsed_time = SYSLOGAGENT_SENDER_MAINLOOP_DURATION;
+        }
+        DWORD wait_time = SYSLOGAGENT_SENDER_MAINLOOP_DURATION - elapsed_time;
+        if (wait_time > 0) {
+            Sleep(wait_time);
+        }
 
         last_start_loop_time = Util::getUnixTimeMilliseconds();
 
@@ -76,7 +81,7 @@ void SyslogSender::run() const {
         string response;
         Debug::senderHeartbeat();
 
-        if (config_.primary_logzilla_version_ == "") {
+        if (config_.primary_logzilla_version_ == "detect") {
             Logger::debug2("SyslogSender::run() detecting primary LogZilla version\n");
             string version = primary_network_client_->getLogzillaVersion();
             if (version == "") {
@@ -88,7 +93,7 @@ void SyslogSender::run() const {
             }
         }
 
-        if (config_.hasSecondaryHost() && config_.secondary_logzilla_version_ == "") {
+        if (config_.hasSecondaryHost() && config_.secondary_logzilla_version_ == "detect") {
             Logger::debug2("SyslogSender::run() detecting secondary LogZilla version\n");
             string version = secondary_network_client_->getLogzillaVersion();
             if (version == "") {

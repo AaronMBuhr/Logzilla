@@ -96,6 +96,8 @@
 #define SYSLOGAGENT_REGISTRYKEY_BATCH_INTERVAL                  L"BatchInterval"
 #define SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGFORMAT               L"PrimaryLogFormat"
 #define SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGFORMAT             L"SecondaryLogFormat"
+#define SYSLOGAGENT_REGISTRYKEY_PRIMARY_LZ_COMPAT_VER			L"PrimaryBackwardsCompatibleVersion";
+#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_LZ_COMPAT_VER			L"SecondaryBackwardsCompatibleVersion";
 #define SYSLOGAGENT_CERT_FILENAME_PRIMARY						L"primary.pfx"
 #define SYSLOGAGENT_CERT_FILENAME_SECONDARY						L"secondary.pfx"
 

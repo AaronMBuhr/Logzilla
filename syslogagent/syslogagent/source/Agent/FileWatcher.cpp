@@ -13,6 +13,7 @@
 using namespace Syslog_agent;
 
 FileWatcher::FileWatcher(
+	Configuration& config,
 	shared_ptr<JsonLogMessageHandler> log_message_handler,
 	const wchar_t* filename,
 	int max_line_length,
@@ -20,18 +21,20 @@ FileWatcher::FileWatcher(
 	const char* host_name,
 	int severity,
 	int facility
-) : log_message_handler_(log_message_handler),
-filename_(filename),
-max_line_length_(max_line_length),
-program_name_(program_name),
-host_name_(host_name),
-severity_(severity),
-facility_(facility),
-last__buffer_position_(-1),
-last_file_position_(-1),
-last_file_size_(0),
-last_char_read_(0),
-num_prebuffer_chars_(0)
+) 
+	: config_(config), 
+	log_message_handler_(log_message_handler),
+	filename_(filename),
+	max_line_length_(max_line_length),
+	program_name_(program_name),
+	host_name_(host_name),
+	severity_(severity),
+	facility_(facility),
+	last__buffer_position_(-1),
+	last_file_position_(-1),
+	last_file_size_(0),
+	last_char_read_(0),
+	num_prebuffer_chars_(0)
 {
 	filename_ = wstring(filename);
 	size_t num_bytes_used = wcstombs(filename_multibyte_, filename_.c_str(), sizeof(filename_multibyte_));
@@ -141,19 +144,45 @@ void FileWatcher::processLine(const char* line_cstr) {
 	OStreamBuf<char> ostream_buffer(message_buffer_.data(), message_buffer_.size());
 	std::ostream stream_output(&ostream_buffer);
 
-	stream_output << "{ "
-		<< "\"program\" : \"" << program_name_ << "\", "
-		<< "\"host\": \"" << host_name_ << "\", "
-		<< "\"severity\": " << severity_ << ", "
-		<< "\"facility\": " << facility_ << ", "
-		<< "\"message\": \"" << line_cstr << "\", "
-		<< "\"extra_fields\": { "
-		<< "\"_source_tag\": \"windows_agent\", "
-		<< "\"log_type\": \"file\", "
-		<< "\"file\": \"" << filename_multibyte_escaped_ << "\" }"
-		<< " }" << '\n' << '\0';
+	for (int servernum = 0; servernum < 2; servernum++) {
 
-	log_message_handler_->handleJsonMessage(const_cast<char*>(message_buffer_.data()));
+		// Reset the ostream to be used again
+		stream_output.clear(); // Clear any error flags
+		ostream_buffer.pubsetbuf(message_buffer_.data(), message_buffer_.size()); // Reset buffer
+		ostream_buffer.pubseekpos(0); // Optionally, reset position to the beginning
+
+		int log_format = (servernum == 0 ? config_.getPrimaryLogformat() : config_.getSecondaryLogformat());
+
+		if (log_format == SYSLOGAGENT_LOGFORMAT_HTTPPORT) {
+
+			stream_output << "{ "
+				<< "\"program\" : \"" << program_name_ << "\", "
+				<< "\"host\": \"" << host_name_ << "\", "
+				<< "\"severity\": " << severity_ << ", "
+				<< "\"facility\": " << facility_ << ", "
+				<< "\"message\": \"" << line_cstr << "\", "
+				<< "\"extra_fields\": { "
+				<< "\"_source_tag\": \"windows_agent\", "
+				<< "\"log_type\": \"file\", "
+				<< "\"file\": \"" << filename_multibyte_escaped_ << "\" }"
+				<< " }" << '\n' << '\0';
+		}
+		else {
+			stream_output << "{ \"_source_type\": \"WindowsAgent\", \"_log_type\": \"file\", \"program\" : \""
+				<< program_name_ << "\", \"host\": \"" << host_name_ << "\", \"severity\": " << severity_
+				<< ", \"facility\": " << facility_ << ", \"file\": \"" << filename_multibyte_escaped_
+				<< "\", \"message\": \"" << line_cstr << "\" }" << '\n' << '\0';
+		}
+
+		shared_ptr<MessageQueue> msg_queue = (servernum == 0 ? primary_message_queue_ : secondary_message_queue_);
+		msg_queue->lock();
+		msg_queue->enqueue(reinterpret_cast<const char*>(message_buffer_.data()), strlen(message_buffer_.data()));
+		msg_queue->unlock();
+
+		if (!config_.hasSecondaryHost()) {
+			break;
+		}
+	}
 }
 
 

@@ -51,8 +51,8 @@ namespace Syslog_agent {
         int utc_offset_minutes_;
         bool include_vs_ignore_eventids_;
         bool only_while_running_;
-        string primary_logzilla_version_ = "";
-        string secondary_logzilla_version_ = "";
+        string primary_logzilla_version_ = "detect";
+        string secondary_logzilla_version_ = "detect";
         int primary_logformat_ = SYSLOGAGENT_LOGFORMAT_DETECT;
         int secondary_logformat_ = SYSLOGAGENT_LOGFORMAT_DETECT;
 

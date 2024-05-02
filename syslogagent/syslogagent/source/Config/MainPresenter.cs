@@ -321,11 +321,11 @@ namespace SyslogAgent.Config
             {
                  () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
                  () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, true, "Primary host"),
-                 () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, false, "Primary host certificate does not match the .pfx file"),
+                 () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, true, false, "Primary host certificate does not match the .pfx file"),
                  () => ValidateApiKey(true, view.PrimaryHost, view.PrimaryApiKey, "Invalid primary API key"),
                  () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, "Invalid secondary host"),
                  () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, view.SendToSecondary.IsSelected, "Secondary host"),
-                 () => ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost, true, "Secondary host certificate does not match the .pfx file"),
+                 () => ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost, view.SendToSecondary.IsSelected, true, "Secondary host certificate does not match the .pfx file"),
                  () => ValidateApiKey(view.SecondaryUseTls.IsSelected, view.SecondaryHost, view.SecondaryApiKey, "Invalid secondary API key"),
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
                  () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds, view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids"),
@@ -374,37 +374,47 @@ namespace SyslogAgent.Config
             return isValid ? null : failureMsg;
         }
 
-        static string ValidateInternetHost(IValidatedStringView host, bool required, string failureMsg)
-        {
-            string host_address = host.Content.Trim();
-            if( host_address == "" )
-            {
-                if( required )
-                {
-                    host.IsValid = false;
-                    return failureMsg;
-                }
-                else
-                {
-                    return null;
-                }   
-            }
+    public static string ValidateInternetHost(IValidatedStringView host, bool required, string failureMsg)
+    {
+        if (!required) return null;
 
-            var regex_valid_ip = @"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$";
-            var regex_valid_host = @"^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$";
-            bool isValid;
-            if (host_address.StartsWith("http://") || host_address.StartsWith("https://"))
+        string host_address = host.Content.Trim();
+        if (host_address == "")
+        {
+            if (required)
             {
-                host_address = host_address.Substring(host_address.IndexOf("://") + 3);
+                host.IsValid = false;
+                return failureMsg;
             }
-            isValid = host.IsValid = Regex.Match(host_address, regex_valid_ip).Success
-                || Regex.Match(host_address, regex_valid_host).Success;
-            return isValid ? null : failureMsg;
+            else
+            {
+                return null;
+            }
         }
 
-        static string ValidateHostConnectivity(IValidatedStringView host, IValidatedOptionView useTls, bool required, string failureMsg)
+        // Regex to validate IP address with optional port
+        var regex_valid_ip = @"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(:\d{1,5})?$";
+
+        // Regex to validate hostname with optional port
+        var regex_valid_host = @"^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])(:\d{1,5})?$";
+
+        // Remove protocol prefix if exists to validate the host or IP address
+        if (host_address.StartsWith("http://") || host_address.StartsWith("https://"))
         {
-            if (!required && host.Content.Trim() == "")
+            host_address = host_address.Substring(host_address.IndexOf("://") + 3);
+        }
+
+        // Check if the host address is valid
+        bool isValid = host.IsValid = Regex.Match(host_address, regex_valid_ip).Success
+            || Regex.Match(host_address, regex_valid_host).Success;
+
+        // Return null if valid, otherwise return the failure message
+        return isValid ? null : failureMsg;
+    }
+
+    static string ValidateHostConnectivity(IValidatedStringView host, IValidatedOptionView useTls, bool required, string failureMsg)
+        {
+            if (!required)
                 return null;
 
             string url = host.Content.Trim();
@@ -460,9 +470,9 @@ namespace SyslogAgent.Config
             return (errMsg == null ? null : $"{failureMsg} {errMsg}");
         }
 
-        static string ValidateTlsCertificate(IValidatedOptionView useTls, IValidatedStringView host, bool is_secondary, string failureMsg)
+        static string ValidateTlsCertificate(IValidatedOptionView useTls, IValidatedStringView host, bool is_required, bool is_secondary, string failureMsg)
         {
-            if ( !useTls.IsSelected )
+            if ( !useTls.IsSelected || !is_required)
             {
                 return null;
             }

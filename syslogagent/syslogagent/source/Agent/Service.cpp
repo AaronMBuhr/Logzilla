@@ -78,6 +78,7 @@ void Service::run(bool running_as_console) {
 		log_msg_sender_ = make_shared<MessageQueueLogMessageSender>(primary_message_queue_, secondary_message_queue_);
 		Logger::debug("Service::run()> starting file watcher for %s\n", Util::wstr2str(config_.tail_filename_).c_str());
 		filewatcher_ = make_shared<FileWatcher>(
+			config_,
 			static_cast<shared_ptr<JsonLogMessageHandler>>(log_msg_sender_),
 			config_.tail_filename_.c_str(),
 			config_.MAX_TAIL_FILE_LINE_LENGTH,
@@ -113,12 +114,15 @@ void Service::run(bool running_as_console) {
 
 	string logzilla_version;
 
-	Logger::debug2("Service::run()> getting primary LogZilla version\n");
+	Logger::info("Service::run()> getting primary LogZilla version...\n");
 	logzilla_version = primary_network_client_->getLogzillaVersion();
 	if (logzilla_version == "") {
+		Logger::info("Error getting version.\n");
         Logger::critical("Could not get primary LogZilla version\n");
     }
 	else {
+		logzilla_version = "6.34"; // DEBUGGING
+		Logger::info("LogZilla version %s\n", logzilla_version.c_str());
 		config_.setPrimaryLogzillaVersion(logzilla_version);
 	}
 
@@ -143,12 +147,14 @@ void Service::run(bool running_as_console) {
             }
 		}
 
-		Logger::debug2("Service::run()> getting secondary LogZilla version\n");
+		Logger::info("Service::run()> getting secondary LogZilla version...\n");
 		logzilla_version = secondary_network_client_->getLogzillaVersion();
 		if (logzilla_version == "") {
+			Logger::info("Error getting version.\n");
 			Logger::critical("Could not get secondary LogZilla version\n");
 		}
 		else {
+			Logger::info("LogZilla version %s\n", logzilla_version.c_str());
 			config_.setSecondaryLogzillaVersion(logzilla_version);
 		}
 
