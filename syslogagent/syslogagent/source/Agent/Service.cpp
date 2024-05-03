@@ -22,7 +22,6 @@ Copyright © 2021 Logzilla Corp.
 #include "EventLogEvent.h"
 #include "EventLogSubscription.h"
 #include "FileWatcher.h"
-#include "MessageQueueLogMessageSender.h"
 #include "Service.h"
 #include "SyslogAgentSharedConstants.h"
 #include "SyslogSender.h"
@@ -37,7 +36,6 @@ shared_ptr<MessageQueue> Service::primary_message_queue_ = nullptr;
 shared_ptr<MessageQueue> Service::secondary_message_queue_ = nullptr;
 shared_ptr<NetworkClient> Service::primary_network_client_ = nullptr;
 shared_ptr<NetworkClient> Service::secondary_network_client_ = nullptr;
-shared_ptr<MessageQueueLogMessageSender> Service::log_msg_sender_ = nullptr;
 
 volatile bool Service::shutdown_requested_ = false;
 volatile bool Service::service_shutdown_requested_ = false;
@@ -75,11 +73,9 @@ void Service::run(bool running_as_console) {
 
 	if (config_.tail_filename_ != L"") {
 		string program_name = Util::wstr2str(config_.tail_program_name_);
-		log_msg_sender_ = make_shared<MessageQueueLogMessageSender>(primary_message_queue_, secondary_message_queue_);
 		Logger::debug("Service::run()> starting file watcher for %s\n", Util::wstr2str(config_.tail_filename_).c_str());
 		filewatcher_ = make_shared<FileWatcher>(
 			config_,
-			static_cast<shared_ptr<JsonLogMessageHandler>>(log_msg_sender_),
 			config_.tail_filename_.c_str(),
 			config_.MAX_TAIL_FILE_LINE_LENGTH,
 			program_name.c_str(),

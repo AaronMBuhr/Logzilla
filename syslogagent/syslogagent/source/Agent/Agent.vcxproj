@@ -139,10 +139,8 @@
     <ClInclude Include="Debug.h" />
     <ClInclude Include="FileWatcher.h" />
     <ClInclude Include="Heartbeat.h" />
-    <ClInclude Include="JsonLogMessageHandler.h" />
     <ClInclude Include="message.h" />
     <ClInclude Include="MessageQueue.h" />
-    <ClInclude Include="MessageQueueLogMessageSender.h" />
     <ClInclude Include="NetworkClient.h" />
     <ClInclude Include="OStreamBuf.h" />
     <ClInclude Include="pugiconfig.hpp" />
@@ -176,9 +174,7 @@
     <ClCompile Include="Debug.cpp" />
     <ClCompile Include="FileWatcher.cpp" />
     <ClCompile Include="Heartbeat.cpp" />
-    <ClCompile Include="JsonLogMessageHandler.cpp" />
     <ClCompile Include="MessageQueue.cpp" />
-    <ClCompile Include="MessageQueueLogMessageSender.cpp" />
     <ClCompile Include="NetworkClient.cpp" />
     <ClCompile Include="pugixml.cpp" />
     <ClCompile Include="RecordNumber.cpp" />

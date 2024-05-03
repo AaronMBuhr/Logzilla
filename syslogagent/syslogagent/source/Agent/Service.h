@@ -11,7 +11,6 @@ Copyright © 2021 Logzilla Corp.
 #include "FileWatcher.h"
 #include "Logger.h"
 #include "MessageQueue.h"
-#include "MessageQueueLogMessageSender.h"
 #include "NetworkClient.h"
 #include "WindowsEvent.h"
 
@@ -39,7 +38,6 @@ namespace Syslog_agent {
         static Configuration config_;
         static shared_ptr<NetworkClient> primary_network_client_;
         static shared_ptr<NetworkClient> secondary_network_client_;
-        static shared_ptr<MessageQueueLogMessageSender> log_msg_sender_;
         static volatile bool shutdown_requested_;
         static volatile bool service_shutdown_requested_;
         static WindowsEvent shutdown_event_;

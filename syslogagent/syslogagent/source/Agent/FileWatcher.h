@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include "Configuration.h"
-#include "JsonLogMessageHandler.h"
 #include "MessageQueue.h"
 #include "Result.h"
 #include "SyslogAgentSharedConstants.h"
@@ -22,7 +21,6 @@ namespace Syslog_agent {
 		const static int READ_BUF_SIZE = 4000;
 		FileWatcher(
 			Configuration& config,
-			shared_ptr<JsonLogMessageHandler> log_message_handler,
 			const wchar_t* filename,
 			int max_line_length,
 			const char* program_name,
@@ -37,7 +35,6 @@ namespace Syslog_agent {
 		int max_line_length_;
 		vector<char> read_buffer_;
 		vector<char> message_buffer_;
-		shared_ptr<JsonLogMessageHandler> log_message_handler_;
 		wstring filename_;
 		char filename_multibyte_[2000];
 		char filename_multibyte_escaped_[2000];

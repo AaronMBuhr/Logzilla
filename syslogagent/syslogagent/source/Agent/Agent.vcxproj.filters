@@ -90,12 +90,6 @@
     <ClInclude Include="FileWatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="JsonLogMessageHandler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MessageQueueLogMessageSender.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="SyslogAgentSharedConstants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -183,12 +177,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="FileWatcher.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MessageQueueLogMessageSender.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="JsonLogMessageHandler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="EventLogSubscription.cpp">

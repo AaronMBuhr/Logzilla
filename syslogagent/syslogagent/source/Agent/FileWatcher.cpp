@@ -14,7 +14,6 @@ using namespace Syslog_agent;
 
 FileWatcher::FileWatcher(
 	Configuration& config,
-	shared_ptr<JsonLogMessageHandler> log_message_handler,
 	const wchar_t* filename,
 	int max_line_length,
 	const char* program_name,
@@ -23,7 +22,6 @@ FileWatcher::FileWatcher(
 	int facility
 ) 
 	: config_(config), 
-	log_message_handler_(log_message_handler),
 	filename_(filename),
 	max_line_length_(max_line_length),
 	program_name_(program_name),
