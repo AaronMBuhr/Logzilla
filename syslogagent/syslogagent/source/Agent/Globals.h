@@ -2,7 +2,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
-#include "BitmappedUsageCollection.h"
+#include "BitmappedObjectPool.h"
 
 /*
 I realize globals / singletons are denigrated but given that this app
@@ -32,7 +32,7 @@ namespace Syslog_agent {
 			int buffer_chunk_size,
 			int percent_slack);
 		static std::unique_ptr<Globals> instance_;
-		std::unique_ptr<BitmappedUsageCollection<char[MESSAGE_BUFFER_SIZE]>> message_buffers_;
+		std::unique_ptr<BitmappedObjectPool<char[MESSAGE_BUFFER_SIZE]>> message_buffers_;
 #ifdef DEBUG
 		std::mutex debug_logging_;
 #endif

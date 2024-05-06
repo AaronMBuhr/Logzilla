@@ -10,7 +10,7 @@ namespace Syslog_agent {
 
 	Globals::Globals(int buffer_chunk_size, int percent_slack) {
 		message_buffers_ 
-			= make_unique <BitmappedUsageCollection<char[MESSAGE_BUFFER_SIZE]>>(buffer_chunk_size, percent_slack);
+			= make_unique <BitmappedObjectPool<char[MESSAGE_BUFFER_SIZE]>>(buffer_chunk_size, percent_slack);
 	}
 
 	void Globals::Initialize() {
@@ -34,7 +34,7 @@ namespace Syslog_agent {
 
 	void Globals::releaseMessageBuffer(char* debug_text, char* buffer) {
 		auto ptr = (char(*)[MESSAGE_BUFFER_SIZE]) buffer;
-		message_buffers_->markUnused(ptr);
+		message_buffers_->markAsUnused(ptr);
 #ifdef DEBUG
 		const std::lock_guard<std::mutex> lock(debug_logging_);
 		FILE* f = fopen("d:\\temp\\buffers.log", "a");

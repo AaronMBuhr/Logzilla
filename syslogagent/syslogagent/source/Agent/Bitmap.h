@@ -6,6 +6,7 @@
 class Bitmap
 {
 public:
+	static constexpr size_t INVALID_BIT_NUMBER = ~static_cast<size_t>(0);
 	Bitmap(int number_of_bits, unsigned char initial_bit_value);
 	bool isSet(int bit_number);
 	unsigned char bitValue(int bit_number);
@@ -22,7 +23,6 @@ public:
 	std::string asBinaryString();
 
 private:
-	static const size_t INVALID_BIT_NUMBER;
 	int number_of_bits_;
 	int number_of_words_;
 	std::vector<size_t> bitmap_;

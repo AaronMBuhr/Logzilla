@@ -300,6 +300,7 @@ namespace SyslogAgent.Config
                 if (dialog_result == System.Windows.Forms.DialogResult.OK)
                 {
                     txtTailFilename.Text = open_file_dialog.FileName;
+                    txtTailProgramName.IsEnabled = true;
                 }
                 else
                 {
@@ -336,8 +337,14 @@ namespace SyslogAgent.Config
         private void txtTailFilename_LostFocus(object sender, RoutedEventArgs e)
         {
             txtTailFilename.Text = txtTailFilename.Text.Trim();
-            if (txtTailFilename.Text == "")
+            if (txtTailFilename.Text == "") { 
                 txtTailProgramName.Text = "";
+                txtTailProgramName.IsEnabled = false;
+            }
+            else
+            {
+                txtTailProgramName.IsEnabled = true;
+            }
             SetTailProgramAvailable();
         }
 

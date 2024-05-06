@@ -3,7 +3,7 @@
 #include <memory>
 #include <Windows.h>
 #include <winevt.h>
-#include "BitmappedUsageCollection.h"
+#include "BitmappedObjectPool.h"
 #include "pugixml.hpp"
 
 using namespace std;

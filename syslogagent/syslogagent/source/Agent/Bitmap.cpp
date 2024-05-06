@@ -1,22 +1,22 @@
 #include "stdafx.h"
 #include "Bitmap.h"
 
-using namespace std;
+#define BITS_PER_BYTE 8
 
-const size_t Bitmap::INVALID_BIT_NUMBER = ~((size_t)0);
+using namespace std;
 
 Bitmap::Bitmap(int number_of_bits, unsigned char initial_bit_value) {
 	number_of_bits_ = number_of_bits;
-	number_of_words_ = (number_of_bits / (sizeof(size_t) * 8)) + ((number_of_bits % (sizeof(size_t) * 8)) == 0 ? 0 : 1);
+	number_of_words_ = (number_of_bits / (sizeof(size_t) * BITS_PER_BYTE)) + ((number_of_bits % (sizeof(size_t) * BITS_PER_BYTE)) == 0 ? 0 : 1);
 	size_t initial_word_value = (initial_bit_value ? ~0 : 0);
 	bitmap_.resize(number_of_words_);
 	fill(bitmap_.begin(), bitmap_.end(), initial_word_value);  // unoptimized
 }
 
 unsigned char Bitmap::bitValue(int bit_number) {
-	int word_num = bit_number / (sizeof(size_t) * 8);
-	size_t word_bit_number = bit_number % (sizeof(size_t) * 8);
-	size_t check_bit = ((size_t)1) << word_bit_number;
+	int word_num = bit_number / (sizeof(size_t) * BITS_PER_BYTE);
+	size_t word_bit_number = bit_number % (sizeof(size_t) * BITS_PER_BYTE);
+	size_t check_bit = (static_cast<size_t>(1)) << word_bit_number;
 	return (bitmap_[word_num] & check_bit) ? 1 : 0;
 }
 
@@ -25,9 +25,9 @@ bool Bitmap::isSet(int bit_number) {
 }
 
 void Bitmap::setBitTo(int bit_number, unsigned char new_bit_value) {
-	int word_num = bit_number / (sizeof(size_t) * 8);
-	int word_bit_number = bit_number % (sizeof(size_t) * 8);
-	size_t check_bit = ((size_t)1) << word_bit_number;
+	int word_num = bit_number / (sizeof(size_t) * BITS_PER_BYTE);
+	int word_bit_number = bit_number % (sizeof(size_t) * BITS_PER_BYTE);
+	size_t check_bit = (static_cast<size_t>(1)) << word_bit_number;
 	if (new_bit_value) {
 		bitmap_[word_num] |= check_bit;
 	}
@@ -48,7 +48,7 @@ int Bitmap::getAndOptionallyClearFirstOne(bool do_clear) {
 					result = -1;
 					break;
 				}
-				size_t check_bit = ((size_t)1) << bit_num;
+				size_t check_bit = (static_cast<size_t>(1)) << bit_num;
 				if (check_bit & check_word) {
 					result = word_num * sizeof(size_t) + bit_num;
 					if (do_clear) {
@@ -71,15 +71,15 @@ int Bitmap::getAndOptionallySetFirstZero(bool do_set) {
 	for (int word_num = 0; word_num < number_of_words_; ++word_num) {
 		size_t check_word = bitmap_[word_num];
 		if (check_word != (size_t)~0) {
-			for (int bit_num = 0; bit_num < sizeof(size_t) * 8; ++bit_num) {
+			for (int bit_num = 0; bit_num < sizeof(size_t) * BITS_PER_BYTE; ++bit_num) {
 				// if we've gone too far then return -1
-				if (word_num * sizeof(size_t) * 8 + bit_num >= number_of_bits_) {
+				if (word_num * sizeof(size_t) * BITS_PER_BYTE + bit_num >= number_of_bits_) {
 					result = -1;
 					break;
 				}
-				size_t check_bit = ((size_t)1) << bit_num;
+				size_t check_bit = (static_cast<size_t>(1)) << bit_num;
 				if ((check_bit & check_word) == 0) {
-					result = word_num * sizeof(size_t) * 8 + bit_num;
+					result = word_num * sizeof(size_t) * BITS_PER_BYTE + bit_num;
 					if (do_set) {
 						bitmap_[word_num] |= check_bit;
 					}
@@ -133,11 +133,11 @@ int Bitmap::countOnes() {
 	int number_of_ones = 0;
 	for (int word_num = 0; word_num < number_of_words_; ++word_num) {
 		size_t check_word = bitmap_[word_num];
-		for (int bit_num = 0; bit_num < sizeof(size_t) * 8; ++bit_num) {
-			if (word_num * sizeof(size_t) * 8 + bit_num >= number_of_bits_) {
+		for (int bit_num = 0; bit_num < sizeof(size_t) * BITS_PER_BYTE; ++bit_num) {
+			if (word_num * sizeof(size_t) * BITS_PER_BYTE + bit_num >= number_of_bits_) {
 				break;
 			}
-			size_t check_bit = ((size_t)1) << bit_num;
+			size_t check_bit = (static_cast<size_t>(1)) << bit_num;
 			if (check_bit & check_word) {
 				++number_of_ones;
 			}
@@ -166,7 +166,7 @@ string Bitmap::asHexString() {
 string Bitmap::asBinaryString() {
 	char buf[1001];
 	if (number_of_bits_ > 1000) {
-		throw std::runtime_error("too many bits in bitmap for binary string");
+		return "(too many bits for binary string)";
 	}
 	int i;
 	for (i = 0; i < number_of_bits_; ++i) {

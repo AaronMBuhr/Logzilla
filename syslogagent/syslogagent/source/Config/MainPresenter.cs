@@ -38,6 +38,7 @@ namespace SyslogAgent.Config
         {
             try
             {
+                string file_path = Globals.ExeFilePath + SharedConstants.SyslogAgentExeFilename;
                 FileVersionInfo verInfo = FileVersionInfo.GetVersionInfo(Globals.ExeFilePath + SharedConstants.SyslogAgentExeFilename);
                 return verInfo.ProductVersion;
             }

@@ -60,7 +60,7 @@
     <ClInclude Include="Bitmap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BitmappedUsageCollection.h">
+    <ClInclude Include="BitmappedObjectPool.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="WindowsEvent.h">

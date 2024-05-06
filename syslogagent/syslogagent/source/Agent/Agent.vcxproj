@@ -135,7 +135,7 @@
     <ClInclude Include="Logger.h" />
     <ClInclude Include="ArrayQueue.h" />
     <ClInclude Include="Bitmap.h" />
-    <ClInclude Include="BitmappedUsageCollection.h" />
+    <ClInclude Include="BitmappedObjectPool.h" />
     <ClInclude Include="Debug.h" />
     <ClInclude Include="FileWatcher.h" />
     <ClInclude Include="Heartbeat.h" />

@@ -402,27 +402,23 @@ int Util::compareSoftwareVersions(const std::string& version_a, const std::strin
 }
 
 
+#include <vector>
+#include <string>
+#include <sstream>
+#include <cctype>
+
 std::vector<int> Util::splitVersion(const std::string& version) {
 	std::vector<int> parts;
 	std::istringstream ss(version);
 	std::string token;
-	std::string numericPart;
 
 	while (std::getline(ss, token, '.')) {
 		if (!token.empty()) {
-			numericPart.clear(); // Clear previous numeric part
-			// Extract only the numeric part from the token
-			for (char ch : token) {
-				if (std::isdigit(ch)) {
-					numericPart += ch;
-				}
-				else {
-					// Break on first non-digit character
-					break;
-				}
-			}
-
-			if (!numericPart.empty()) {
+			// Find the first numeric part in the token
+			size_t start = token.find_first_of("0123456789");
+			if (start != std::string::npos) {
+				size_t end = token.find_first_not_of("0123456789", start);
+				std::string numericPart = token.substr(start, end - start);
 				try {
 					parts.push_back(std::stoi(numericPart));
 				}
@@ -431,7 +427,7 @@ std::vector<int> Util::splitVersion(const std::string& version) {
 				}
 			}
 			else {
-				// If no digits were found, treat it as zero
+				// If no numeric part found, treat it as zero
 				parts.push_back(0);
 			}
 		}

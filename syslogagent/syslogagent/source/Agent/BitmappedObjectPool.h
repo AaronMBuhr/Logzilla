@@ -5,7 +5,7 @@
 #include <vector>
 
 template <class T>
-class BitmappedUsageCollection
+class BitmappedObjectPool
 {
 public:
 
@@ -17,10 +17,10 @@ public:
 				chunk is entirely unused before getting rid of ones above it. -1
 				percent_slack means never free up chunks, keep them reserved forever. */
 
-	BitmappedUsageCollection(const int chunk_size, const int percent_slack) : chunk_size_(chunk_size), percent_slack_(percent_slack) {
+	BitmappedObjectPool(const int chunk_size, const int percent_slack) : chunk_size_(chunk_size), percent_slack_(percent_slack) {
 	}
 
-	template <class U> BitmappedUsageCollection(const BitmappedUsageCollection<U>& old_obj) {
+	template <class U> BitmappedObjectPool(const BitmappedObjectPool<U>& old_obj) {
 		usage_bitmaps_.reserve(old_obj.usage_bitmaps_.size());
 		for (const auto& e : old_obj.usage_bitmaps_) {
 			usage_bitmaps_.push_back(std::make_shared<Bitmap>(*e));
@@ -60,7 +60,7 @@ public:
 		return &last_data_element[bitnum];
 	}
 
-	bool markUnused(T*& now_unused) {
+	bool markAsUnused(T*& now_unused) {
 		const std::lock_guard<std::mutex> lock(in_use_);
 		unsigned int now_unused_bitmap_idx = 0;
 		uint64_t now_unused_bit = -1;

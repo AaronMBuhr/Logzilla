@@ -2,7 +2,7 @@
 #include <memory>
 #include <mutex>
 #include "ArrayQueue.h"
-#include "BitmappedUsageCollection.h"
+#include "BitmappedObjectPool.h"
 
 class MessageQueue
 {
@@ -34,7 +34,7 @@ private:
 		int data_length;
 	} Message;
 	unique_ptr<ArrayQueue<Message>> send_buffers_queue_;
-	unique_ptr<BitmappedUsageCollection<MessageBuffer>> send_buffers_;
+	unique_ptr<BitmappedObjectPool<MessageBuffer>> send_buffers_;
 
 	int message_queue_size_;
 	int message_queue_chunk_size_;

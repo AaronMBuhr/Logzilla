@@ -11,7 +11,7 @@ MessageQueue::MessageQueue(
 	in_use_counter_(0)
 {
 	send_buffers_queue_ = make_unique<ArrayQueue<Message>>(message_queue_size_);
-	send_buffers_ = make_unique<BitmappedUsageCollection<MessageBuffer>>(message_buffers_chunk_size, MESSAGE_QUEUE_SLACK_PERCENT);
+	send_buffers_ = make_unique<BitmappedObjectPool<MessageBuffer>>(message_buffers_chunk_size, MESSAGE_QUEUE_SLACK_PERCENT);
 }
 
 
@@ -67,7 +67,7 @@ int MessageQueue::dequeue(char* message_content, const int max_len) {
 	for (int c = 0; c < num_chunks; ++c) {
 		int copy_size = (leftover == 0 || c < num_chunks - 1) ? MESSAGE_BUFFER_SIZE : leftover;
 		memcpy(bufptr, message.message_buffers[c]->buffer, copy_size);
-		send_buffers_->markUnused(message.message_buffers[c]);
+		send_buffers_->markAsUnused(message.message_buffers[c]);
 		bufptr += MESSAGE_BUFFER_SIZE;
 	}
 	return message.data_length;
@@ -120,7 +120,7 @@ bool MessageQueue::removeFront() {
 		int leftover = message.data_length % MESSAGE_BUFFER_SIZE;
 		int num_chunks = message.data_length / MESSAGE_BUFFER_SIZE + (leftover == 0 ? 0 : 1);
 		for (int c = 0; c < num_chunks; ++c) {
-			send_buffers_->markUnused(message.message_buffers[c]);
+			send_buffers_->markAsUnused(message.message_buffers[c]);
 		}
 	}
 	if (was_error) {

@@ -117,8 +117,10 @@ void Service::run(bool running_as_console) {
         Logger::critical("Could not get primary LogZilla version\n");
     }
 	else {
-		logzilla_version = "6.34"; // DEBUGGING
 		Logger::info("LogZilla version %s\n", logzilla_version.c_str());
+		if (logzilla_version[0] == 'v') {
+			logzilla_version = logzilla_version.substr(1);
+		}
 		config_.setPrimaryLogzillaVersion(logzilla_version);
 	}
 
@@ -151,6 +153,9 @@ void Service::run(bool running_as_console) {
 		}
 		else {
 			Logger::info("LogZilla version %s\n", logzilla_version.c_str());
+			if (logzilla_version[0] == 'v') {
+				logzilla_version = logzilla_version.substr(1);
+			}
 			config_.setSecondaryLogzillaVersion(logzilla_version);
 		}
 

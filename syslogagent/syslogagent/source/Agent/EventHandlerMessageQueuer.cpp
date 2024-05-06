@@ -122,8 +122,8 @@ namespace Syslog_agent {
 		sscanf_s(event_id_str, "%u", &event_id);
 		if (configuration_.include_vs_ignore_eventids_) {
 			if (configuration_.event_id_filter_.find(event_id) == configuration_.event_id_filter_.end()) {
-                return false;
-            }
+				return false;
+			}
 		}
 		else
 		{
@@ -171,24 +171,24 @@ namespace Syslog_agent {
 			json_output << " \"ts\": " << timestamp << "." << decimal_time << ",";
 		}
 		if (configuration_.host_name_[0] != 0) {
-            json_output << " \"host\": \"" << configuration_.host_name_ << "\",";
-        }
+			json_output << " \"host\": \"" << configuration_.host_name_ << "\",";
+		}
 		json_output
 			<< " \"program\": \"" << provider << "\","
 			<< " \"severity\": " << ((char)(severity + '0')) << ","
 			<< " \"facility\": " << configuration_.facility_;
 		switch (logformat) {
-			case SYSLOGAGENT_LOGFORMAT_HTTPPORT:
-				json_output << ", \"message\": \"" << escaped_buf << "\" ";
-				break;
+		case SYSLOGAGENT_LOGFORMAT_HTTPPORT:
+			json_output << ", \"message\": \"" << escaped_buf << "\" ";
+			break;
 
-			case SYSLOGAGENT_LOGFORMAT_JSONPORT:
-				json_output << ", \"message\": \"JSON log event\" ";
-				break;
+		case SYSLOGAGENT_LOGFORMAT_JSONPORT:
+			json_output << ", \"message\": \"JSON log event\" ";
+			break;
 
-			default:
-				Logger::fatal("EventHandlerMessageQueuer::generateLogMessage()> Unknown logformat: %d", logformat);
-				exit(1); // shouldn't be needed
+		default:
+			Logger::fatal("EventHandlerMessageQueuer::generateLogMessage()> Unknown logformat: %d", logformat);
+			exit(1); // shouldn't be needed
 		}
 		json_output << ", \"extra_fields\": { "
 			<< " \"_source_tag\": \"windows_agent\","
@@ -219,10 +219,15 @@ namespace Syslog_agent {
 				json_output << ", \"" << data_name << "\": \"" << escaped_buf << "\"";
 			}
 		}
-		json_output << " }";
+		if (logformat == SYSLOGAGENT_LOGFORMAT_JSONPORT) {
+			json_output << " }";
+		}	
 		Globals::instance()->releaseMessageBuffer("escaped_buf", escaped_buf);
 		if (suffix_utf8_[0] != 0) {
 			json_output << "," << suffix_utf8_;
+		}
+		if (logformat != SYSLOGAGENT_LOGFORMAT_JSONPORT) {
+			json_output << " }";
 		}
 		json_output << " }" << (char)10 << (char)0;
 
