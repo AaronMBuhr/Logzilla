@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <clocale>
 #include <codecvt>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <locale>
@@ -17,11 +18,8 @@
 
 using namespace std;
 
-const string Logger::EVENTS_FILE_PATH_AND_FILENAME = "events.out";
-const wstring Logger::DEFAULT_LOG_FILENAME = L"syslogagent.log";
 Logger* Logger::singleton_ = nullptr;
-char const* Logger::LOGLEVEL_ABBREVS[] = { "DBG3", "DBG2", "DEBG", "VERB", "INFO", "WARN", "RERR", "CRIT", "FATL", "NONE", "ALWY", "FORC"};
-char* Logger::LOGLEVEL_ABBREVS_WITHBRACKET[];
+vector<string> Logger::LOGLEVEL_ABBREVS_WITHBRACKET;
 
 Logger* Logger::singleton() {
 	if (singleton_ == nullptr) {
@@ -30,21 +28,21 @@ Logger* Logger::singleton() {
 	return singleton_;
 }
 
-Logger::Logger() : log_path_and_filename_(DEFAULT_LOG_FILENAME), log_events_to_file_(false), is_unittest_running_(-1) {
+Logger::Logger() 
+	: log_path_and_filename_(DEFAULT_LOG_FILENAME), 
+	log_events_to_file_(false), 
+	is_unittest_running_(-1),
+	fatal_error_handler_(nullptr) {
 	log_message_buffer_[0] = 0;
 	int l = 0;
+	LOGLEVEL_ABBREVS_WITHBRACKET.resize(static_cast<int>(LogLevel::FORCE) + 1);
 	do {
-		LOGLEVEL_ABBREVS_WITHBRACKET[l] = new char[7];
-		sprintf_s(LOGLEVEL_ABBREVS_WITHBRACKET[l],7, "%s] ", LOGLEVEL_ABBREVS[l]);
+		LOGLEVEL_ABBREVS_WITHBRACKET[l] = std::string(LOGLEVEL_ABBREVS[l]) + "] ";
 	} while (l++ != static_cast<int>(LogLevel::FORCE));
 }
 
 
 bool Logger::log(const LogLevel log_level, const char* format, ...) {
-
-	//bool do_log = (log_level == FORCE)
-	//	|| (singleton()->current_log_level_ != NOLOG && log_level == ALWAYS)
-	//	|| (log_level >= singleton()->current_log_level_);
 
 	bool log_level_force = log_level == FORCE;
 	bool current_log_level_nolog = singleton()->current_log_level_ == NOLOG;
@@ -59,13 +57,13 @@ bool Logger::log(const LogLevel log_level, const char* format, ...) {
 	}
 	bool result;
 
-	singleton()->logger_lock_.lock();
+	std::unique_lock<std::mutex> lock(singleton()->logger_lock_);
 
 	char dt_buf[40];
-	time_t     now = time(0);
-	struct tm  tstruct;
+	time_t now = time(0);
+	struct tm tstruct;
 	localtime_s(&tstruct, &now);
-	const char* log_abbrev = (log_level <= FORCE ? LOGLEVEL_ABBREVS_WITHBRACKET[static_cast<int>(log_level)] : nullptr);
+	const char* log_abbrev = (log_level <= FORCE ? LOGLEVEL_ABBREVS_WITHBRACKET[static_cast<int>(log_level)].c_str() : nullptr);
 	strftime(dt_buf, sizeof(dt_buf), "[%Y%m%d.%H%M%S ", &tstruct);
 	switch (singleton()->log_destination_) {
 	case DEST_CONSOLE:
@@ -98,7 +96,6 @@ bool Logger::log(const LogLevel log_level, const char* format, ...) {
 		);
 		va_end(args);
 
-		// TODO move the switch logic into a function pointer
 		bool result = true;
 		switch (singleton()->log_destination_) {
 		case DEST_CONSOLE:
@@ -112,7 +109,6 @@ bool Logger::log(const LogLevel log_level, const char* format, ...) {
 			break;
 		}
 	}
-	singleton()->logger_lock_.unlock();
 	return result;
 }
 
@@ -121,7 +117,8 @@ bool Logger::log_no_datetime(const LogLevel log_level, const char* format, ...) 
 	if (log_level < singleton()->current_log_level_) {
 		return true;
 	}
-	singleton()->logger_lock_.lock();
+	std::unique_lock<std::mutex> lock(singleton()->logger_lock_);
+
 	va_list args;
 	va_start(args, format);
 	int num_chars = vsnprintf_s(
@@ -133,7 +130,6 @@ bool Logger::log_no_datetime(const LogLevel log_level, const char* format, ...) 
 	);
 	va_end(args);
 
-	// TODO move the switch logic into a function pointer
 	bool result = true;
 	switch (singleton()->log_destination_) {
 	case DEST_CONSOLE:
@@ -146,11 +142,11 @@ bool Logger::log_no_datetime(const LogLevel log_level, const char* format, ...) 
 		result = singleton()->logToConsoleAndFile(singleton()->log_message_buffer_);
 		break;
 	}
-	singleton()->logger_lock_.unlock();
 	return result;
 }
 
 void Logger::setLogLevel(const LogLevel log_level) {
+	std::lock_guard<std::mutex> guard(singleton()->logger_lock_);
 	singleton()->current_log_level_ = log_level;
 	if (log_level != NOLOG) {
 		always("Log level set to: %s\n", LOGLEVEL_ABBREVS[(int) log_level]);
@@ -162,17 +158,18 @@ Logger::LogLevel Logger::getLogLevel() {
 }
 
 void Logger::setLogDestination(LogDestination log_destination) {
+	std::lock_guard<std::mutex> guard(singleton()->logger_lock_);
 	singleton()->log_destination_ = log_destination;
 }
 
-bool Logger::logToConsole(const char* log_message_cstring) {
+bool Logger::logToConsole(const char* log_message_cstring) const {
 	if (log_message_cstring) {
 		printf("%s", log_message_cstring);
 	}
 	return true;
 }
 
-bool Logger::logToFile(const char* log_message_cstring) {
+bool Logger::logToFile(const char* log_message_cstring) const {
 	if (log_message_cstring) {
 		FILE* logfile;
 		_wfopen_s(&logfile, log_path_and_filename_.c_str(), L"a");
@@ -185,7 +182,7 @@ bool Logger::logToFile(const char* log_message_cstring) {
 	return true;
 }
 
-bool Logger::logToConsoleAndFile(const char* log_message_cstring) {
+bool Logger::logToConsoleAndFile(const char* log_message_cstring) const {
 	logToConsole(log_message_cstring);
 	logToFile(log_message_cstring);
 	return true;
@@ -211,15 +208,6 @@ void Logger::setLogFile(const wstring const_log_path_and_filename) {
 }
 
 
-void Logger::logEventToFile(string event_message) {
-	if (!getLogEventsToFile()) return;
-	ofstream events_file;
-	events_file.open(EVENTS_FILE_PATH_AND_FILENAME, ios::app);
-	events_file << event_message << endl << endl;
-	events_file.close();
-}
-
-
 void Logger::getDateTimeStr(char* buf, int bufsize) {
 	time_t     now = time(0);
 	struct tm  tstruct;
@@ -227,9 +215,21 @@ void Logger::getDateTimeStr(char* buf, int bufsize) {
 	strftime(buf, bufsize, "%Y-%m-%d.%X", &tstruct);
 }
 
+
 bool Logger::isUnittestRunning() {
 	if (singleton()->is_unittest_running_ == -1) {
-		singleton()->is_unittest_running_ = strcmp(getenv("UNITTEST_RUNNING"), "1") == 0 ? 1 : 0;
+		char value[16];  // Buffer to store the environment variable value
+		size_t size = sizeof(value);
+		errno_t err = getenv_s(&size, value, "UNITTEST_RUNNING");
+
+		if (err != 0 || size == 0) {
+			singleton()->is_unittest_running_ = 0;
+			// Failed to retrieve the variable, assuming not running
+		}
+		else {
+			// Compare the value and set is_unittest_running_ appropriately
+			singleton()->is_unittest_running_ = (strcmp(value, "1") == 0) ? 1 : 0;
+		}
 	}
 	return singleton()->is_unittest_running_ == 1;
 }

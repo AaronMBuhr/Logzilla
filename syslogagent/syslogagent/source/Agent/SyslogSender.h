@@ -41,5 +41,8 @@ namespace Syslog_agent {
         shared_ptr<NetworkClient> secondary_network_client_;
         volatile static bool stop_requested_;
         unique_ptr<char[]> message_buffer_;
+
+        int sendMessageBatch(shared_ptr<MessageQueue> msg_queue, shared_ptr
+            <NetworkClient> network_client, char* buf) const;
     };
 }

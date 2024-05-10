@@ -18,6 +18,6 @@ namespace Syslog_agent {
         std::string nname_;
         std::wstring bookmark_;
         void loadFromRegistry(Registry& parent);
-        void saveToRegistry(Registry& parent);
+        void saveToRegistry(Registry& parent) const;
     };
 }

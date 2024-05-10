@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 
 #include <memory>
@@ -15,9 +20,9 @@ namespace Syslog_agent {
 		~EventLogEvent();
 		void renderEvent();
 		pugi::xml_document& getXmlDoc() { return xml_doc_; }
-		bool isRendered() { return xml_buffer_ != nullptr; }
-		char* getEventXml() { return xml_buffer_; }
-		char* getEventText() { return text_buffer_; }
+		bool isRendered() const { return xml_buffer_ != nullptr; }
+		char* getEventXml() const { return xml_buffer_; }
+		char* getEventText() const { return text_buffer_; }
 
 	private:
 		void renderXml();

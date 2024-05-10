@@ -34,15 +34,16 @@ FileWatcher::FileWatcher(
 	last_char_read_(0),
 	num_prebuffer_chars_(0)
 {
-	filename_ = wstring(filename);
-	size_t num_bytes_used = wcstombs(filename_multibyte_, filename_.c_str(), sizeof(filename_multibyte_));
-	if (num_bytes_used < 1) {
+	size_t num_bytes_used;
+	errno_t result = wcstombs_s(&num_bytes_used, filename_multibyte_, sizeof(filename_multibyte_), 
+		filename_.c_str(), filename_.length());
+	if (result != ERROR_SUCCESS || num_bytes_used < 1) {
 		filename_multibyte_[0] = 0;
 		throw Result(ResultCodes::BadFileName, "FileWatcher()", "couldn't parse filename");
 	}
 	string filename_escaped(filename_multibyte_, num_bytes_used);
 	Util::replaceAll(filename_escaped, "\\", "\\\\");
-	strcpy(filename_multibyte_escaped_, filename_escaped.c_str());
+	strcpy_s(filename_multibyte_escaped_, sizeof(filename_multibyte_escaped_), filename_escaped.c_str());
 	read_buffer_.resize(max_line_length + READ_BUF_SIZE);
 	buffer_write_start_ = read_buffer_.data() + max_line_length;
 	num_prebuffer_chars_ = 0;
@@ -90,7 +91,8 @@ Result FileWatcher::readToLastLine() {
 		file_pos.QuadPart = 0 - max_line_length_;
 		if (0 == SetFilePointerEx(file_handle, file_pos, NULL, FILE_END)) {
 			CloseHandle(file_handle);
-			return Result::ResultLog(ResultCodes::FailReadFile, Logger::DEBUG2, "could not seek log file %s, error %d", filename_multibyte_, GetLastError());
+			return Result::ResultLog(ResultCodes::FailReadFile, Logger::DEBUG2, 
+				"could not seek log file %s, error %d", filename_multibyte_, GetLastError());
 		}
 	}
 
@@ -99,7 +101,8 @@ Result FileWatcher::readToLastLine() {
 	if (0 == ReadFile((HANDLE)file_handle, read_buffer_.data(), max_line_length_, &num_bytes_read, NULL))
 	{
 		CloseHandle(file_handle);
-		return Result::ResultLog(ResultCodes::FailReadFile, Logger::DEBUG2, "could not read log file %s, error %d", filename_multibyte_, GetLastError());
+		return Result::ResultLog(ResultCodes::FailReadFile, Logger::DEBUG2, 
+			"could not read log file %s, error %d", filename_multibyte_, GetLastError());
 	}
 	if (num_bytes_read < 1)
 	{
@@ -151,7 +154,7 @@ void FileWatcher::processLine(const char* line_cstr) {
 
 		int log_format = (servernum == 0 ? config_.getPrimaryLogformat() : config_.getSecondaryLogformat());
 
-		if (log_format == SYSLOGAGENT_LOGFORMAT_HTTPPORT) {
+		if (log_format == SharedConstants::LOGFORMAT_HTTPPORT) {
 
 			stream_output << "{ "
 				<< "\"program\" : \"" << program_name_ << "\", "
@@ -173,9 +176,8 @@ void FileWatcher::processLine(const char* line_cstr) {
 		}
 
 		shared_ptr<MessageQueue> msg_queue = (servernum == 0 ? primary_message_queue_ : secondary_message_queue_);
-		msg_queue->lock();
-		msg_queue->enqueue(reinterpret_cast<const char*>(message_buffer_.data()), strlen(message_buffer_.data()));
-		msg_queue->unlock();
+		msg_queue->enqueue(reinterpret_cast<const char*>(message_buffer_.data()), 
+			static_cast<uint32_t>(strlen(message_buffer_.data())));
 
 		if (!config_.hasSecondaryHost()) {
 			break;
@@ -197,7 +199,8 @@ Result FileWatcher::process() {
 
 	LARGE_INTEGER current_file_size;
 	if (0 == GetFileSizeEx(file_handle, &current_file_size)) {
-		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s, error %d", filename_multibyte_, GetLastError());
+		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, 
+			"could not check file size %s, error %d", filename_multibyte_, GetLastError());
 	}
 
 	if (current_file_size.QuadPart == last_file_size_) {

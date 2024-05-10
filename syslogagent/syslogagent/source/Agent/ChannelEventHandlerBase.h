@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 #include "EventLogEvent.h"
 #include "Result.h"

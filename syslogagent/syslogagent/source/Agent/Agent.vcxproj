@@ -136,9 +136,7 @@
     <ClInclude Include="ArrayQueue.h" />
     <ClInclude Include="Bitmap.h" />
     <ClInclude Include="BitmappedObjectPool.h" />
-    <ClInclude Include="Debug.h" />
     <ClInclude Include="FileWatcher.h" />
-    <ClInclude Include="Heartbeat.h" />
     <ClInclude Include="message.h" />
     <ClInclude Include="MessageQueue.h" />
     <ClInclude Include="NetworkClient.h" />
@@ -147,7 +145,6 @@
     <ClInclude Include="pugixml.hpp" />
     <ClInclude Include="RecordNumber.h" />
     <ClInclude Include="Configuration.h" />
-    <ClInclude Include="resource.h" />
     <ClInclude Include="Result.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="LogConfiguration.h" />
@@ -171,9 +168,7 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="Bitmap.cpp" />
     <ClCompile Include="Configuration.cpp" />
-    <ClCompile Include="Debug.cpp" />
     <ClCompile Include="FileWatcher.cpp" />
-    <ClCompile Include="Heartbeat.cpp" />
     <ClCompile Include="MessageQueue.cpp" />
     <ClCompile Include="NetworkClient.cpp" />
     <ClCompile Include="pugixml.cpp" />

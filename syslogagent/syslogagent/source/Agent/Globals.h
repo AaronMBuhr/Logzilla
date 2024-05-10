@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 #include <memory>
 #include <mutex>
@@ -15,9 +20,9 @@ deallocated.
 namespace Syslog_agent {
 	class Globals {
 	public:
-		static const unsigned int MESSAGE_BUFFER_SIZE = 132000;
-		static const unsigned int BUFFER_CHUNK_SIZE = 12;
-		static const unsigned int PERCENT_SLACK = -1;
+		static constexpr unsigned int MESSAGE_BUFFER_SIZE = 132000;
+		static constexpr unsigned int BUFFER_CHUNK_SIZE = 12;
+		static constexpr unsigned int PERCENT_SLACK = -1;
 		static void Initialize();
 		char* getMessageBuffer(char *debug_text);
 		void releaseMessageBuffer(char* debug_text, char* buffer);
@@ -26,7 +31,7 @@ namespace Syslog_agent {
 				Initialize();
 			return instance_.get();
 		}
-		int getMessageBufferSize() { return message_buffers_->countBuffers(); }
+		int getMessageBufferSize() const { return message_buffers_->countBuffers(); }
 	private:
 		Globals(
 			int buffer_chunk_size,

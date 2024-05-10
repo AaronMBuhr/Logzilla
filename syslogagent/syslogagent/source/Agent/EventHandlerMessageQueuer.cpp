@@ -2,7 +2,6 @@
 #include <iomanip>
 #include <locale>
 #include <sstream>
-#include "Debug.h"
 #include "EventHandlerMessageQueuer.h"
 #include "Globals.h"
 #include "Logger.h"
@@ -25,15 +24,34 @@ namespace Syslog_agent {
 		secondary_message_queue_(secondary_message_queue)
 	{
 		DWORD chars_written;
-		chars_written = WideCharToMultiByte(CP_UTF8, 0, log_name, wcslen(log_name), log_name_utf8_, 999, NULL, NULL);
+		size_t length = wcslen(log_name);
+		if (length > INT_MAX) {
+			// Handle the error, perhaps by truncating or by throwing an exception
+			throw std::runtime_error("String too long");
+		}
+		chars_written = (DWORD)WideCharToMultiByte(CP_UTF8, 0, log_name,
+			static_cast<int>(length), log_name_utf8_, 999, NULL, NULL);
 		log_name_utf8_[chars_written] = 0;
 		if (configuration_.suffix_.length() > 0) {
-			if (configuration_.suffix_.length() > SYSLOGAGENT_MAX_SUFFIX_LENGTH) {
-				strcpy_s(suffix_utf8_, SYSLOGAGENT_MAX_SUFFIX_LENGTH, "\"error_suffix\": \"too long\"");
+			if (configuration_.suffix_.length() > SharedConstants::MAX_SUFFIX_LENGTH) {
+				strcpy_s(suffix_utf8_, SharedConstants::MAX_SUFFIX_LENGTH, 
+					"\"error_suffix\": \"too long\"");
 			}
 			else {
-				chars_written = WideCharToMultiByte(CP_UTF8, 0, configuration_.suffix_.c_str(), configuration_.suffix_.length(), suffix_utf8_, 1000, NULL, NULL);
-				suffix_utf8_[chars_written] = 0;
+				size_t length = configuration_.suffix_.length();
+				if (length > INT_MAX) {
+					// Handle the error, perhaps by truncating the string or throwing an exception
+					Logger::recoverable_error("Suffix length exceeds the maximum allowable"
+						" limit for WideCharToMultiByte.");
+					// Optionally, truncate length or take other corrective measures
+					length = INT_MAX;
+				}
+
+				// Now safely cast length to int since we've ensured it doesn't exceed INT_MAX
+				chars_written = WideCharToMultiByte(CP_UTF8, 0,
+					configuration_.suffix_.c_str(),
+					static_cast<int>(length),
+					suffix_utf8_, 1000, NULL, NULL);
 			}
 		}
 		else {
@@ -41,123 +59,125 @@ namespace Syslog_agent {
 		}
 	}
 
-	Result EventHandlerMessageQueuer::handleEvent(const wchar_t* subscription_name, EventLogEvent& event) {
-		// TODO maybe different return results?
+	Result EventHandlerMessageQueuer::handleEvent(const wchar_t* subscription_name, 
+		EventLogEvent& event) {
 		event.renderEvent();
 		char* json_buffer = Globals::instance()->getMessageBuffer("json_buffer");
 		int primary_logformat = configuration_.getPrimaryLogformat();
-		if (generateLogMessage(event, primary_logformat, json_buffer, Globals::MESSAGE_BUFFER_SIZE)) {
-#if !DEBUG_SETTINGS_SKIP_MESSAGEQUEUE
-			primary_message_queue_->lock();
-			if (primary_message_queue_->isFull()) {
+		if (generateLogMessage(event, primary_logformat, json_buffer, 
+			Globals::MESSAGE_BUFFER_SIZE)) {
+			while (primary_message_queue_->isFull()) {
 				primary_message_queue_->removeFront();
 			}
 			primary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
-			primary_message_queue_->unlock();
 			if (secondary_message_queue_ != nullptr) {
 				bool have_secondary_message = true;
 				int secondary_logformat = configuration_.getSecondaryLogformat();
 				if (primary_logformat != secondary_logformat) {
-					have_secondary_message = generateLogMessage(event, secondary_logformat, json_buffer, Globals::MESSAGE_BUFFER_SIZE);
+					have_secondary_message = generateLogMessage(event, 
+						secondary_logformat, json_buffer, Globals::MESSAGE_BUFFER_SIZE);
 				}
 				if (have_secondary_message) {
-					secondary_message_queue_->lock();
-					if (secondary_message_queue_->isFull()) {
+					while (secondary_message_queue_->isFull()) {
 						secondary_message_queue_->removeFront();
 					}
-					secondary_message_queue_->enqueue(json_buffer, (const int)strlen(json_buffer));
-					secondary_message_queue_->unlock();
+					secondary_message_queue_->enqueue(json_buffer, 
+						(const int)strlen(json_buffer));
 				}
 				else {
-					Logger::warn("EventHandlerMessageQueuer::handleEvent()> secondary generateLogMessage() failed");
+					Logger::warn("EventHandlerMessageQueuer::handleEvent()>"
+						" secondary generateLogMessage() failed");
 				}
             }
-			//SyslogSender::enqueue_timer_.set(configuration_.batch_interval_);
-#endif
 		}
 		else {
-            Logger::warn("EventHandlerMessageQueuer::handleEvent()> primary generateLogMessage() failed");
+            Logger::warn("EventHandlerMessageQueuer::handleEvent()> primary"
+				" generateLogMessage() failed");
         }
 		Globals::instance()->releaseMessageBuffer("json_buffer", json_buffer);
 		return Result((DWORD)ERROR_SUCCESS);
 	}
 
-	unsigned char EventHandlerMessageQueuer::unixSeverityFromWindowsSeverity(char windows_severity_num) {
+	unsigned char EventHandlerMessageQueuer::unixSeverityFromWindowsSeverity(
+		char windows_severity_num) {
 		unsigned char result = 0;
 		switch (windows_severity_num) {
 		case '0':
 			// "LogAlways"
-			result = SYSLOGAGENT_SEVERITY_NOTICE;
+			result = SharedConstants::Severities::NOTICE;
 			break;
 		case '1':
 			// "Critical"
-			result = SYSLOGAGENT_SEVERITY_CRITICAL;
+			result = SharedConstants::Severities::CRITICAL;
 			break;
 		case '2':
 			// "Error"
-			result = SYSLOGAGENT_SEVERITY_ERROR;
+			result = SharedConstants::Severities::ERR;
 			break;
 		case '3':
 			// "Warning":
-			result = SYSLOGAGENT_SEVERITY_WARNING;
+			result = SharedConstants::Severities::WARNING;
 			break;
 		case '4':
 			// "Informational"
-			result = SYSLOGAGENT_SEVERITY_INFORMATIONAL;
+			result = SharedConstants::Severities::INFORMATIONAL;
 			break;
 		case '5':
 			// "Verbose"
-			result = SYSLOGAGENT_SEVERITY_DEBUG;
+			result = SharedConstants::Severities::DEBUG;
 			break;
 		}
 		return result;
 	}
 
 
-	bool EventHandlerMessageQueuer::generateLogMessage(EventLogEvent& event, const int logformat, char* json_buffer, size_t buflen) {
+	bool EventHandlerMessageQueuer::generateLogMessage(EventLogEvent& event, 
+		const int logformat, char* json_buffer, size_t buflen) {
 
 		// figure out some message details
-		auto event_id_str = event.getXmlDoc().child("Event").child("System").child("EventID").child_value();
+		auto event_id_str 
+			= event.getXmlDoc().child("Event").child("System").child("EventID").child_value();
 		DWORD event_id;
 		sscanf_s(event_id_str, "%u", &event_id);
 		if (configuration_.include_vs_ignore_eventids_) {
-			if (configuration_.event_id_filter_.find(event_id) == configuration_.event_id_filter_.end()) {
+			if (configuration_.event_id_filter_.find(event_id) 
+				== configuration_.event_id_filter_.end()) {
 				return false;
 			}
 		}
 		else
 		{
-			if (configuration_.event_id_filter_.find(event_id) != configuration_.event_id_filter_.end()) {
+			if (configuration_.event_id_filter_.find(event_id) 
+				!= configuration_.event_id_filter_.end()) {
 				return false;
 			}
 		}
 		char severity;
-		if (configuration_.severity_ == SYSLOGAGENT_SEVERITY_DYNAMIC) {
-			auto level = event.getXmlDoc().child("Event").child("System").child("Level").child_value();
+		if (configuration_.severity_ == SharedConstants::Severities::DYNAMIC) {
+			auto level 
+				= event.getXmlDoc().child("Event").child("System").child("Level").child_value();
 			severity = unixSeverityFromWindowsSeverity(level[0]);
-			// Logger::always("%s > %d : %s\n", time_field, event_id, level);
 		}
 		else {
 			severity = configuration_.severity_;
 		}
 
-		auto time_field = event.getXmlDoc().child("Event").child("System").child("TimeCreated").attribute("SystemTime").value();
+		auto time_field 
+			= event.getXmlDoc().child("Event").child("System").child("TimeCreated").attribute("SystemTime").value();
 		time_t timestamp = 0;
 		unsigned int decimal_time = 0;
-#if !DEBUG_SETTINGS_SKIP_TIMESTAMP
 		std::tm t = {};
 		std::istringstream ss(time_field);
 		if (ss >> std::get_time(&t, "%Y-%m-%dT%H:%M:%S"))
 		{
 			timestamp = std::mktime(&t) - (60 * configuration_.utc_offset_minutes_);
-			// timestamp = std::mktime(&t);
 			auto time_period_pos = strstr(time_field, ".");
 			if (time_period_pos != NULL) {
 				sscanf_s(time_period_pos, ".%uZ", &decimal_time);
 			}
 		}
-#endif
-		auto provider = event.getXmlDoc().child("Event").child("System").child("Provider").attribute("Name").value();
+		auto provider 
+			= event.getXmlDoc().child("Event").child("System").child("Provider").attribute("Name").value();
 		// generate json
 		// we're going to copy the message text into the json so we need
 		// to escape certain characters for valid json
@@ -178,16 +198,17 @@ namespace Syslog_agent {
 			<< " \"severity\": " << ((char)(severity + '0')) << ","
 			<< " \"facility\": " << configuration_.facility_;
 		switch (logformat) {
-		case SYSLOGAGENT_LOGFORMAT_HTTPPORT:
+		case SharedConstants::LOGFORMAT_HTTPPORT:
 			json_output << ", \"message\": \"" << escaped_buf << "\" ";
 			break;
 
-		case SYSLOGAGENT_LOGFORMAT_JSONPORT:
+		case SharedConstants::LOGFORMAT_JSONPORT:
 			json_output << ", \"message\": \"JSON log event\" ";
 			break;
 
 		default:
-			Logger::fatal("EventHandlerMessageQueuer::generateLogMessage()> Unknown logformat: %d", logformat);
+			Logger::fatal("EventHandlerMessageQueuer::generateLogMessage()> Unknown"
+				" logformat: %d", logformat);
 			exit(1); // shouldn't be needed
 		}
 		json_output << ", \"extra_fields\": { "
@@ -195,7 +216,7 @@ namespace Syslog_agent {
 			<< " \"log_type\": \"eventlog\","
 			<< " \"event_id\": \"" << event_id_str << "\","
 			<< " \"event_log\": \"" << log_name_utf8_ << "\"";
-		if (logformat == SYSLOGAGENT_LOGFORMAT_JSONPORT) {
+		if (logformat == SharedConstants::LOGFORMAT_JSONPORT) {
 			json_output
 				<< ", \"_source_type\": \"WindowsAgent\","
 				<< " \"program\": \"" << provider << "\","
@@ -210,7 +231,8 @@ namespace Syslog_agent {
 			json_output << ", \"message\": \"" << escaped_buf << "\" ";
 		}
 		pugi::xml_node event_data = event.getXmlDoc().child("Event").child("EventData");
-		for (pugi::xml_node data_item = event_data.first_child(); data_item; data_item = data_item.next_sibling()) {
+		for (pugi::xml_node data_item = event_data.first_child(); data_item;
+			data_item = data_item.next_sibling()) {
 			auto data_name = data_item.attribute("Name").value();
 			if (data_name[0] != 0) {
 				auto value = data_item.child_value();
@@ -219,14 +241,14 @@ namespace Syslog_agent {
 				json_output << ", \"" << data_name << "\": \"" << escaped_buf << "\"";
 			}
 		}
-		if (logformat == SYSLOGAGENT_LOGFORMAT_JSONPORT) {
+		if (logformat == SharedConstants::LOGFORMAT_JSONPORT) {
 			json_output << " }";
 		}	
 		Globals::instance()->releaseMessageBuffer("escaped_buf", escaped_buf);
 		if (suffix_utf8_[0] != 0) {
 			json_output << "," << suffix_utf8_;
 		}
-		if (logformat != SYSLOGAGENT_LOGFORMAT_JSONPORT) {
+		if (logformat != SharedConstants::LOGFORMAT_JSONPORT) {
 			json_output << " }";
 		}
 		json_output << " }" << (char)10 << (char)0;

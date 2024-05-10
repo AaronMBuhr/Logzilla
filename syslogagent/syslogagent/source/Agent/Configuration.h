@@ -17,13 +17,14 @@ namespace Syslog_agent {
 
     class Configuration {
     public:
-        static const wstring PRIMARY_CERT_FILENAME;
-        static const wstring SECONDARY_CERT_FILENAME;
+        static constexpr const wchar_t* PRIMARY_CERT_FILENAME 
+            = SharedConstants::Defaults::PRIMARY_CERT;
+        static constexpr const wchar_t* SECONDARY_CERT_FILENAME 
+            = SharedConstants::Defaults::SECONDARY_CERT;
 
-        wstring api_path_ = SYSLOGAGENT_HTTP_API_PATH;
-        wstring version_path_ = SYSLOGAGENT_LOGZILLA_VERSION_PATH;
+        wstring api_path_ = SharedConstants::HTTP_API_PATH;
+        wstring version_path_ = SharedConstants::LOGZILLA_VERSION_PATH;
         bool lookup_accounts_ = false;
-        bool include_key_value_pairs_ = false;
         bool forward_to_secondary_ = false;
         const bool use_ping_ = false;
         const bool use_tcp_ = true;
@@ -32,18 +33,18 @@ namespace Syslog_agent {
         bool use_log_agent_ = true;
         bool primary_use_tls_ = false;
         bool secondary_use_tls_ = false;
-        int debug_level_setting_ = Logger::NOLOG;
-        int	event_log_poll_interval_ = 10;
+        static int debug_level_setting_;
+        static int event_log_poll_interval_;
         int facility_;
         int severity_;
         char host_name_[256];
         int batch_interval_;
-        wstring primary_host_ = SYSLOGAGENT_DEFAULT_PRIMARY_HOST;
+        wstring primary_host_ = SharedConstants::Defaults::PRIMARY_HOST;;
         wstring primary_api_key_ = L"";
-        wstring secondary_host_ = SYSLOGAGENT_DEFAULT_SECONDARY_HOST;
+        wstring secondary_host_ = SharedConstants::Defaults::SECONDARY_HOST;
         wstring secondary_api_key_ = L"";
-        wstring suffix_ = SYSLOGAGENT_DEFAULT_SUFFIX;
-        wstring debug_log_file_ = SYSLOGAGENT_DEFAULT_DEBUG_LOG_FILENAME;
+        wstring suffix_ = SharedConstants::Defaults::SUFFIX;
+        wstring debug_log_file_ = SharedConstants::Defaults::DEBUG_LOG_FILENAME;
         vector<LogConfiguration> logs_;
         set<DWORD> event_id_filter_;
         wstring tail_filename_;
@@ -51,14 +52,15 @@ namespace Syslog_agent {
         int utc_offset_minutes_;
         bool include_vs_ignore_eventids_;
         bool only_while_running_;
-        string primary_logzilla_version_ = "detect";
-        string secondary_logzilla_version_ = "detect";
-        int primary_logformat_ = SYSLOGAGENT_LOGFORMAT_DETECT;
-        int secondary_logformat_ = SYSLOGAGENT_LOGFORMAT_DETECT;
+        string primary_logzilla_version_ = SharedConstants::Defaults::LOGZILLA_VER;
+        string secondary_logzilla_version_ = SharedConstants::Defaults::LOGZILLA_VER;
+        int primary_logformat_ = SharedConstants::LOGFORMAT_DETECT;
+        int secondary_logformat_ = SharedConstants::LOGFORMAT_DETECT;
 
 
-        void loadFromRegistry(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting);
-        void saveToRegistry();
+        void loadFromRegistry(bool running_from_console, bool override_log_level, 
+            Logger::LogLevel override_log_level_setting);
+        void saveToRegistry() const;
         bool hasSecondaryHost() const;
         string getHostName() const;
         void setPrimaryLogzillaVersion(const string& version);
@@ -66,12 +68,14 @@ namespace Syslog_agent {
         int getPrimaryLogformat() const;
         int getSecondaryLogformat() const;
 
-        static const int MAX_TAIL_FILE_LINE_LENGTH = 16000;
+        static constexpr int MAX_TAIL_FILE_LINE_LENGTH = 16000;
 
     private:
-        static const int MAX_COMPUTERNAME_LENGH = 200;
+        static constexpr int MAX_COMPUTERNAME_LENGH = 200;
         void loadFilterIds(wstring value);
         void getTimeZoneOffset();
+
+        void setLogformatForVersion(int& logformat, const string& version);
     };
 }
 

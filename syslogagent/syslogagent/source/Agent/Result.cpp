@@ -13,23 +13,23 @@ Result::Result() {
     status_ = ERROR_SUCCESS;
 }
 
+
 Result::Result(Result& other) {
     status_ = other.status_;
     message_str_ = other.message_str_;
 }
 
+
 Result::Result(DWORD status) {
     setResult(status, "", "");
 }
+
 
 Result::Result(const char* message) {
 	status_ = ERROR_INVALID_FUNCTION;
 	this->message_str_ = message;
 }
 
-//Result::Result(DWORD status, const char* message) {
-//    setResult(status, message, "");
-//}
 
 Result::Result(DWORD status, const char* name, const char* format, ...) {
     va_list args;
@@ -39,7 +39,9 @@ Result::Result(DWORD status, const char* name, const char* format, ...) {
     setResult(status, name, message);
 }
 
-Result Result::ResultLog(DWORD status, Logger::LogLevel log_level, const char* name, const char* format, ...) {
+
+Result Result::ResultLog(DWORD status, Logger::LogLevel log_level, 
+    const char* name, const char* format, ...) {
     va_list args;
     va_start(args, format);
     char message[1024];
@@ -50,6 +52,7 @@ Result Result::ResultLog(DWORD status, Logger::LogLevel log_level, const char* n
     return retval;
 
 }
+
 
 void Result::setResult(DWORD status, const char* from, const char* message) {
     this->status_ = status;
@@ -63,7 +66,8 @@ void Result::setResult(DWORD status, const char* from, const char* message) {
         }
         LPSTR status_message;
         auto size = FormatMessageA(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ARGUMENT_ARRAY,
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM 
+            | FORMAT_MESSAGE_ARGUMENT_ARRAY,
             nullptr, status, LANG_NEUTRAL, (LPSTR)&status_message, 0, nullptr);
         if (size == 0) return;
         while (size > 0 && iscntrl(status_message[size - 1])) size--;
@@ -73,14 +77,23 @@ void Result::setResult(DWORD status, const char* from, const char* message) {
     }
 }
 
+
 bool Result::isSuccess() const { return status_ == ERROR_SUCCESS; }
+
 
 DWORD Result::statusCode() const { return this->status_; }
 
+
 const char* Result::what() const { return message_str_.c_str(); }
 
-void Result::log() const { Logger::log(isSuccess() ? Logger::INFO : Logger::CRITICAL, "%s\n", what()); }
- 
-void Result::logLastError(const char* from, const char* message) { Result(GetLastError(), from, message).log(); }
 
-void Result::throwLastError(const char* from, const char* message) { throw Result(GetLastError(), from, message); }
+void Result::log() const { Logger::log(isSuccess() ? Logger::INFO 
+    : Logger::CRITICAL, "%s\n", what()); }
+ 
+
+void Result::logLastError(const char* from, const char* message) 
+{ Result(GetLastError(), from, message).log(); }
+
+
+void Result::throwLastError(const char* from, const char* message) 
+{ throw Result(GetLastError(), from, message); }

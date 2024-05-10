@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <sstream>
 #include <string>
+#include <tlhelp32.h>
 #include <vector>
 #include <windows.h>
 #include <Psapi.h>
@@ -20,9 +21,12 @@
 
 #include "Util.h"
 
+
 using namespace std;
 
-void Util::toPrintableAscii(char* destination, int destination_count, const wchar_t* source, char space_replacement) {
+
+void Util::toPrintableAscii(char* destination, int destination_count, 
+	const wchar_t* source, char space_replacement) {
 	int i;
 	for (i = 0; i < destination_count - 1; i++) {
 		if (source[i] == 0) break;
@@ -33,6 +37,7 @@ void Util::toPrintableAscii(char* destination, int destination_count, const wcha
 	destination[i] = 0;
 }
 
+
 std::string Util::wstr2str(const std::wstring& wstr)
 {
 	using convert_typeX = std::codecvt_utf8<wchar_t>;
@@ -40,6 +45,7 @@ std::string Util::wstr2str(const std::wstring& wstr)
 
 	return converterX.to_bytes(wstr);
 }
+
 
 std::string Util::wstr2str_truncate(const std::wstring& wstr) {
 	std::string result(wstr.length(), 0);
@@ -49,10 +55,12 @@ std::string Util::wstr2str_truncate(const std::wstring& wstr) {
 	return result;
 }
 
+
 wstring Util::getThisPath()
 {
 	return getThisPath(false);
 }
+
 
 wstring Util::getThisPath(bool with_trailing_backslash)
 {
@@ -72,8 +80,10 @@ wstring Util::getThisPath(bool with_trailing_backslash)
 	if (last_pos == string::npos || last_pos < 1) {
 		return wstring();
 	}
-	return module_filename_wstr.substr(0, last_pos) + (with_trailing_backslash ? L"\\" : L"");
+	return module_filename_wstr.substr(0, last_pos) 
+		+ (with_trailing_backslash ? L"\\" : L"");
 }
+
 
 string Util::readFileAsString(const char* filename) {
 	ifstream infile(filename);
@@ -85,6 +95,7 @@ string Util::readFileAsString(const char* filename) {
 	return buffer.str();
 }
 
+
 string Util::readFileAsString(const wchar_t* filename) {
 	FILE* infile;
 	_wfopen_s(&infile, filename, L"r");
@@ -93,8 +104,8 @@ string Util::readFileAsString(const wchar_t* filename) {
 	}
 
 	fseek(infile, 0, SEEK_END);
-	long fsize = ftell(infile);
-	fseek(infile, 0, SEEK_SET);  /* same as rewind(f); */
+	int64_t fsize = ftell(infile);
+	fseek(infile, 0, SEEK_SET);  
 	vector<char> contents(fsize + 1);
 	fread(contents.data(), 1, fsize, infile);
 	fclose(infile);
@@ -102,15 +113,19 @@ string Util::readFileAsString(const wchar_t* filename) {
 	return string(contents.data(), fsize);
 }
 
-void Util::replaceAll(std::string& str, const std::string& from, const std::string& to) {
+
+void Util::replaceAll(std::string& str, const std::string& from, 
+	const std::string& to) {
 	if (from.empty())
 		return;
 	size_t start_pos = 0;
 	while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
 		str.replace(start_pos, from.length(), to);
-		start_pos += to.length(); // In case 'to' contains 'from', like replacing 'x' with 'yx'
+		start_pos += to.length(); 
+			// In case 'to' contains 'from', like replacing 'x' with 'yx'
 	}
 }
+
 
 size_t Util::hashWstring(const std::wstring& _Keyval)
 {	// hash _Keyval to size_t value by pseudorandomizing transform
@@ -126,7 +141,9 @@ size_t Util::hashWstring(const std::wstring& _Keyval)
 	return (_Val);
 }
 
-int Util::jsonEscape(char* input_buffer, char* output_buffer, int output_buffer_length) {
+
+int Util::jsonEscape(char* input_buffer, char* output_buffer, 
+	int output_buffer_length) {
 	int output_pos = 0;
 	for (int i = 0;
 		output_pos < output_buffer_length - 1 && input_buffer[i] != 0;
@@ -163,7 +180,9 @@ int Util::jsonEscape(char* input_buffer, char* output_buffer, int output_buffer_
 }
 
 
-static vector<std::wstring> wstringSplit(const std::wstring& delimited_string, const wchar_t delimiter) {
+static vector<std::wstring> wstringSplit(
+	const std::wstring& delimited_string, 
+	const wchar_t delimiter) {
 	wstringstream ss(delimited_string);
 	wstring substr;
 	vector<wstring> elems;
@@ -175,24 +194,21 @@ static vector<std::wstring> wstringSplit(const std::wstring& delimited_string, c
 	return elems;
 }
 
-bool Util::copyFile(const wchar_t const* source_filename, const wchar_t const* dest_filename)
+
+bool Util::copyFile(const wchar_t* const source_filename, const wchar_t* const dest_filename)
 {
-	// Open the source file
 	ifstream src(source_filename, ios::binary);
 	if (!src) {
 		return false;
 	}
 
-	// Open the destination file
 	ofstream dest(dest_filename, ios::binary);
 	if (!dest) {
 		return false;
 	}
 
-	// Copy the contents of the source file to the destination file
 	dest << src.rdbuf();
 
-	// Close the files
 	src.close();
 	dest.close();
 
@@ -200,59 +216,7 @@ bool Util::copyFile(const wchar_t const* source_filename, const wchar_t const* d
 }
 
 
-#if 0
-/* this uses unsupported windows functions */
-void EnumerateOpenHandles()
-{
-	// Get a handle to the current process
-	HANDLE processHandle = GetCurrentProcess();
-
-	// Create a buffer to hold the list of handles
-	DWORD bufferSize = 4096;
-	BYTE* buffer = new BYTE[bufferSize];
-
-	// Call the NtQuerySystemInformation function with the SystemHandleInformation class
-	NTSTATUS status = NtQuerySystemInformation(SystemHandleInformation, buffer, bufferSize, NULL);
-
-	// If the buffer was not large enough, reallocate it and try again
-	while (status == STATUS_INFO_LENGTH_MISMATCH)
-	{
-		bufferSize *= 2;
-		delete[] buffer;
-		buffer = new BYTE[bufferSize];
-		status = NtQuerySystemInformation(SystemHandleInformation, buffer, bufferSize, NULL);
-	}
-
-	// If the NtQuerySystemInformation function call failed, print an error message and return
-	if (status != STATUS_SUCCESS)
-	{
-		std::cerr << "NtQuerySystemInformation failed with error code " << status << std::endl;
-		return;
-	}
-
-	// Parse the handle information in the buffer
-	SYSTEM_HANDLE_INFORMATION* handleInfo = (SYSTEM_HANDLE_INFORMATION*)buffer;
-	for (DWORD i = 0; i < handleInfo->NumberOfHandles; i++)
-	{
-		// Get a handle to the current handle
-		HANDLE handle = (HANDLE)handleInfo->Handles[i].Handle;
-
-		// If the handle belongs to the current process, print its details
-		if (handleInfo->Handles[i].ProcessId == GetCurrentProcessId())
-		{
-			std::cout << "Handle: " << handle << ", Type: " << handleInfo->Handles[i].ObjectTypeNumber << std::endl;
-		}
-	}
-
-	// Clean up the buffer
-	delete[] buffer;
-}
-#endif
-
-
-#include <windows.h>
-#include <tlhelp32.h>
-#include <stdio.h>
+#if MAYBE_THIS_WILL_BE_NEEDED
 
 void EnumerateOpenFileHandles(DWORD processId)
 {
@@ -290,7 +254,6 @@ void EnumerateOpenFileHandles(DWORD processId)
 	CloseHandle(hFileSnap);
 }
 
-#if 0
 /* to use this function you must include winsock2.h and iphlpapi.h, and link in iphlpapi.lib */
 #include <winsock2.h>
 #include <iphlpapi.h>
@@ -352,6 +315,7 @@ std::wstring Util::toLowercase(const std::wstring& input) {
 	return result;
 }
 
+
 std::string Util::toLowercase(const std::string& input) {
 	std::string result = input;
 	std::transform(result.begin(), result.end(), result.begin(),
@@ -369,7 +333,8 @@ int64_t Util::getUnixTimeMilliseconds() {
 	li.LowPart = ft.dwLowDateTime;
 	li.HighPart = ft.dwHighDateTime;
 
-	// Convert FILETIME (100-nanoseconds since January 1, 1601) to Unix epoch time in milliseconds
+	// Convert FILETIME (100-nanoseconds since January 1, 1601) to 
+	// Unix epoch time in milliseconds
 	int64_t unixTimeMilliseconds = (li.QuadPart - 116444736000000000LL) / 10000;
 
 	return unixTimeMilliseconds;
@@ -377,7 +342,8 @@ int64_t Util::getUnixTimeMilliseconds() {
 
 
 
-int Util::compareSoftwareVersions(const std::string& version_a, const std::string& version_b) {
+int Util::compareSoftwareVersions(const std::string& version_a, 
+	const std::string& version_b) {
 	std::vector<int> parts_a = splitVersion(version_a);
 	std::vector<int> parts_b = splitVersion(version_b);
 
@@ -402,11 +368,6 @@ int Util::compareSoftwareVersions(const std::string& version_a, const std::strin
 }
 
 
-#include <vector>
-#include <string>
-#include <sstream>
-#include <cctype>
-
 std::vector<int> Util::splitVersion(const std::string& version) {
 	std::vector<int> parts;
 	std::istringstream ss(version);
@@ -422,8 +383,9 @@ std::vector<int> Util::splitVersion(const std::string& version) {
 				try {
 					parts.push_back(std::stoi(numericPart));
 				}
-				catch (const std::invalid_argument& ia) {
-					parts.push_back(0); // Default to zero if conversion fails
+				catch (const std::invalid_argument&) {
+					parts.push_back(0); 
+						// Default to zero if conversion fails
 				}
 			}
 			else {

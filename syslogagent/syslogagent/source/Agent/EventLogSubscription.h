@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 
 #include <memory>
@@ -34,11 +39,12 @@ namespace Syslog_agent {
 		void subscribe(const wstring& bookmark_xml);
 		void cancelSubscription();
 		void saveBookmark();
-		wstring getBookmark() { return bookmark_xml_; }
-		wstring getName() { return subscription_name_; }
-		wstring getChannel() { return channel_; }
+		wstring getBookmark() const { return bookmark_xml_; }
+		wstring getName() const { return subscription_name_; }
+		wstring getChannel() const { return channel_; }
 	private:
-		static DWORD WINAPI handleSubscriptionEvent(EVT_SUBSCRIBE_NOTIFY_ACTION action, PVOID pContext, EVT_HANDLE hEvent);
+		static DWORD WINAPI handleSubscriptionEvent(EVT_SUBSCRIBE_NOTIFY_ACTION action, 
+			PVOID pContext, EVT_HANDLE hEvent);
 		EventLogSubscription(const EventLogSubscription&);
 		wstring subscription_name_;
 		wstring channel_;

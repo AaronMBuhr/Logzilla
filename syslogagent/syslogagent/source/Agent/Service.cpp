@@ -17,7 +17,6 @@ Copyright © 2021 Logzilla Corp.
 
 #include "Logger.h"
 #include "Configuration.h"
-#include "Debug.h"
 #include "EventHandlerMessageQueuer.h"
 #include "EventLogEvent.h"
 #include "EventLogSubscription.h"
@@ -29,6 +28,7 @@ Copyright © 2021 Logzilla Corp.
 
 using namespace Syslog_agent;
 
+
 std::atomic<bool> Service::fatal_shutdown_in_progress = false; 
 unique_ptr<thread> Service::send_thread_ = nullptr;
 Configuration Service::config_;
@@ -36,12 +36,12 @@ shared_ptr<MessageQueue> Service::primary_message_queue_ = nullptr;
 shared_ptr<MessageQueue> Service::secondary_message_queue_ = nullptr;
 shared_ptr<NetworkClient> Service::primary_network_client_ = nullptr;
 shared_ptr<NetworkClient> Service::secondary_network_client_ = nullptr;
-
 volatile bool Service::shutdown_requested_ = false;
 volatile bool Service::service_shutdown_requested_ = false;
 WindowsEvent Service::shutdown_event_{ L"LogZilla_SyslogAgent_Service_Shutdown" };
 shared_ptr<FileWatcher> Service::filewatcher_ = nullptr;
 vector<EventLogSubscription> Service::subscriptions_;
+
 
 void sendMessagesThread() {
 	Logger::debug2("sendMessagesThread()> starting\n");
@@ -73,38 +73,42 @@ void Service::run(bool running_as_console) {
 
 	if (config_.tail_filename_ != L"") {
 		string program_name = Util::wstr2str(config_.tail_program_name_);
-		Logger::debug("Service::run()> starting file watcher for %s\n", Util::wstr2str(config_.tail_filename_).c_str());
+		Logger::debug("Service::run()> starting file watcher for %s\n", 
+			Util::wstr2str(config_.tail_filename_).c_str());
 		filewatcher_ = make_shared<FileWatcher>(
 			config_,
 			config_.tail_filename_.c_str(),
 			config_.MAX_TAIL_FILE_LINE_LENGTH,
 			program_name.c_str(),
 			config_.host_name_,
-			(config_.severity_ == SYSLOGAGENT_SEVERITY_DYNAMIC ? SYSLOGAGENT_SEVERITY_INFORMATIONAL : config_.severity_),
+			(config_.severity_ == SharedConstants::Severities::DYNAMIC 
+				? SharedConstants::Severities::INFORMATIONAL : config_.severity_),
 			config_.facility_
 			);
 	}
 
 	Logger::debug("Service::run()> starting message queue\n");
-	Service::primary_message_queue_ = make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
+	Service::primary_message_queue_ 
+		= make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, 
+			Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 
 	Logger::debug("Service::run()> starting network clients\n");
 	Service::primary_network_client_ = make_shared<NetworkClient>();
 	Logger::debug2("Service::run()> initializing primary_network_client\n");
 
-
-	if (!Service::primary_network_client_->initialize(&config_, config_.primary_api_key_, config_.primary_host_)) {
+	if (!Service::primary_network_client_->initialize(&config_, 
+		config_.primary_api_key_, config_.primary_host_)) {
 		Logger::fatal("Could not initialize primary network client\n");
-		exit(1); // shouldn't be necessary
 	}
 
 	// read primary cert file
 	Logger::debug2("Service::run()> checking for primary tls\n");
 	if (config_.primary_use_tls_) {
-		wstring primary_cert_path = Util::getThisPath(true) + config_.PRIMARY_CERT_FILENAME;
+		wstring primary_cert_path = Util::getThisPath(true) 
+			+ config_.PRIMARY_CERT_FILENAME;
 		if (!primary_network_client_->loadCertificate(primary_cert_path)) {
-			Logger::fatal("Could not read primary cert from %s\n", Util::wstr2str(primary_cert_path).c_str());
-			exit(1); // shouldn't be necessary
+			Logger::fatal("Could not read primary cert from %s\n", 
+				Util::wstr2str(primary_cert_path).c_str());
 		}
 	}
 
@@ -126,22 +130,27 @@ void Service::run(bool running_as_console) {
 
 	Logger::debug2("Service::run()> checking for secondary host\n");
 	if (config_.hasSecondaryHost()) {
-		Logger::debug2("Service::run()> has secondary host, making message queue and client\n");
-		Service::secondary_message_queue_ = make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, Service::MESSAGE_BUFFERS_CHUNK_SIZE);
+		Logger::debug2("Service::run()> has secondary host, making"
+			" message queue and client\n");
+		Service::secondary_message_queue_ 
+			= make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, 
+				Service::MESSAGE_BUFFERS_CHUNK_SIZE);
 		Service::secondary_network_client_ = make_shared<NetworkClient>();
-		Logger::debug2("Service::run()> initializing secondary_network_client\n");
-		if (!Service::secondary_network_client_->initialize(&config_, config_.secondary_api_key_, config_.secondary_host_)) {
+		Logger::debug2("Service::run()> initializing"
+			" secondary_network_client\n");
+		if (!Service::secondary_network_client_->initialize(&config_, 
+			config_.secondary_api_key_, config_.secondary_host_)) {
 			Logger::fatal("Could not initialize secondary network client\n");
-			exit(1); // shouldn't be necessary
 		}
 
 		// read secondary cert file
 		Logger::debug2("Service::run()> checking for secondary tls\n");
 		if (config_.secondary_use_tls_) {
-			wstring secondary_cert_path = Util::getThisPath(true) + config_.SECONDARY_CERT_FILENAME;
+			wstring secondary_cert_path = Util::getThisPath(true) 
+				+ config_.SECONDARY_CERT_FILENAME;
 			if (!secondary_network_client_->loadCertificate(secondary_cert_path)) {
-                Logger::fatal("Could not read secondary cert from %s\n", Util::wstr2str(secondary_cert_path).c_str());
-                exit(1); // shouldn't be necessary
+                Logger::fatal("Could not read secondary cert from %s\n", 
+					Util::wstr2str(secondary_cert_path).c_str());
             }
 		}
 
@@ -178,7 +187,6 @@ void Service::run(bool running_as_console) {
 	bool first_loop = true;
 	int restart_needed = 0;
 	Logger::debug2("Service::run()> starting heartbeat monitoring\n");
-	Debug::startHeartbeatMonitoring();
 
 	Logger::debug("Service::run()> starting event log subscriptions\n");
 	if (config_.use_log_agent_) {
@@ -217,7 +225,7 @@ void Service::run(bool running_as_console) {
 
 		first_loop = false;
 		Logger::debug("waiting for key hit/shutdown requested...\n");
-		for (auto i = 0; i < /* config_.event_log_poll_interval_ */ SYSLOGAGENT_DEFAULT_POLL_INTERVAL; i++) {
+		for (auto i = 0; i < config_.event_log_poll_interval_; i++) {
 			if (shutdown_requested_) {
 				break;
 			}
@@ -226,7 +234,7 @@ void Service::run(bool running_as_console) {
 			}
 			if (config_.use_log_agent_ && primary_message_queue_->isEmpty() 
 				&& (secondary_message_queue_ == nullptr || secondary_message_queue_->isEmpty())) {
-				//Logger::debug("Saving config to registry");
+				Logger::debug2("Saving config to registry");
 				config_.saveToRegistry();
 			}
 			if (_kbhit() || restart_needed) {
@@ -240,12 +248,10 @@ void Service::run(bool running_as_console) {
 				break;
 			}
 			if (!shutdown_requested_) {
-				//Logger::debug2("service run last !shutdown_requested\n");
 				shutdown_event_.wait(1000);
-				//Logger::debug2("service run shutdown_event_.wait() complete\n");
 			}
 		}
-		Logger::debug("no key hit & no shutdown requested...\n");
+		Logger::debug2("no key hit & no shutdown requested...\n");
 	}
 
 	for (auto& sub : subscriptions_) {
@@ -276,6 +282,7 @@ void Service::run(bool running_as_console) {
 	Logger::debug("service run exiting\n");
 
 }
+
 
 void Service::shutdown() {
 	Logger::info("Service shutdown requested\n");
