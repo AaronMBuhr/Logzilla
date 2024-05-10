@@ -16,9 +16,8 @@ using namespace Syslog_agent;
 
 #define REG_BUFFER_LEN				2048
 
-
-const wstring Configuration::PRIMARY_CERT_FILENAME = SYSLOGAGENT_CERT_FILENAME_PRIMARY;
-const wstring Configuration::SECONDARY_CERT_FILENAME = SYSLOGAGENT_CERT_FILENAME_SECONDARY;;
+int Configuration::debug_level_setting_ = Logger::NOLOG;
+int Configuration::event_log_poll_interval_ = SharedConstants::Defaults::POLL_INTERVAL_SEC;
 
 bool Configuration::hasSecondaryHost() const {
     return forward_to_secondary_ && secondary_host_.size() > 0;
@@ -26,7 +25,8 @@ bool Configuration::hasSecondaryHost() const {
 
 void Configuration::loadFromRegistry(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting) {
 
-    strcpy(host_name_, getHostName().c_str());
+	char hostname_buf[MAX_COMPUTERNAME_LENGTH + 1];
+	strcpy_s(hostname_buf, sizeof(hostname_buf), "");
     Registry registry;
     registry.open();
 
@@ -34,9 +34,9 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
         debug_level_setting_ = override_log_level_setting;
     }
     else {
-        debug_level_setting_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_DEBUG_LEVEL_SETTING, 0);
+        debug_level_setting_ = registry.readInt(SharedConstants::RegistryKey::DEBUG_LEVEL_SETTING, 0);
     }
-    debug_log_file_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_DEBUG_LOG_FILE, L"");
+    debug_log_file_ = registry.readString(SharedConstants::RegistryKey::DEBUG_LOG_FILE, L"");
     Logger::setLogFile(debug_log_file_);
     if (debug_level_setting_ != (int)Logger::NOLOG) {
         if (debug_log_file_.length() > 0) {
@@ -58,11 +58,11 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
 
     // need this because originally only_while_running_ was a string
     try {
-        only_while_running_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_ONLY_WHILE_RUNNING, false);
+        only_while_running_ = registry.readBool(SharedConstants::RegistryKey::ONLY_WHILE_RUNNING, false);
     }
-    catch (const std::exception& e) {
+    catch (std::exception) {
         try {
-            wstring bad_reg_string = registry.readString(SYSLOGAGENT_REGISTRYKEY_ONLY_WHILE_RUNNING, L"");
+            wstring bad_reg_string = registry.readString(SharedConstants::RegistryKey::ONLY_WHILE_RUNNING, L"");
             if ((Util::toLowercase(bad_reg_string) == L"true")
                 || (Util::toLowercase(bad_reg_string) == L"yes")
                 || (bad_reg_string == L"1")) {
@@ -72,34 +72,31 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
                 only_while_running_ = false;
             }
         }
-        catch (const std::exception& e) {
+        catch (std::exception) {
             only_while_running_ = false;
         }
     }
-    api_path_ = SYSLOGAGENT_HTTP_API_PATH;
-    event_log_poll_interval_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_EVENT_LOG_POLL_INTERVAL, 10);
-    primary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_HOST, L"localhost");
-    primary_api_key_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGZILLA_API_KEY, L"");
-    secondary_host_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_HOST, L"");
-    secondary_api_key_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGZILLA_API_KEY, L"");
-    suffix_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_SUFFIX, L"");
-    forward_to_secondary_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_FORWARD_TO_SECONDARY, false);
-    primary_use_tls_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_PRIMARY_USE_TLS, false);
-    secondary_use_tls_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_SECONDARY_USE_TLS, false);
-    lookup_accounts_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_LOOKUP_ACCOUNTS, true);
-    include_key_value_pairs_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_INCLUDE_KEY_VALUE_PAIRS, false);
-    batch_interval_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_BATCH_INTERVAL, SYSLOGAGENT_DEFAULT_BATCH_INTERVAL);
-    facility_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_FACILITY, SYSLOGAGENT_DEFAULT_FACILITY);
-    severity_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_SEVERITY, SYSLOGAGENT_DEFAULT_SEVERITY);
-    tail_filename_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_TAIL_FILENAME, L"");
-    tail_program_name_ = registry.readString(SYSLOGAGENT_REGISTRYKEY_TAIL_PROGRAM_NAME, L"");
-    primary_logformat_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGFORMAT, SYSLOGAGENT_LOGFORMAT_DETECT);
-    secondary_logformat_ = registry.readInt(SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGFORMAT, SYSLOGAGENT_LOGFORMAT_DETECT);
+	api_path_ = SharedConstants::HTTP_API_PATH;
+    event_log_poll_interval_ = registry.readInt(SharedConstants::RegistryKey::EVENT_LOG_POLL_INTERVAL, SharedConstants::Defaults::POLL_INTERVAL_SEC);
+    primary_host_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_HOST, L"localhost");
+    primary_api_key_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_API_KEY, L"");
+    secondary_host_ = registry.readString(SharedConstants::RegistryKey::SECONDARY_HOST, L"");
+    secondary_api_key_ = registry.readString(SharedConstants::RegistryKey::SECONDARY_API_KEY, L"");
+    suffix_ = registry.readString(SharedConstants::RegistryKey::SUFFIX, L"");
+    forward_to_secondary_ = registry.readBool(SharedConstants::RegistryKey::FORWARD_TO_SECONDARY, false);
+    primary_use_tls_ = registry.readBool(SharedConstants::RegistryKey::PRIMARY_USE_TLS, false);
+    secondary_use_tls_ = registry.readBool(SharedConstants::RegistryKey::SECONDARY_USE_TLS, false);
+    lookup_accounts_ = registry.readBool(SharedConstants::RegistryKey::LOOKUP_ACCOUNTS, true);
+    batch_interval_ = registry.readInt(SharedConstants::RegistryKey::BATCH_INTERVAL, SharedConstants::Defaults::BATCH_INTERVAL);
+    facility_ = registry.readInt(SharedConstants::RegistryKey::FACILITY, SharedConstants::Defaults::FACILITY);
+    severity_ = registry.readInt(SharedConstants::RegistryKey::SEVERITY, SharedConstants::Defaults::SEVERITY);
+    tail_filename_ = registry.readString(SharedConstants::RegistryKey::TAIL_FILENAME, L"");
     string tail_file = Util::wstr2str(tail_filename_);
     Logger::debug("Tail requested for file %s\n", tail_file.c_str());
+    tail_program_name_ = registry.readString(SharedConstants::RegistryKey::TAIL_PROGRAM_NAME, L"");
 
-    include_vs_ignore_eventids_ = registry.readBool(SYSLOGAGENT_REGISTRYKEY_INCLUDE_VS_IGNORE_EVENTIDS, false);
-    loadFilterIds(registry.readString(SYSLOGAGENT_REGISTRYKEY_EVENT_ID_FILTER, L""));
+    include_vs_ignore_eventids_ = registry.readBool(SharedConstants::RegistryKey::INCLUDE_VS_IGNORE_EVENT_IDS, false);
+    loadFilterIds(registry.readString(SharedConstants::RegistryKey::EVENT_ID_FILTER, L""));
 
     auto channels = registry.readChannels();
     logs_.clear();
@@ -120,7 +117,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
 
 }
 
-void Configuration::saveToRegistry() {
+void Configuration::saveToRegistry() const {
     Registry registry;
     registry.open();
     for (auto& log : logs_) {
@@ -165,35 +162,34 @@ string Configuration::getHostName() const {
     }
 }
 
-void Configuration::setPrimaryLogzillaVersion(const string& version) {
-    primary_logzilla_version_ = version;
-    if (Util::compareSoftwareVersions(version, SYSLOGAGENT_LOGFORMAT_LZ_VERSION_HTTP) < 0) {
-        primary_logformat_ = SYSLOGAGENT_LOGFORMAT_JSONPORT;
+void Configuration::setLogformatForVersion(int& logformat, const string& version) {
+    if (Util::compareSoftwareVersions(version, SharedConstants::LOGFORMAT_LZ_VERSION_HTTP) < 0) {
+        primary_logformat_ = SharedConstants::LOGFORMAT_JSONPORT;
     }
     else {
-        primary_logformat_ = SYSLOGAGENT_LOGFORMAT_HTTPPORT;
+        primary_logformat_ = SharedConstants::LOGFORMAT_HTTPPORT;
     }
+}
+
+void Configuration::setPrimaryLogzillaVersion(const string& version) {
+    primary_logzilla_version_ = version;
+	setLogformatForVersion(primary_logformat_, version);
 }
 
 void Configuration::setSecondaryLogzillaVersion(const string& version) {
     secondary_logzilla_version_ = version;
-    if (Util::compareSoftwareVersions(version, SYSLOGAGENT_LOGFORMAT_LZ_VERSION_HTTP) < 0) {
-        secondary_logformat_ = SYSLOGAGENT_LOGFORMAT_JSONPORT;
-    }
-    else {
-        secondary_logformat_ = SYSLOGAGENT_LOGFORMAT_HTTPPORT;
-    }
+	setLogformatForVersion(secondary_logformat_, version);
 }
 
 int Configuration::getPrimaryLogformat() const {
-    if (primary_logformat_ == SYSLOGAGENT_LOGFORMAT_DETECT)
-        return SYSLOGAGENT_LOGFORMAT_JSONPORT;
+    if (primary_logformat_ == SharedConstants::LOGFORMAT_DETECT)
+        return SharedConstants::LOGFORMAT_JSONPORT;
     return primary_logformat_;
 }
 
 int Configuration::getSecondaryLogformat() const {
-    if (secondary_logformat_ == SYSLOGAGENT_LOGFORMAT_DETECT)
-        return SYSLOGAGENT_LOGFORMAT_JSONPORT;
+    if (secondary_logformat_ == SharedConstants::LOGFORMAT_DETECT)
+        return SharedConstants::LOGFORMAT_JSONPORT;
     return secondary_logformat_;
 }
 

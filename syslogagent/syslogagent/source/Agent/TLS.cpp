@@ -26,8 +26,10 @@
         } while(rval == GNUTLS_E_AGAIN || rval == GNUTLS_E_INTERRUPTED);
 #endif
 
+
 uint8_t* TLS::cert_der_data_s_ = nullptr;
 uint32_t TLS::cert_der_length_s_ = 0;
+
 
 uint8_t TLS::base64Decode(uint8_t ch)
 {
@@ -55,6 +57,7 @@ uint8_t TLS::base64Decode(uint8_t ch)
 
     return (ret);
 }
+
 
 int TLS::convertPemCertToDer(const uint8_t* pem, uint32_t plen, uint8_t** der,
     uint32_t* dlen)
@@ -101,11 +104,13 @@ int TLS::convertPemCertToDer(const uint8_t* pem, uint32_t plen, uint8_t** der,
     return (0);
 }
 
+
 int verifyCertificate(gnutls_session_t session) {
 
     unsigned int cert_list_size;
     const gnutls_datum_t* raw_cert = gnutls_certificate_get_peers(session, &cert_list_size);
-    //Logger::force("verifyCertificate() verifying cert: list_size=%d, cert size=%d\n", cert_list_size, raw_cert->size);
+    Logger::debug2("verifyCertificate() verifying cert: list_size=%d, cert size=%d\n", 
+        cert_list_size, raw_cert->size);
     if (TLS::getCertDerLength() != raw_cert->size) {
         return -1;
     }
@@ -117,6 +122,7 @@ int verifyCertificate(gnutls_session_t session) {
     }
     return 0;
 }
+
 
 void TLS::setServerCertPem(const char * const server_cert_pem) {
     if (cert_der_data_s_) {
@@ -152,8 +158,8 @@ void TLS::setServerCertPem(const char * const server_cert_pem) {
 void TLS::setupTlsForConnection() {
 
     if (gnutls_check_version("3.6.6") == NULL) {
-        Logger::fatal("TLS::setupTlsForConnection() GnuTLS 3.4.6 or later is required\n");
-        exit(1); // shouldn't be necessary
+        Logger::fatal("TLS::setupTlsForConnection() GnuTLS 3.4.6 or later"
+            " is required\n");
     }
 
     /* for backwards compatibility with gnutls < 3.3.0 */
@@ -176,6 +182,7 @@ void TLS::setupTlsForConnection() {
     clean_ = false;
 }
 
+
 bool TLS::doHandshake(SOCKET socket) {
 
     int ret;
@@ -186,7 +193,7 @@ bool TLS::doHandshake(SOCKET socket) {
 
     socket_ = socket;
 
-    gnutls_transport_set_int(session_, socket_);
+    gnutls_transport_set_int(session_, static_cast<int>(socket_));
     // gnutls_handshake_set_timeout(session_, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
     gnutls_handshake_set_timeout(session_, 5000 /* msec */);
 
@@ -201,25 +208,28 @@ bool TLS::doHandshake(SOCKET socket) {
             status = gnutls_session_get_verify_cert_status(session_);
             CHECK(gnutls_certificate_verification_status_print(status,
                 type, &out, 0));
-            Logger::fatal("TLS::setupTlsForConnection() error cert verify output: %s\n", out.data);
-            gnutls_free(out.data);
-            exit(1);
+            Logger::fatal("TLS::setupTlsForConnection() error cert verify"
+                " output: %s\n", out.data);
+            // gnutls_free(out.data);
         }
-        Logger::fatal("TLS::setupTlsForConnection() *** Handshake failed: %s\n", gnutls_strerror(ret));
-        exit(1); // shouldn't be necessary
+        Logger::fatal("TLS::setupTlsForConnection() *** Handshake failed:"
+            " %s\n", gnutls_strerror(ret));
         return false;
     }
     else {
         desc = gnutls_session_get_desc(session_);
-        Logger::debug("TLS::testForHostAddress() TLS succeeded, session info: %s\n", desc);
+        Logger::debug("TLS::testForHostAddress() TLS succeeded, session"
+            " info: %s\n", desc);
         gnutls_free(desc);
         return true;
     }
 }
 
+
 void TLS::close() {
     CHECK(gnutls_bye(session_, GNUTLS_SHUT_RDWR));
 }
+
 
 void TLS::cleanup() {
     if (!clean_) {
@@ -231,10 +241,11 @@ void TLS::cleanup() {
 }
 
 
-int TLS::tls_send(const char* message, size_t message_length) {
+int TLS::tls_send(const char* message, size_t message_length) const {
     return (int) gnutls_record_send(session_, static_cast<const void*>(message), message_length);
 }
 
-int TLS::tls_receive(char* buffer, size_t buffer_size) {
+
+int TLS::tls_receive(char* buffer, size_t buffer_size) const {
     return (int) gnutls_record_recv(session_, buffer, buffer_size);
 }

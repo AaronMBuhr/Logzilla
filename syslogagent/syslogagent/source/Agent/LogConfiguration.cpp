@@ -13,7 +13,7 @@ void LogConfiguration::loadFromRegistry(Registry& parent) {
     bookmark_ = Registry::readBookmark(channel_.c_str());
 }
 
-void LogConfiguration::saveToRegistry(Registry& parent) {
+void LogConfiguration::saveToRegistry(Registry& parent) const {
     Registry::writeBookmark(channel_.c_str(), bookmark_.c_str());
 }
 

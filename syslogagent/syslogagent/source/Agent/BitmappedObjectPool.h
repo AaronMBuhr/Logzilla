@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 #include "Bitmap.h"
 #include <mutex>
@@ -17,7 +22,8 @@ public:
 				chunk is entirely unused before getting rid of ones above it. -1
 				percent_slack means never free up chunks, keep them reserved forever. */
 
-	BitmappedObjectPool(const int chunk_size, const int percent_slack) : chunk_size_(chunk_size), percent_slack_(percent_slack) {
+	BitmappedObjectPool(const int chunk_size, const int percent_slack) 
+		: chunk_size_(chunk_size), percent_slack_(percent_slack) {
 	}
 
 	template <class U> BitmappedObjectPool(const BitmappedObjectPool<U>& old_obj) {
@@ -36,7 +42,7 @@ public:
 	T* getAndMarkNextUnused() {
 		// no maximum, if you do too much you'll get an out-of-memory error
 		const std::lock_guard<std::mutex> lock(in_use_);
-		long bitmap_index = -1;
+		int32_t bitmap_index = -1;
 		int bitnum = -1;
 		for (unsigned int i = 0; i < usage_bitmaps_.size(); ++i) {
 			int idx = usage_bitmaps_[i]->getAndSetFirstZero();
@@ -53,7 +59,7 @@ public:
 			auto first_addr = &data_elements_[data_elements_.size() - 1][0];
 			auto last_addr = &data_elements_[data_elements_.size() - 1][chunk_size_ - 1];
 			auto difference = last_addr - first_addr;
-			bitmap_index = usage_bitmaps_.end() - usage_bitmaps_.begin() - 1;
+			bitmap_index = static_cast<int32_t>(usage_bitmaps_.end() - usage_bitmaps_.begin()) - 1;
 			bitnum = usage_bitmaps_.back()->getAndSetFirstZero();
 		}
 		auto& last_data_element = data_elements_[bitmap_index];
@@ -69,7 +75,8 @@ public:
 		for (unsigned int i = 0; !found && i < usage_bitmaps_.size(); ++i) {
 			auto start_address = &data_elements_[i][0];
 			auto end_address = &data_elements_[i][chunk_size_ - 1];
-			if (now_unused_address >= start_address && now_unused_address <= end_address) {
+			if (now_unused_address >= start_address 
+				&& now_unused_address <= end_address) {
 				now_unused_bitmap_idx = i;
 				now_unused_bit = now_unused - start_address;
 				found = true;
@@ -85,7 +92,8 @@ public:
 				// we're below the maximum chunk
 				// is every one above us empty?
 				bool empty_above_us = true;
-				for (unsigned int cn = now_unused_bitmap_idx + 1; cn < usage_bitmaps_.size(); ++cn) {
+				for (unsigned int cn = now_unused_bitmap_idx + 1; 
+					cn < usage_bitmaps_.size(); ++cn) {
 					if (usage_bitmaps_[cn]->countOnes() > 0) {
 						empty_above_us = false;
 						break;
@@ -93,7 +101,8 @@ public:
 				}
 				// if empty above us then see if we have enough slack
 				if (empty_above_us) {
-					int number_of_zeroes = usage_bitmaps_[now_unused_bitmap_idx]->countZeroes();
+					int number_of_zeroes 
+						= usage_bitmaps_[now_unused_bitmap_idx]->countZeroes();
 					if (number_of_zeroes * 100 / chunk_size_ >= percent_slack_) {
 						// if empty above us and we have enough slack, 
 						// get rid of extra chunk(s)
@@ -107,7 +116,7 @@ public:
 		return true;
 	}
 
-	int countBuffers() {
+	int countBuffers() const {
 		int count = 0;
 		for (auto& bm : usage_bitmaps_) {
 			count += bm->countOnes();
@@ -115,7 +124,7 @@ public:
 		return count;
 	}
 
-	const std::string asHexString() {
+	const std::string asHexString() const {
 		std::string result;
 		for (auto& bm : usage_bitmaps_) {
 			result.append(bm->asHexString());
@@ -123,7 +132,7 @@ public:
 		return result;
 	}
 
-	const std::string asBinaryString() {
+	const std::string asBinaryString() const {
 		std::string result;
 		for (auto& bm : usage_bitmaps_) {
 			result.append(bm->asBinaryString());

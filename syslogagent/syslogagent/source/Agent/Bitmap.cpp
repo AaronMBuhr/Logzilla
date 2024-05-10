@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #include "stdafx.h"
 #include "Bitmap.h"
 
@@ -13,14 +18,14 @@ Bitmap::Bitmap(int number_of_bits, unsigned char initial_bit_value) {
 	fill(bitmap_.begin(), bitmap_.end(), initial_word_value);  // unoptimized
 }
 
-unsigned char Bitmap::bitValue(int bit_number) {
+unsigned char Bitmap::bitValue(int bit_number) const {
 	int word_num = bit_number / (sizeof(size_t) * BITS_PER_BYTE);
 	size_t word_bit_number = bit_number % (sizeof(size_t) * BITS_PER_BYTE);
 	size_t check_bit = (static_cast<size_t>(1)) << word_bit_number;
 	return (bitmap_[word_num] & check_bit) ? 1 : 0;
 }
 
-bool Bitmap::isSet(int bit_number) {
+bool Bitmap::isSet(int bit_number) const {
 	return bitValue(bit_number) == 1;
 }
 
@@ -94,12 +99,12 @@ int Bitmap::getAndOptionallySetFirstZero(bool do_set) {
 	return (result == INVALID_BIT_NUMBER ? -1 : (int) result);
 }
 
-int Bitmap::getFirstOne() {
-	return getAndOptionallyClearFirstOne(false);
+int Bitmap::getFirstOne() const {
+	return const_cast<Bitmap*>(this)->getAndOptionallyClearFirstOne(false);
 }
 
-int Bitmap::getFirstZero() {
-	return getAndOptionallySetFirstZero(false);
+int Bitmap::getFirstZero() const {
+	return const_cast<Bitmap*>(this)->getAndOptionallySetFirstZero(false);
 }
 
 int Bitmap::getAndSetFirstZero() {
@@ -150,7 +155,7 @@ int Bitmap::countZeroes() {
 	return number_of_bits_ - countOnes();
 }
 
-string Bitmap::asHexString() {
+string Bitmap::asHexString() const {
 	// this should be called relatively infrequently so we're not optimizing
 	string result;
 	char format[10];
@@ -163,7 +168,7 @@ string Bitmap::asHexString() {
 	return result;
 }
 
-string Bitmap::asBinaryString() {
+string Bitmap::asBinaryString() const {
 	char buf[1001];
 	if (number_of_bits_ > 1000) {
 		return "(too many bits for binary string)";

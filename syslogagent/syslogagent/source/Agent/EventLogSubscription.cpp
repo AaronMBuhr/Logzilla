@@ -39,10 +39,12 @@ namespace Syslog_agent {
             }
         }
         if (bookmark_ == NULL) {
-            Logger::fatal("EventLogSubscription::subscribe()> could not create bookmark for %s\n", channel_.c_str());
+            Logger::fatal("EventLogSubscription::subscribe()> could not create "
+                " bookmark for %s\n", channel_.c_str());
             exit(1); // shouldn't be necessary
         }
-        EVT_HANDLE new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), query_.c_str(), bookmark_, this,
+        EVT_HANDLE new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), 
+            query_.c_str(), bookmark_, this,
             EventLogSubscription::handleSubscriptionEvent, EvtSubscribeStartAfterBookmark);
         subscription_active_ = true;
     }
@@ -55,7 +57,10 @@ namespace Syslog_agent {
         }
     }
 
-    DWORD WINAPI EventLogSubscription::handleSubscriptionEvent(EVT_SUBSCRIBE_NOTIFY_ACTION action, PVOID pContext, EVT_HANDLE hEvent) {
+    DWORD WINAPI EventLogSubscription::handleSubscriptionEvent(
+        EVT_SUBSCRIBE_NOTIFY_ACTION action, 
+        PVOID pContext, 
+        EVT_HANDLE hEvent) {
         DWORD status = ERROR_SUCCESS;
         EventLogSubscription* subscription = reinterpret_cast<EventLogSubscription*>(pContext);
         if (!subscription->subscription_active_)
@@ -67,29 +72,36 @@ namespace Syslog_agent {
             // includes EvtSubscribeStrict and the channel contains missing event records.
         case EvtSubscribeActionError:
         {
-            if (ERROR_EVT_QUERY_RESULT_STALE == (DWORD)hEvent)
+            DWORD errorCode = static_cast<DWORD>(reinterpret_cast<std::uintptr_t>(hEvent));
+            // Cast hEvent to DWORD to get the error code.
+            if (ERROR_EVT_QUERY_RESULT_STALE == errorCode)
             {
-                Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> The subscription callback was notified that event records are missing.\n");
-                // Handle if this is an issue for your application.
+                Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> The "
+                    "subscription callback was notified that event records are missing.\n");
+                // Additional handling if needed.
             }
             else
             {
-                Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()>The subscription callback received the following Win32 error: %lu\n", (DWORD)hEvent);
+                Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()>The "
+                    "subscription callback received the following Win32 error: %lu\n", errorCode);
             }
             break;
         }
         case EvtSubscribeActionDeliver:
         {
             EventLogEvent processed_event(hEvent);
-            subscription->event_handler_->handleEvent(subscription->subscription_name_.c_str(), processed_event);
+            subscription->event_handler_->handleEvent(subscription->subscription_name_.c_str(),
+                processed_event);
             if (!EvtUpdateBookmark(subscription->bookmark_, hEvent)) {
-                Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> could not update bookmark.\n");
+                Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()>"
+                    " could not update bookmark.\n");
             }
             break;
         }
 
         default:
-            Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Unknown action.\n");
+            Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()>"
+                " Unknown action.\n");
         }
 
         return ERROR_SUCCESS;
@@ -100,13 +112,16 @@ namespace Syslog_agent {
         DWORD buffer_used;
         DWORD property_count;
         if (subscription_active_) {
-            if (!EvtRender(NULL, bookmark_, EvtRenderBookmark, sizeof(xml_buffer), xml_buffer, &buffer_used, &property_count)) {
+            if (!EvtRender(NULL, bookmark_, EvtRenderBookmark, sizeof(xml_buffer), 
+                xml_buffer, &buffer_used, &property_count)) {
                 auto status = GetLastError();
                 if (status == ERROR_INSUFFICIENT_BUFFER) {
-                    Logger::recoverable_error("EventLogSubscription::saveBookmark()> insufficient xml buffer\n");
+                    Logger::recoverable_error("EventLogSubscription::saveBookmark()>"
+                        " insufficient xml buffer\n");
                 }
                 else {
-                    Logger::recoverable_error("EventLogSubscription::saveBookmark()> error %d\n", status);
+                    Logger::recoverable_error("EventLogSubscription::saveBookmark()>"
+                        " error %d\n", status);
                 }
             }
             else {

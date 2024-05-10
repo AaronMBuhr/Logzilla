@@ -15,10 +15,10 @@ namespace Syslog_agent {
         Result();
 		Result(const char* message);
         Result(DWORD status);
-        //Result(DWORD status, const char* message);
         Result(DWORD status, const char* from, const char* format, ...);
         Result(Result& other);
-        static Result ResultLog(DWORD status, Logger::LogLevel log_level, const char* name, const char* format, ...);
+        static Result ResultLog(DWORD status, Logger::LogLevel log_level, 
+            const char* name, const char* format, ...);
         const char* what() const override;
         bool isSuccess() const;
         DWORD statusCode() const;

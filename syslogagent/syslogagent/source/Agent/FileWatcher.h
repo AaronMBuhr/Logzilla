@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 
 #include <memory>
@@ -16,9 +21,9 @@ namespace Syslog_agent {
 
 	public:
 		enum ResultCodes { Success = 0, NoNewData = 1, BadFileName = 2, FailOpenFile, FailReadFile };
-		const static char LINEBREAK = '\n';
-		const static char CARRIAGERETURN = '\r';
-		const static int READ_BUF_SIZE = 4000;
+		static constexpr char LINEBREAK = '\n';
+		static constexpr char CARRIAGERETURN = '\r';
+		static constexpr int READ_BUF_SIZE = 4000;
 		FileWatcher(
 			Configuration& config,
 			const wchar_t* filename,
@@ -31,7 +36,7 @@ namespace Syslog_agent {
 		Result process();
 
 	private:
-		const int JSON_HEADERS_SIZE = 200;
+		static constexpr int JSON_HEADERS_SIZE = 200;
 		int max_line_length_;
 		vector<char> read_buffer_;
 		vector<char> message_buffer_;

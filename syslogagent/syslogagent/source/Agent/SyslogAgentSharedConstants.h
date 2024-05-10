@@ -1,4 +1,9 @@
-/* SyslogAgentSharedContants.h 
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
+/* SyslogAgentSharedContants.h
 * single file to collect constants that must be shared between
 * Syslog Agent apps (such as the config app)
 * unfortunately this file still must be manually synched to
@@ -6,105 +11,143 @@
 * reduces the chances of mismatch
 */
 
-#define SYSLOGAGENT_CURRENT_VERSION                 L"6.30.2.0"
-#define SYSLOGAGENT_CURRENT_CONFIG_VERSION		    L"6.30.0.0"
+#pragma once
 
-#define SYSLOGAGENT_DEFAULT_FACILITY				20
-#define SYSLOGAGENT_DEFAULT_SEVERITY				8
-#define SYSLOGAGENT_DEFAULT_PRIMARY_HOST			L""
-#define SYSLOGAGENT_DEFAULT_SECONDARY_HOST			L""
-#define SYSLOGAGENT_DEFAULT_USE_FORWARDER			(false)
-#define SYSLOGAGENT_DEFAULT_FORWARDER_DEST			L""
-#define SYSLOGAGENT_DEFAULT_UDP_FWD_PORT_S			L""
-#define SYSLOGAGENT_DEFAULT_TCP_FWD_PORT_S			L""
-#define SYSLOGAGENT_DEFAULT_SUFFIX					L""
-#define SYSLOGAGENT_DEFAULT_DEBUG_LOG_FILENAME		L""
-#define SYSLOGAGENT_DEFAULT_TAIL_FILENAME			L""
-#define SYSLOGAGENT_DEFAULT_TAIL_PROGRAMNAME		L""
-#define SYSLOGAGENT_DEFAULT_POLL_INTERVAL			2
-#define SYSLOGAGENT_USER_AGENT	        			L"LZ Syslog Agent/" SYSLOGAGENT_CURRENT_VERSION
-#define SYSLOGAGENT_HTTP_API_PATH                   L"/incoming"
-#define SYSLOGAGENT_LOGZILLA_VERSION_PATH           L"/version"
-#define SYSLOGAGENT_DEFAULT_BATCH_INTERVAL          1000
+namespace Syslog_agent {
 
+#define SYSLOGAGENT_CURRENT_VERSION L"6.30.2.0"
+    
+    class SharedConstants {
+    public:
+        // Misc
+        static constexpr wchar_t const* USER_AGENT              = L"LZ Syslog Agent/" SYSLOGAGENT_CURRENT_VERSION;
+        static constexpr wchar_t const* HTTP_API_PATH           = L"/incoming";
+        static constexpr wchar_t const* LOGZILLA_VERSION_PATH   = L"/version";
+        static constexpr wchar_t const* CERT_FILE_PRIMARY       = L"primary.pfx";
+        static constexpr wchar_t const* CERT_FILE_SECONDARY     = L"secondary.pfx";
 
-#define SYSLOGAGENT_SEVERITY_EMERGENCY			0
-#define SYSLOGAGENT_SEVERITY_ALERT				1
-#define SYSLOGAGENT_SEVERITY_CRITICAL			2
-#define SYSLOGAGENT_SEVERITY_ERROR				3
-#define SYSLOGAGENT_SEVERITY_WARNING			4
-#define SYSLOGAGENT_SEVERITY_NOTICE				5
-#define SYSLOGAGENT_SEVERITY_INFORMATIONAL		6
-#define SYSLOGAGENT_SEVERITY_DEBUG				7
-#define SYSLOGAGENT_SEVERITY_DYNAMIC			8
+        // Version strings
+        static constexpr wchar_t const* CURRENT_VERSION         = SYSLOGAGENT_CURRENT_VERSION;
+        static constexpr wchar_t const* CURRENT_CONFIG_VERSION  = L"6.30.0.0";
 
-#define SYSLOGAGENT_FACILITY_KERNEL				0
-#define SYSLOGAGENT_FACILITY_USER				1
-#define SYSLOGAGENT_FACILITY_MAIL				2
-#define SYSLOGAGENT_FACILITY_SYSTEM				3
-#define SYSLOGAGENT_FACILITY_SECAUTH			4
-#define SYSLOGAGENT_FACILITY_SYSLOGD			5
-#define SYSLOGAGENT_FACILITY_LPRINTER			6
-#define SYSLOGAGENT_FACILITY_NETNEWS			7
-#define SYSLOGAGENT_FACILITY_UUCP				8
-#define SYSLOGAGENT_FACILITY_CLOCK				9
-#define SYSLOGAGENT_FACILITY_SECAUTH2			10
-#define SYSLOGAGENT_FACILITY_FTP				11
-#define SYSLOGAGENT_FACILITY_NTP				12
-#define SYSLOGAGENT_FACILITY_LOGAUDIT			13
-#define SYSLOGAGENT_FACILITY_LOGALERT			14
-#define SYSLOGAGENT_FACILITY_CLOCK2				15
-#define SYSLOGAGENT_FACILITY_LOCALUSE0			16
-#define SYSLOGAGENT_FACILITY_LOCALUSE1			17
-#define SYSLOGAGENT_FACILITY_LOCALUSE2			18
-#define SYSLOGAGENT_FACILITY_LOCALUSE3			19
-#define SYSLOGAGENT_FACILITY_LOCALUSE4			20
-#define SYSLOGAGENT_FACILITY_LOCALUSE5			21
-#define SYSLOGAGENT_FACILITY_LOCALUSE6			22
-#define SYSLOGAGENT_FACILITY_LOCALUSE7			23
+        // Default values
+        class Defaults {
+        public:
+            static constexpr unsigned int       FACILITY            = 20;
+            static constexpr unsigned int       SEVERITY            = 8;
+            static constexpr wchar_t const*     PRIMARY_HOST        = L"";
+            static constexpr wchar_t const*     SECONDARY_HOST      = L"";
+            static constexpr bool               USE_FORWARDER       = false;
+            static constexpr wchar_t const*     FORWARDER_DEST      = L"";
+            static constexpr wchar_t const*     UDP_FWD_PORT_S      = L"";
+            static constexpr wchar_t const*     TCP_FWD_PORT_S      = L"";
+            static constexpr wchar_t const*     SUFFIX              = L"";
+            static constexpr wchar_t const*     DEBUG_LOG_FILENAME  = L"";
+            static constexpr wchar_t const*     TAIL_FILENAME       = L"";
+            static constexpr wchar_t const*     TAIL_PROGRAMNAME    = L"";
+            static constexpr int                BATCH_INTERVAL      = 1000;
+            static constexpr wchar_t*           PRIMARY_CERT        = L"PrimaryCert.pem";
+            static constexpr wchar_t*           SECONDARY_CERT      = L"SecondaryCert.pem";
+			static constexpr char*              VERSION_DETECT_STR  = "detect";
+            static constexpr char*              LOGZILLA_VER        = VERSION_DETECT_STR;
+            static constexpr int                POLL_INTERVAL_SEC   = 10;
+        };
 
-#define SYSLOGAGENT_REGISTRYKEY_MAIN							L"SOFTWARE\\LogZilla\\SyslogAgent"
-#define SYSLOGAGENT_REGISTRYKEY_CHANNELS						L"SOFTWARE\\LogZilla\\SyslogAgent\\Channels"
-#define SYSLOGAGENT_REGISTRYKEY_CONFIGVERSION					L"ConfigVersion"
-#define SYSLOGAGENT_REGISTRYKEY_INCLUDE_VS_IGNORE_EVENTIDS      L"IncludeVsIgnoreEventIds"
-#define SYSLOGAGENT_REGISTRYKEY_EVENT_ID_FILTER					L"EventIDFilterList"
-#define SYSLOGAGENT_REGISTRYKEY_ONLY_WHILE_RUNNING              L"OnlyWhileRunning"
-#define SYSLOGAGENT_REGISTRYKEY_EVENT_LOG_POLL_INTERVAL			L"EventLogPollInterval"
-#define SYSLOGAGENT_REGISTRYKEY_FORWARD_TO_SECONDARY			L"ForwardToMirror"
-#define SYSLOGAGENT_REGISTRYKEY_LOOKUP_ACCOUNTS					L"LookupAccountSID"
-#define SYSLOGAGENT_REGISTRYKEY_INCLUDE_KEY_VALUE_PAIRS			L"IncludeKeyValuePairs"
-#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_PORT					L"SendToBackupPort"
-#define SYSLOGAGENT_REGISTRYKEY_PRIMARY_HOST					L"Syslog"
-#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_HOST					L"Syslog1"
-#define SYSLOGAGENT_REGISTRYKEY_PRIMARY_USE_TLS					L"PrimaryUseTLS"
-#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_USE_TLS				L"SecondaryUseTLS"
-#define SYSLOGAGENT_REGISTRYKEY_FACILITY						L"Facility"
-#define SYSLOGAGENT_REGISTRYKEY_SEVERITY						L"Severity"
-#define SYSLOGAGENT_REGISTRYKEY_SUFFIX							L"Suffix"
-#define SYSLOGAGENT_REGISTRYKEY_DEBUG_LEVEL_SETTING				L"DebugLevel"
-#define SYSLOGAGENT_REGISTRYKEY_DEBUG_LOG_FILE					L"DebugLogFile"
-#define SYSLOGAGENT_REGISTRYKEY_TAIL_FILENAME					L"TailFilename"
-#define SYSLOGAGENT_REGISTRYKEY_TAIL_PROGRAM_NAME				L"TailProgramName"
-#define SYSLOGAGENT_REGISTRYKEY_CHANNEL_ENABLED					L"Enabled"
-#define SYSLOGAGENT_REGISTRYKEY_CHANNEL_BOOKMARK				L"Bookmark"
-#define SYSLOGAGENT_REGISTRYKEY_INITIAL_SETUP_FILE				L"InitialSetupRegFile"
-#define SYSLOGAGENT_REGISTRYKEY_SETUP_TEMP_RESTORE				L"SetupRestore"
-#define SYSLOGAGENT_REGISTRYKEY_SETUP_PRIMARY_TLS_FILENAME		L"PrimaryTlsFileName"
-#define SYSLOGAGENT_REGISTRYKEY_SETUP_SECONDARY_TLS_FILENAME	L"SecondaryTlsFileName"
-#define SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGZILLA_API_KEY        L"PrimaryLogZillaApiKey"
-#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGZILLA_API_KEY      L"SecondaryLogZillaApiKey"
-#define SYSLOGAGENT_REGISTRYKEY_BATCH_INTERVAL                  L"BatchInterval"
-#define SYSLOGAGENT_REGISTRYKEY_PRIMARY_LOGFORMAT               L"PrimaryLogFormat"
-#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_LOGFORMAT             L"SecondaryLogFormat"
-#define SYSLOGAGENT_REGISTRYKEY_PRIMARY_LZ_COMPAT_VER			L"PrimaryBackwardsCompatibleVersion";
-#define SYSLOGAGENT_REGISTRYKEY_SECONDARY_LZ_COMPAT_VER			L"SecondaryBackwardsCompatibleVersion";
-#define SYSLOGAGENT_CERT_FILENAME_PRIMARY						L"primary.pfx"
-#define SYSLOGAGENT_CERT_FILENAME_SECONDARY						L"secondary.pfx"
+        // Severity levels
+        class Severities {
+        public:
+            static constexpr int                EMERGENCY           = 0;
+            static constexpr int                ALERT               = 1;
+            static constexpr int                CRITICAL            = 2;
+            static constexpr int                ERR                 = 3;
+            static constexpr int                WARNING             = 4;
+            static constexpr int                NOTICE              = 5;
+            static constexpr int                INFORMATIONAL       = 6;
+            static constexpr int                DEBUG               = 7;
+            static constexpr int                DYNAMIC             = 8;
+        };
 
-#define SYSLOGAGENT_MAX_SUFFIX_LENGTH							1000
-#define SYSLOGAGENT_SENDER_MAINLOOP_DURATION                    1000
+        // Facility codes
+        class Facilities {
+        public:
+            static constexpr int                KERNEL              = 0;
+            static constexpr int                USER                = 1;
+            static constexpr int                MAIL                = 2;
+            static constexpr int                SYSTEM              = 3;
+            static constexpr int                SECAUTH             = 4;
+            static constexpr int                SYSLOGD             = 5;
+            static constexpr int                LPRINTER            = 6;
+            static constexpr int                NETNEWS             = 7;
+            static constexpr int                UUCP                = 8;
+            static constexpr int                CLOCK               = 9;
+            static constexpr int                SECAUTH2            = 10;
+            static constexpr int                FTP                 = 11;
+            static constexpr int                NTP                 = 12;
+            static constexpr int                LOGAUDIT            = 13;
+            static constexpr int                LOGALERT            = 14;
+            static constexpr int                CLOCK2              = 15;
+            static constexpr int                LOCALUSE0           = 16;
+            static constexpr int                LOCALUSE1           = 17;
+            static constexpr int                LOCALUSE2           = 18;
+            static constexpr int                LOCALUSE3           = 19;
+            static constexpr int                LOCALUSE4           = 20;
+            static constexpr int                LOCALUSE5           = 21;
+            static constexpr int                LOCALUSE6           = 22;
+            static constexpr int                LOCALUSE7           = 23;
+        };
 
-#define SYSLOGAGENT_LOGFORMAT_DETECT                            0
-#define SYSLOGAGENT_LOGFORMAT_JSONPORT                          1
-#define SYSLOGAGENT_LOGFORMAT_HTTPPORT                          2
-#define SYSLOGAGENT_LOGFORMAT_LZ_VERSION_HTTP                   "6.34"
+        // Maximum lengths and sizes
+        static constexpr int                MAX_SUFFIX_LENGTH       = 1000;
+        static constexpr int                SENDER_MAINLOOP_DURATION = 1000;
+
+        // Log formats
+        static constexpr int                LOGFORMAT_DETECT        = 0;
+        static constexpr int                LOGFORMAT_JSONPORT      = 1;
+        static constexpr int                LOGFORMAT_HTTPPORT      = 2;
+        static constexpr char const*        LOGFORMAT_LZ_VERSION_HTTP = "6.34";
+
+        class RegistryKey {
+        public:
+            static constexpr wchar_t const* MAIN_KEY                    = L"SOFTWARE\\LogZilla\\SyslogAgent";
+            static constexpr wchar_t const* CHANNELS_KEY                = L"SOFTWARE\\LogZilla\\SyslogAgent\\Channels";
+            static constexpr wchar_t const* CONFIG_VERSION              = L"ConfigVersion";
+            static constexpr wchar_t const* INCLUDE_VS_IGNORE_EVENT_IDS = L"IncludeVsIgnoreEventIds";
+            static constexpr wchar_t const* EVENT_ID_FILTER             = L"EventIDFilterList";
+            static constexpr wchar_t const* ONLY_WHILE_RUNNING          = L"OnlyWhileRunning";
+            static constexpr wchar_t const* EVENT_LOG_POLL_INTERVAL     = L"EventLogPollInterval";
+            static constexpr wchar_t const* FORWARD_TO_SECONDARY        = L"ForwardToMirror";
+            static constexpr wchar_t const* LOOKUP_ACCOUNTS             = L"LookupAccountSID";
+            static constexpr wchar_t const* EXTRA_KEY_VALUE_PAIRS       = L"ExtraKeyValuePairs";
+            static constexpr wchar_t const* PRIMARY_HOST                = L"Syslog";
+            static constexpr wchar_t const* PRIMARY_PORT                = L"SendToPort"; // deprecated
+            static constexpr wchar_t const* PRIMARY_API_KEY             = L"PrimaryLogZillaApiKey";
+            static constexpr wchar_t const* PRIMARY_USE_TLS             = L"PrimaryUseTLS";
+            static constexpr wchar_t const* SECONDARY_HOST              = L"Syslog1";
+            static constexpr wchar_t const* SECONDARY_PORT              = L"SendToBackupPort";
+            static constexpr wchar_t const* SECONDARY_API_KEY           = L"SecondaryLogZillaApiKey";
+            static constexpr wchar_t const* SECONDARY_USE_TLS           = L"SecondaryUseTLS";
+            static constexpr wchar_t const* FACILITY                    = L"Facility";
+            static constexpr wchar_t const* SEVERITY                    = L"Severity";
+            static constexpr wchar_t const* SUFFIX                      = L"Suffix";
+            static constexpr wchar_t const* DEBUG_LEVEL_SETTING         = L"DebugLevel";
+            static constexpr wchar_t const* DEBUG_LOG_FILE              = L"DebugLogFile";
+            static constexpr wchar_t const* TAIL_FILENAME               = L"TailFilename";
+            static constexpr wchar_t const* TAIL_PROGRAM_NAME           = L"TailProgramName";
+            static constexpr wchar_t const* CHANNEL_ENABLED             = L"Enabled";
+            static constexpr wchar_t const* CHANNEL_BOOKMARK            = L"Bookmark";
+            static constexpr wchar_t const* PRIMARY_TLS_FILENAME        = L"PrimaryTlsFileName";
+            static constexpr wchar_t const* SECONDARY_TLS_FILENAME      = L"SecondaryTlsFileName";
+            static constexpr wchar_t const* LOGZILLA_REGISTRY_KEY       = L"SOFTWARE\\LogZilla\\SyslogAgent";
+            static constexpr wchar_t const* WINDOWS_EVENT_CHANNELS_KEY  = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Channels";
+            static constexpr wchar_t const* SELECTED_EVENT_CHANNELS_KEY = L"SOFTWARE\\LogZilla\\SyslogAgent\\Channels";
+            static constexpr wchar_t const* INITIAL_SETUP_REG_FILE_KEY  = L"InitialSetupRegFile";
+            static constexpr wchar_t const* BATCH_INTERVAL              = L"BatchInterval";
+            static constexpr wchar_t const* PRIMARY_BACKWARDS_COMPAT_VER = L"PrimaryBackwardsCompatibleVersion";
+            static constexpr wchar_t const* SECONDARY_BACKWARDS_COMPAT_VER = L"SecondaryBackwardsCompatibleVersion";
+            static constexpr wchar_t const* INITIAL_SETUP_FILE          = L"InitialSetupRegFile";
+        };
+    };
+
+#undef SYSLOGAGENT_CURRENT_VERSION
+
+} // namespace SyslogAgent

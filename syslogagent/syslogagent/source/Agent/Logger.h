@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 #include <stdarg.h>
 #include <mutex>
@@ -6,19 +11,19 @@
 using namespace std;
 
 
-// TODO add unicode support
-
 #define LOG_CURRENT_LOCATION(p) Logger::debug( "Debug marker (%s) - ::%s() in file: %s(%d)\n", p, __func__ , __FILE__, __LINE__ )
 class Logger
 {
 public:
+	static constexpr wchar_t* DEFAULT_LOG_FILENAME = L"syslogagent.log";
 	typedef void (*FATAL_ERROR_HANDLER)(const char* fatal_error_message);
 
-	static const int MAX_LOGMSG_LENGTH = 16384;
-	static const wstring DEFAULT_LOG_FILENAME;
-	enum LogLevel { DEBUG3, DEBUG2, DEBUG, VERBOSE, INFO, WARN, RECOVERABLE_ERROR, CRITICAL, FATAL, NOLOG, ALWAYS, FORCE };
-	static char const* LOGLEVEL_ABBREVS[12];
-	static char* LOGLEVEL_ABBREVS_WITHBRACKET[12];
+	static constexpr int MAX_LOGMSG_LENGTH = 16384;
+	enum LogLevel { DEBUG3, DEBUG2, DEBUG, VERBOSE, INFO, WARN, RECOVERABLE_ERROR, 
+		CRITICAL, FATAL, NOLOG, ALWAYS, FORCE };
+	static constexpr char const* LOGLEVEL_ABBREVS[12] = { "DBG3", "DBG2", "DEBG", 
+		"VERB", "INFO", "WARN", "RERR", "CRIT", "FATL", "NONE", "ALWY", "FORC" };
+	static vector<string> LOGLEVEL_ABBREVS_WITHBRACKET;
 	enum LogDestination { DEST_CONSOLE, DEST_FILE, DEST_CONSOLE_AND_FILE };
 
 	static void setFatalErrorHandler(FATAL_ERROR_HANDLER fatal_error_handler) {
@@ -33,8 +38,7 @@ public:
 	static bool log_no_datetime(const LogLevel log_level, const char* format, ...);
 	static void setLogEventsToFile() { singleton()->log_events_to_file_ = true; }
 	static bool getLogEventsToFile() { return singleton()->log_events_to_file_; }
-	static void logEventToFile(string event_message);
-	// returns false if there was an error logging
+	static void logEventToFile(string event_message); // returns false if there was an error logging
 	static void getDateTimeStr(char* buf, int bufsize);
 	static bool isUnittestRunning();
 	static string getUnitTestLog();
@@ -64,12 +68,13 @@ public:
 	template<typename... _args> static bool critical(const char* format, _args... args) {
 		return log(CRITICAL, format, args...);
 	}
-	//template<typename... _args> static bool fatal(const char* format, _args... args) {
-	//	return log(FATAL, format, args...);
-	//}
+
+	// this logs with at any log level
 	template<typename... _args> static bool always(const char* format, _args... args) {
 		return log(ALWAYS, format, args...);
 	}
+
+	// this forces a log even when logging is off
 	template<typename... _args> static bool force(const char* format, _args... args) {
 		return log(FORCE, format, args...);
 	}
@@ -102,7 +107,6 @@ public:
 
 
 private:
-	static const string EVENTS_FILE_PATH_AND_FILENAME;
 	Logger();
 	static Logger* singleton_;
 	LogLevel current_log_level_ = NOLOG;
@@ -116,8 +120,8 @@ private:
 	FATAL_ERROR_HANDLER fatal_error_handler_;
 
 	static Logger* singleton();
-	bool logToConsole(const char* log_message_cstring);
-	bool logToFile(const char* log_message_cstring);
-	bool logToConsoleAndFile(const char* log_message_cstring);
+	bool logToConsole(const char* log_message_cstring) const;
+	bool logToFile(const char* log_message_cstring) const;
+	bool logToConsoleAndFile(const char* log_message_cstring) const;
 };
 

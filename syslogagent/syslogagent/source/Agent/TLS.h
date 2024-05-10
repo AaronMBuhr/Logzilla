@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #pragma once
 
 #include <memory>
@@ -29,8 +34,8 @@ public:
 	TLS() : clean_(true), socket_(0), xcred_(0), session_(0) {}
 	void setupTlsForConnection();
 	bool doHandshake(SOCKET socket);
-	int tls_send(const char* message, size_t message_length);
-	int tls_receive(char* buffer, size_t buffer_size);
+	int tls_send(const char* message, size_t message_length) const;
+	int tls_receive(char* buffer, size_t buffer_size) const;
 	void close();
 	void cleanup();
 	~TLS() { cleanup(); }

@@ -23,24 +23,12 @@ namespace Syslog_agent {
 
 	char* Globals::getMessageBuffer(char* debug_text) {
 		auto result = reinterpret_cast<char*>(message_buffers_->getAndMarkNextUnused());
-#ifdef DEBUG
-		const std::lock_guard<std::mutex> lock(debug_logging_);
-		FILE* f = fopen("d:\\temp\\buffers.log", "a");
-		fprintf(f, "%30s GET %p : %d : %s\n", debug_text, (void*)result, message_buffers_->countBuffers(), message_buffers_->asBinaryString().c_str());
-		fclose(f);
-#endif
 		return result;
 	}
 
 	void Globals::releaseMessageBuffer(char* debug_text, char* buffer) {
 		auto ptr = (char(*)[MESSAGE_BUFFER_SIZE]) buffer;
 		message_buffers_->markAsUnused(ptr);
-#ifdef DEBUG
-		const std::lock_guard<std::mutex> lock(debug_logging_);
-		FILE* f = fopen("d:\\temp\\buffers.log", "a");
-		fprintf(f, "%30s RLS %p : %d : %s\n", debug_text, (void*)buffer, message_buffers_->countBuffers(), message_buffers_->asBinaryString().c_str());
-		fclose(f);
-#endif
 	}
 
 }
