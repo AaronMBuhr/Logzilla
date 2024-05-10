@@ -6,10 +6,10 @@ Copyright © 2021 Logzilla Corp.
 #pragma once
 
 #include <memory>
+#include "pugixml.hpp"
 #include <Windows.h>
 #include <winevt.h>
 #include "BitmappedObjectPool.h"
-#include "pugixml.hpp"
 
 using namespace std;
 

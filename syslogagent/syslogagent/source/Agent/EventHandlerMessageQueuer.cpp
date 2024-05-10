@@ -1,12 +1,12 @@
 #include "stdafx.h"
 #include <iomanip>
 #include <locale>
+#include "pugixml.hpp"
 #include <sstream>
 #include "EventHandlerMessageQueuer.h"
 #include "Globals.h"
 #include "Logger.h"
 #include "OStreamBuf.h"
-#include "pugixml.hpp"
 #include "SyslogSender.h"
 #include "Util.h"
 

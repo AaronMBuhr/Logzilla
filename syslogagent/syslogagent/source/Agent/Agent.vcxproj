@@ -113,7 +113,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>D:\Source\Logzilla\syslogagent_with_forwarder\syslogagent\source\Agent\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\Source\Logzilla\syslogagent_with_forwarder\syslogagent\source\Agent\include;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -131,6 +131,8 @@
     <ClInclude Include="EventHandlerMessageQueuer.h" />
     <ClInclude Include="EventLogEvent.h" />
     <ClInclude Include="EventLogSubscription.h" />
+    <ClInclude Include="external\pugixml\src\pugiconfig.hpp" />
+    <ClInclude Include="external\pugixml\src\pugixml.hpp" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="ArrayQueue.h" />
@@ -141,8 +143,6 @@
     <ClInclude Include="MessageQueue.h" />
     <ClInclude Include="NetworkClient.h" />
     <ClInclude Include="OStreamBuf.h" />
-    <ClInclude Include="pugiconfig.hpp" />
-    <ClInclude Include="pugixml.hpp" />
     <ClInclude Include="RecordNumber.h" />
     <ClInclude Include="Configuration.h" />
     <ClInclude Include="Result.h" />
@@ -164,6 +164,9 @@
     <ClCompile Include="EventHandlerMessageQueuer.cpp" />
     <ClCompile Include="EventLogEvent.cpp" />
     <ClCompile Include="EventLogSubscription.cpp" />
+    <ClCompile Include="external\pugixml\src\pugixml.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="Bitmap.cpp" />
@@ -171,7 +174,6 @@
     <ClCompile Include="FileWatcher.cpp" />
     <ClCompile Include="MessageQueue.cpp" />
     <ClCompile Include="NetworkClient.cpp" />
-    <ClCompile Include="pugixml.cpp" />
     <ClCompile Include="RecordNumber.cpp" />
     <ClCompile Include="Result.cpp" />
     <ClCompile Include="LogConfiguration.cpp" />
