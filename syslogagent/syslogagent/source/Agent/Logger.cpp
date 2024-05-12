@@ -18,29 +18,43 @@
 
 using namespace std;
 
-Logger* Logger::singleton_ = nullptr;
 vector<string> Logger::LOGLEVEL_ABBREVS_WITHBRACKET;
 
 Logger* Logger::singleton() {
-	if (singleton_ == nullptr) {
-		singleton_ = new Logger();
-	}
-	return singleton_;
+	static Logger instance;
+	// DEBUGGING
+	//instance.logger_lock_.lock();
+	//instance.logger_lock_.unlock();
+	return &instance;
 }
 
-Logger::Logger() 
-	: log_path_and_filename_(DEFAULT_LOG_FILENAME), 
-	log_events_to_file_(false), 
+//Logger* Logger::singleton() {
+//	static Logger* instance = nullptr;
+//	static std::mutex mutex;
+//
+//	if (instance == nullptr) {
+//		std::lock_guard<std::mutex> lock(mutex);
+//		if (instance == nullptr) {
+//			instance = new Logger();
+//		}
+//	}
+//	return instance;
+//}
+
+
+Logger::Logger()
+	: log_path_and_filename_(DEFAULT_LOG_FILENAME),
+	log_events_to_file_(false),
 	is_unittest_running_(-1),
-	fatal_error_handler_(nullptr) {
-	log_message_buffer_[0] = 0;
+	fatal_error_handler_(nullptr),
+	log_message_buffer_{ 0 },
+	logger_lock_() {
 	int l = 0;
 	LOGLEVEL_ABBREVS_WITHBRACKET.resize(static_cast<int>(LogLevel::FORCE) + 1);
 	do {
 		LOGLEVEL_ABBREVS_WITHBRACKET[l] = std::string(LOGLEVEL_ABBREVS[l]) + "] ";
 	} while (l++ != static_cast<int>(LogLevel::FORCE));
 }
-
 
 bool Logger::log(const LogLevel log_level, const char* format, ...) {
 
@@ -57,6 +71,10 @@ bool Logger::log(const LogLevel log_level, const char* format, ...) {
 	}
 	bool result;
 
+	//Logger* logger = singleton();
+	//// Access the mutex through the logger instance
+	//logger->logger_lock_.lock();
+	//// ...
 	std::unique_lock<std::mutex> lock(singleton()->logger_lock_);
 
 	char dt_buf[40];
@@ -146,7 +164,7 @@ bool Logger::log_no_datetime(const LogLevel log_level, const char* format, ...) 
 }
 
 void Logger::setLogLevel(const LogLevel log_level) {
-	std::lock_guard<std::mutex> guard(singleton()->logger_lock_);
+	// std::lock_guard<std::mutex> guard(singleton()->logger_lock_);
 	singleton()->current_log_level_ = log_level;
 	if (log_level != NOLOG) {
 		always("Log level set to: %s\n", LOGLEVEL_ABBREVS[(int) log_level]);
@@ -158,7 +176,7 @@ Logger::LogLevel Logger::getLogLevel() {
 }
 
 void Logger::setLogDestination(LogDestination log_destination) {
-	std::lock_guard<std::mutex> guard(singleton()->logger_lock_);
+	// std::lock_guard<std::mutex> guard(singleton()->logger_lock_);
 	singleton()->log_destination_ = log_destination;
 }
 

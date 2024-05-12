@@ -50,7 +50,7 @@ namespace Syslog_agent {
             static constexpr wchar_t*           SECONDARY_CERT      = L"SecondaryCert.pem";
 			static constexpr char*              VERSION_DETECT_STR  = "detect";
             static constexpr char*              LOGZILLA_VER        = VERSION_DETECT_STR;
-            static constexpr int                POLL_INTERVAL_SEC   = 10;
+            static constexpr int                POLL_INTERVAL_SEC   = 2;
         };
 
         // Severity levels

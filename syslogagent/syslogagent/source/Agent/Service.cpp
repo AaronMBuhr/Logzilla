@@ -80,7 +80,7 @@ void Service::run(bool running_as_console) {
 			config_.tail_filename_.c_str(),
 			config_.MAX_TAIL_FILE_LINE_LENGTH,
 			program_name.c_str(),
-			config_.host_name_,
+			config_.host_name_.c_str(),
 			(config_.severity_ == SharedConstants::Severities::DYNAMIC 
 				? SharedConstants::Severities::INFORMATIONAL : config_.severity_),
 			config_.facility_

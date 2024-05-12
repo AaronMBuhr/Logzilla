@@ -108,7 +108,6 @@ public:
 
 private:
 	Logger();
-	static Logger* singleton_;
 	LogLevel current_log_level_ = NOLOG;
 	LogDestination log_destination_ = DEST_CONSOLE;
 	mutex logger_lock_;

@@ -52,6 +52,7 @@ namespace Syslog_agent {
 					configuration_.suffix_.c_str(),
 					static_cast<int>(length),
 					suffix_utf8_, 1000, NULL, NULL);
+				suffix_utf8_[chars_written] = 0;
 			}
 		}
 		else {
@@ -66,6 +67,10 @@ namespace Syslog_agent {
 		int primary_logformat = configuration_.getPrimaryLogformat();
 		if (generateLogMessage(event, primary_logformat, json_buffer, 
 			Globals::MESSAGE_BUFFER_SIZE)) {
+			// DEBUGGING
+			//if (strstr(json_buffer, "IntelDal") != NULL) {
+			//	Logger::breakPoint();
+			//}
 			while (primary_message_queue_->isFull()) {
 				primary_message_queue_->removeFront();
 			}
@@ -182,28 +187,38 @@ namespace Syslog_agent {
 		// we're going to copy the message text into the json so we need
 		// to escape certain characters for valid json
 		auto escaped_buf = Globals::instance()->getMessageBuffer("escaped_buf");
+		// DEBUGGING
+		auto txt = event.getEventText();
 		Util::jsonEscape(event.getEventText(), escaped_buf, Globals::MESSAGE_BUFFER_SIZE);
+		if (strlen(escaped_buf) == 0) {
+			strcpy(escaped_buf, "(no event message given)");
+		}
 		OStreamBuf<char> ostream_buffer(json_buffer, buflen);
 		ostream json_output(&ostream_buffer);
 		json_output.fill('0');
 		json_output << "{";
 		if (timestamp != 0) {
-			json_output << " \"ts\": " << timestamp << "." << decimal_time << ",";
+			json_output << " \"ts\": " << timestamp << "." << decimal_time;
 		}
-		if (configuration_.host_name_[0] != 0) {
-			json_output << " \"host\": \"" << configuration_.host_name_ << "\",";
+		if (configuration_.host_name_ != "") {
+			json_output << ", \"host\": \"" << configuration_.host_name_ << "\"";
 		}
 		json_output
-			<< " \"program\": \"" << provider << "\","
-			<< " \"severity\": " << ((char)(severity + '0')) << ","
-			<< " \"facility\": " << configuration_.facility_;
+			<< ", \"program\": \"" << provider << "\""
+			<< ", \"severity\": " << ((char)(severity + '0'))
+			<< ", \"facility\": " << configuration_.facility_;
+		// DEBUGGING
+		//if (strcmp(provider,"IntelDalJhi") == 0) {
+		//	Logger::breakPoint();
+		//}
 		switch (logformat) {
 		case SharedConstants::LOGFORMAT_HTTPPORT:
-			json_output << ", \"message\": \"" << escaped_buf << "\" ";
+			json_output << ", \"message\": \"" << escaped_buf << "\"";
 			break;
 
 		case SharedConstants::LOGFORMAT_JSONPORT:
-			json_output << ", \"message\": \"JSON log event\" ";
+			json_output << ", \"message\": \"JSON log event\""
+				<< ", \"_source_type\": \"WindowsAgent\"";
 			break;
 
 		default:
@@ -212,20 +227,20 @@ namespace Syslog_agent {
 			exit(1); // shouldn't be needed
 		}
 		json_output << ", \"extra_fields\": { "
-			<< " \"_source_tag\": \"windows_agent\","
-			<< " \"log_type\": \"eventlog\","
-			<< " \"event_id\": \"" << event_id_str << "\","
-			<< " \"event_log\": \"" << log_name_utf8_ << "\"";
+			<< " \"_source_tag\": \"windows_agent\""
+			<< ", \"log_type\": \"eventlog\""
+			<< ", \"event_id\": \"" << event_id_str << "\""
+			<< ", \"event_log\": \"" << log_name_utf8_ << "\"";
 		if (logformat == SharedConstants::LOGFORMAT_JSONPORT) {
 			json_output
-				<< ", \"_source_type\": \"WindowsAgent\","
-				<< " \"program\": \"" << provider << "\","
-				<< " \"severity\": " << ((char)(severity + '0')) << ","
-				<< " \"facility\": " << configuration_.facility_;
+				<< ", \"program\": \"" << provider << "\""
+				<< ", \"severity\": " << ((char)(severity + '0'))
+				<< ", \"facility\": " << configuration_.facility_
+				<< ", \"_source_type\": \"WindowsAgent\"";
 			if (timestamp != 0) {
 				json_output << ", \"ts\": " << timestamp << "." << decimal_time;
 			}
-			if (configuration_.host_name_[0] != 0) {
+			if (configuration_.host_name_ != "") {
 				json_output << ", \"host\": \"" << configuration_.host_name_ << "\" ";
 			}
 			json_output << ", \"message\": \"" << escaped_buf << "\" ";

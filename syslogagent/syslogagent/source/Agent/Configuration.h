@@ -37,7 +37,7 @@ namespace Syslog_agent {
         static int event_log_poll_interval_;
         int facility_;
         int severity_;
-        char host_name_[256];
+        string host_name_;
         int batch_interval_;
         wstring primary_host_ = SharedConstants::Defaults::PRIMARY_HOST;;
         wstring primary_api_key_ = L"";

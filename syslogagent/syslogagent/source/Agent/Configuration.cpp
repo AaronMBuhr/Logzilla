@@ -78,6 +78,9 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     }
 	api_path_ = SharedConstants::HTTP_API_PATH;
     event_log_poll_interval_ = registry.readInt(SharedConstants::RegistryKey::EVENT_LOG_POLL_INTERVAL, SharedConstants::Defaults::POLL_INTERVAL_SEC);
+    if (event_log_poll_interval_ == 0) {
+        event_log_poll_interval_ = SharedConstants::Defaults::POLL_INTERVAL_SEC;
+    }
     primary_host_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_HOST, L"localhost");
     primary_api_key_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_API_KEY, L"");
     secondary_host_ = registry.readString(SharedConstants::RegistryKey::SECONDARY_HOST, L"");
@@ -111,6 +114,8 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     }
 
     registry.close();
+
+	host_name_ = getHostName();
 
     getTimeZoneOffset();
     Logger::debug("Loaded configuration from registry (from console: %s)\n", (running_from_console ? "true" : "false"));
