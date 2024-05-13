@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,11 +14,13 @@ namespace SyslogAgent
     public static class SharedConstants
     {
 
-        public enum Severity { Emergency = 0, Alert = 1, Critical, Error, Warning, Notice, Information, Debug, Dynamic };
+        public enum Severity { Emergency = 0, Alert = 1, Critical, Error, Warning, 
+            Notice, Information, Debug, Dynamic };
 
-        public enum Facility { Kernel = 0, User = 1, Mail, System, SecAuth, Syslogd, LPrinter, NetNews, UUCP, Clock, 
-            SecAuth2, FTP, NTP, LogAudit, LogAlert, Clock2, LocalUse0, LocalUse1, LocalUse2, LocalUse3, LocalUse4, 
-            LocalUse5, LocalUse6, LocalUse7}
+        public enum Facility { Kernel = 0, User = 1, Mail, System, SecAuth, Syslogd, 
+            LPrinter, NetNews, UUCP, Clock, SecAuth2, FTP, NTP, LogAudit, LogAlert, 
+            Clock2, LocalUse0, LocalUse1, LocalUse2, LocalUse3, LocalUse4, LocalUse5, 
+            LocalUse6, LocalUse7}
 
         public static class RegistryKey
         {

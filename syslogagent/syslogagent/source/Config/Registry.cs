@@ -18,35 +18,76 @@ namespace SyslogAgent.Config
         public void ReadConfigFromRegistry(ref Configuration config)
                 {
             openRegistryKey();
-            config.PollInterval = (int)mainKey.GetValue(SharedConstants.RegistryKey.EventLogPollInterval, SharedConstants.ConfigDefaults.EventLogPollInterval);
-            config.LookUpAccountIDs = GetBinary(SharedConstants.RegistryKey.LookupAccounts, SharedConstants.ConfigDefaults.LookupAccountsB) != 0;
-            config.IncludeVsIgnoreEventIds = GetBinary(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, SharedConstants.ConfigDefaults.IncludeVsIgnoreEventIdsB) != 0;
-            config.EventIdFilter = mainKey.GetValue(SharedConstants.RegistryKey.EventIdFilter, SharedConstants.ConfigDefaults.EventIdFilter).ToString();
-            config.OnlyWhileRunning = GetBinary( SharedConstants.RegistryKey.OnlyWhileRunning, SharedConstants.ConfigDefaults.OnlyWhileRunning ) != 0;
-            config.Facility = (int)mainKey.GetValue(SharedConstants.RegistryKey.Facility, (int)SharedConstants.ConfigDefaults.Facility);
-            config.Severity = (int)mainKey.GetValue(SharedConstants.RegistryKey.Severity, (int)SharedConstants.ConfigDefaults.Severity);
-            //IncludeKeyValuePairs = GetBinary(SharedConstants.RegistryKey.IncludeKeyValuePairs, SharedConstants.ConfigDefaults.IncludeKeyValuePairsB) != 0,
-            config.Suffix = mainKey.GetValue(SharedConstants.RegistryKey.Suffix, SharedConstants.ConfigDefaults.Suffix).ToString();
-            config.SecondaryHost = mainKey.GetValue(SharedConstants.RegistryKey.SecondaryHost, SharedConstants.ConfigDefaults.SecondaryHost).ToString();
-            config.PrimaryHost = mainKey.GetValue(SharedConstants.RegistryKey.PrimaryHost, SharedConstants.ConfigDefaults.PrimaryHost).ToString();
-            config.PrimaryApiKey = mainKey.GetValue(SharedConstants.RegistryKey.PrimaryApiKey, SharedConstants.ConfigDefaults.PrimaryApiKey).ToString();
-            config.SendToSecondary = GetBinary(SharedConstants.RegistryKey.SendToSecondary, SharedConstants.ConfigDefaults.SendToSecondaryB) != 0;
-            config.SecondaryApiKey = mainKey.GetValue(SharedConstants.RegistryKey.SecondaryApiKey, SharedConstants.ConfigDefaults.SecondaryApiKey).ToString();
-            config.PrimaryUseTls = GetBinary(SharedConstants.RegistryKey.PrimaryUseTls, SharedConstants.ConfigDefaults.PrimaryUseTlsB) != 0;
-            config.SecondaryUseTls = GetBinary(SharedConstants.RegistryKey.SecondaryUseTls, SharedConstants.ConfigDefaults.SecondaryUseTlsB) != 0;
-            config.DebugLevel = 9 - (int)mainKey.GetValue(SharedConstants.RegistryKey.DebugLevelSetting, 0);
-            config.DebugLogFilename = mainKey.GetValue(SharedConstants.RegistryKey.DebugLogFile, "").ToString();
-            config.TailFilename = mainKey.GetValue(SharedConstants.RegistryKey.TailFilename, string.Empty).ToString();
-            config.TailProgramName = mainKey.GetValue(SharedConstants.RegistryKey.TailProgramName, string.Empty).ToString();
+            config.PollInterval 
+                = (int)mainKey.GetValue(SharedConstants.RegistryKey.EventLogPollInterval, 
+                SharedConstants.ConfigDefaults.EventLogPollInterval);
+            config.LookUpAccountIDs 
+                = GetBinary(SharedConstants.RegistryKey.LookupAccounts, 
+                SharedConstants.ConfigDefaults.LookupAccountsB) != 0;
+            config.IncludeVsIgnoreEventIds 
+                = GetBinary(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, 
+                SharedConstants.ConfigDefaults.IncludeVsIgnoreEventIdsB) != 0;
+            config.EventIdFilter 
+                = mainKey.GetValue(SharedConstants.RegistryKey.EventIdFilter, 
+                SharedConstants.ConfigDefaults.EventIdFilter).ToString();
+            config.OnlyWhileRunning 
+                = GetBinary( SharedConstants.RegistryKey.OnlyWhileRunning, 
+                SharedConstants.ConfigDefaults.OnlyWhileRunning ) != 0;
+            config.Facility 
+                = (int)mainKey.GetValue(SharedConstants.RegistryKey.Facility, 
+                (int)SharedConstants.ConfigDefaults.Facility);
+            config.Severity 
+                = (int)mainKey.GetValue(SharedConstants.RegistryKey.Severity, 
+                (int)SharedConstants.ConfigDefaults.Severity);
+            config.Suffix 
+                = mainKey.GetValue(SharedConstants.RegistryKey.Suffix, 
+                SharedConstants.ConfigDefaults.Suffix).ToString();
+            config.SecondaryHost 
+                = mainKey.GetValue(SharedConstants.RegistryKey.SecondaryHost, 
+                SharedConstants.ConfigDefaults.SecondaryHost).ToString();
+            config.PrimaryHost 
+                = mainKey.GetValue(SharedConstants.RegistryKey.PrimaryHost, 
+                SharedConstants.ConfigDefaults.PrimaryHost).ToString();
+            config.PrimaryApiKey 
+                = mainKey.GetValue(SharedConstants.RegistryKey.PrimaryApiKey, 
+                SharedConstants.ConfigDefaults.PrimaryApiKey).ToString();
+            config.SendToSecondary 
+                = GetBinary(SharedConstants.RegistryKey.SendToSecondary, 
+                SharedConstants.ConfigDefaults.SendToSecondaryB) != 0;
+            config.SecondaryApiKey 
+                = mainKey.GetValue(SharedConstants.RegistryKey.SecondaryApiKey, 
+                SharedConstants.ConfigDefaults.SecondaryApiKey).ToString();
+            config.PrimaryUseTls 
+                = GetBinary(SharedConstants.RegistryKey.PrimaryUseTls, 
+                SharedConstants.ConfigDefaults.PrimaryUseTlsB) != 0;
+            config.SecondaryUseTls 
+                = GetBinary(SharedConstants.RegistryKey.SecondaryUseTls, 
+                SharedConstants.ConfigDefaults.SecondaryUseTlsB) != 0;
+            config.DebugLevel 
+                = 9 - (int)mainKey.GetValue(SharedConstants.RegistryKey.DebugLevelSetting, 0);
+            config.DebugLogFilename 
+                = mainKey.GetValue(SharedConstants.RegistryKey.DebugLogFile, "").ToString();
+            config.TailFilename 
+                = mainKey.GetValue(SharedConstants.RegistryKey.TailFilename, 
+                string.Empty).ToString();
+            config.TailProgramName 
+                = mainKey.GetValue(SharedConstants.RegistryKey.TailProgramName, 
+                string.Empty).ToString();
             config.AllEventLogPaths = Registry.AllEventLogPaths;
             config.SelectedEventLogPaths = Registry.SelectedEventLogPaths;
-            config.BatchInterval = (int)mainKey.GetValue( SharedConstants.RegistryKey.BatchInterval, SharedConstants.ConfigDefaults.BatchInterval );
-            config.PrimaryBackwardsCompatVer = mainKey.GetValue(SharedConstants.RegistryKey.PrimaryBackwardsCompatVer, SharedConstants.ConfigDefaults.BackwardsCompatVer).ToString();
+            config.BatchInterval 
+                = (int)mainKey.GetValue( SharedConstants.RegistryKey.BatchInterval, 
+                SharedConstants.ConfigDefaults.BatchInterval );
+            config.PrimaryBackwardsCompatVer 
+                = mainKey.GetValue(SharedConstants.RegistryKey.PrimaryBackwardsCompatVer, 
+                SharedConstants.ConfigDefaults.BackwardsCompatVer).ToString();
             if (!SharedConstants.BackwardsCompatVersions.Contains(config.PrimaryBackwardsCompatVer))
             {
                 config.PrimaryBackwardsCompatVer = SharedConstants.ConfigDefaults.BackwardsCompatVer;
             }
-            config.PrimaryBackwardsCompatVer = mainKey.GetValue( SharedConstants.RegistryKey.SecondaryBackwardsCompatVer, SharedConstants.ConfigDefaults.BackwardsCompatVer).ToString();
+            config.PrimaryBackwardsCompatVer 
+                = mainKey.GetValue( SharedConstants.RegistryKey.SecondaryBackwardsCompatVer, 
+                SharedConstants.ConfigDefaults.BackwardsCompatVer).ToString();
             if (!SharedConstants.BackwardsCompatVersions.Contains(config.SecondaryBackwardsCompatVer))
             {
                 config.SecondaryBackwardsCompatVer = SharedConstants.ConfigDefaults.BackwardsCompatVer;
@@ -56,44 +97,47 @@ namespace SyslogAgent.Config
         public void WriteConfigToRegistry(Configuration config) {
             openRegistryKey();
 
-            mainKey.SetValue(SharedConstants.RegistryKey.ConfigVersion, SharedConstants.CurrentConfigVersion);
-            mainKey.SetValue(SharedConstants.RegistryKey.EventLogPollInterval, config.PollInterval, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.ConfigVersion, 
+                SharedConstants.CurrentConfigVersion);
+            mainKey.SetValue(SharedConstants.RegistryKey.EventLogPollInterval, 
+                config.PollInterval, RegistryValueKind.DWord);
             PutBool(SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
-            PutBool(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds);
-            mainKey.SetValue(SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter, RegistryValueKind.String);
+            PutBool(SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, 
+                config.IncludeVsIgnoreEventIds);
+            mainKey.SetValue(SharedConstants.RegistryKey.EventIdFilter, 
+                config.EventIdFilter, RegistryValueKind.String);
             PutBool( SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
-            mainKey.SetValue(SharedConstants.RegistryKey.Facility, config.Facility, RegistryValueKind.DWord);
-            mainKey.SetValue(SharedConstants.RegistryKey.Severity, config.Severity, RegistryValueKind.DWord);
-            mainKey.SetValue(SharedConstants.RegistryKey.BatchInterval, config.BatchInterval, RegistryValueKind.DWord);
-            //PutBool(SharedConstants.RegistryKey.IncludeKeyValuePairs, value.IncludeKeyValuePairs);
-            mainKey.SetValue(SharedConstants.RegistryKey.Suffix, config.Suffix, RegistryValueKind.String);
-            mainKey.SetValue(SharedConstants.RegistryKey.PrimaryHost, config.PrimaryHost, RegistryValueKind.String);
-            mainKey.SetValue(SharedConstants.RegistryKey.PrimaryApiKey, config.PrimaryApiKey, RegistryValueKind.String );
-            mainKey.SetValue(SharedConstants.RegistryKey.SecondaryHost, config.SecondaryHost, RegistryValueKind.String );
-            mainKey.SetValue(SharedConstants.RegistryKey.SecondaryApiKey, config.SecondaryApiKey, RegistryValueKind.String );
+            mainKey.SetValue(SharedConstants.RegistryKey.Facility, 
+                config.Facility, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.Severity, 
+                config.Severity, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.BatchInterval, 
+                config.BatchInterval, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.Suffix, config.Suffix, 
+                RegistryValueKind.String);
+            mainKey.SetValue(SharedConstants.RegistryKey.PrimaryHost, 
+                config.PrimaryHost, RegistryValueKind.String);
+            mainKey.SetValue(SharedConstants.RegistryKey.PrimaryApiKey, 
+                config.PrimaryApiKey, RegistryValueKind.String );
+            mainKey.SetValue(SharedConstants.RegistryKey.SecondaryHost, 
+                config.SecondaryHost, RegistryValueKind.String );
+            mainKey.SetValue(SharedConstants.RegistryKey.SecondaryApiKey, 
+                config.SecondaryApiKey, RegistryValueKind.String );
             PutBool( SharedConstants.RegistryKey.SendToSecondary, config.SendToSecondary);
             PutBool(SharedConstants.RegistryKey.PrimaryUseTls, config.PrimaryUseTls);
             PutBool(SharedConstants.RegistryKey.SecondaryUseTls, config.SecondaryUseTls);
-            mainKey.SetValue(SharedConstants.RegistryKey.DebugLevelSetting, 9 - config.DebugLevel, RegistryValueKind.DWord);
-            mainKey.SetValue(SharedConstants.RegistryKey.DebugLogFile, config.DebugLogFilename, RegistryValueKind.String);
-            mainKey.SetValue(SharedConstants.RegistryKey.TailFilename, config.TailFilename, RegistryValueKind.String);
-            mainKey.SetValue(SharedConstants.RegistryKey.TailProgramName, config.TailProgramName, RegistryValueKind.String);
-            mainKey.SetValue(SharedConstants.RegistryKey.PrimaryBackwardsCompatVer, config.PrimaryBackwardsCompatVer, RegistryValueKind.String);
-            mainKey.SetValue(SharedConstants.RegistryKey.SecondaryBackwardsCompatVer, config.SecondaryBackwardsCompatVer, RegistryValueKind.String);
-
-                //foreach (var log in value.EventLogs)
-                //{
-
-                //    if (log.IsChosen)
-                //    {
-                //        var logKey = mainKey.CreateSubKey(log.Name, true);
-                //        logKey.Close();
-                //    }
-                //    else
-                //    {
-                //        mainKey.DeleteSubKey(log.Name, false);
-                //    }
-                //}
+            mainKey.SetValue(SharedConstants.RegistryKey.DebugLevelSetting, 
+                9 - config.DebugLevel, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.DebugLogFile, 
+                config.DebugLogFilename, RegistryValueKind.String);
+            mainKey.SetValue(SharedConstants.RegistryKey.TailFilename, 
+                config.TailFilename, RegistryValueKind.String);
+            mainKey.SetValue(SharedConstants.RegistryKey.TailProgramName, 
+                config.TailProgramName, RegistryValueKind.String);
+            mainKey.SetValue(SharedConstants.RegistryKey.PrimaryBackwardsCompatVer, 
+                config.PrimaryBackwardsCompatVer, RegistryValueKind.String);
+            mainKey.SetValue(SharedConstants.RegistryKey.SecondaryBackwardsCompatVer, 
+                config.SecondaryBackwardsCompatVer, RegistryValueKind.String);
 
             saveSelectedEventChannelNames(config.SelectedEventLogPaths);
             disableMissingEventLogNames(config.SelectedEventLogPaths);
@@ -133,7 +177,8 @@ namespace SyslogAgent.Config
 
         static void PutBool(RegistryKey parent, string key, bool value)
         {
-            parent.SetValue(key, new byte[] { value ? (byte)1 : (byte)0 }, RegistryValueKind.Binary);
+            parent.SetValue(key, 
+                new byte[] { value ? (byte)1 : (byte)0 }, RegistryValueKind.Binary);
         }
 
         RegistryKey mainKey = null;
@@ -142,7 +187,8 @@ namespace SyslogAgent.Config
         {
             if (mainKey == null)
             {
-                mainKey = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(SharedConstants.RegistryKey.LogzillaRegistryKey, true);
+                mainKey = Microsoft.Win32.Registry.LocalMachine
+                    .CreateSubKey(SharedConstants.RegistryKey.LogzillaRegistryKey, true);
             }
         }
 
@@ -162,18 +208,12 @@ namespace SyslogAgent.Config
             "ForwarderUdpListenPort"
         };
 
-        // this isn't used?
-        //public static string[] getWindowsEventChannelNames()
-        //{
-        //    RegistryKey windows_event_channels_key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(SharedConstants.RegistryKey.WindowsEventChannelsKey, false);
-        //    string[] result = windows_event_channels_key.GetSubKeyNames();
-        //    windows_event_channels_key.Close();
-        //    return result;
-        //}
 
         public static string[] getSavedEventChannelNames()
         {
-            RegistryKey saved_event_channels_key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(SharedConstants.RegistryKey.SelectedEventChannelsKey, false);
+            RegistryKey saved_event_channels_key 
+                = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                    SharedConstants.RegistryKey.SelectedEventChannelsKey, false);
             if (saved_event_channels_key == null)
             {
                 // key does not exist, return empty set
@@ -190,7 +230,9 @@ namespace SyslogAgent.Config
             var saved_names = getSavedEventChannelNames();
             foreach (var name in saved_names)
             {
-                var channel_key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(SharedConstants.RegistryKey.SelectedEventChannelsKey + @"\" + name, false);
+                var channel_key = Microsoft.Win32.Registry.LocalMachine
+                    .OpenSubKey(SharedConstants.RegistryKey.SelectedEventChannelsKey 
+                    + @"\" + name, false);
                 if (channel_key == null)
                     continue;
                 var value = channel_key.GetValue(SharedConstants.RegistryKey.ChannelEnabledName);
@@ -203,7 +245,8 @@ namespace SyslogAgent.Config
 
         public void saveSelectedEventChannelNames(IEnumerable<string> channel_names)
         {
-            var channels_key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(SharedConstants.RegistryKey.SelectedEventChannelsKey, true);
+            var channels_key = Microsoft.Win32.Registry.LocalMachine
+                .CreateSubKey(SharedConstants.RegistryKey.SelectedEventChannelsKey, true);
             foreach (var name in channel_names)
             {
                 var log_key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(
@@ -220,7 +263,9 @@ namespace SyslogAgent.Config
             var missing = saved_channels.Where(x => !selected_event_log_names.Contains(x));
             foreach (var path in missing)
             {
-                var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(SharedConstants.RegistryKey.SelectedEventChannelsKey + @"\" + path, true);
+                var key = Microsoft.Win32.Registry.LocalMachine
+                    .OpenSubKey(SharedConstants.RegistryKey.SelectedEventChannelsKey
+                    + @"\" + path, true);
                 if (key != null)
                     key.SetValue(SharedConstants.RegistryKey.ChannelEnabledName, 0);
             }
@@ -241,7 +286,8 @@ namespace SyslogAgent.Config
         {
             try
             { // if there's any error, this status isn't really a problem so just let it be
-                RegistryKey sub_key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(SharedConstants.RegistryKey.LogzillaRegistryKey, true);
+                RegistryKey sub_key = Microsoft.Win32.Registry.LocalMachine
+                    .OpenSubKey(SharedConstants.RegistryKey.LogzillaRegistryKey, true);
                 if (sub_key == null)
                 {
                     // key does not exist, just return
@@ -295,29 +341,53 @@ namespace SyslogAgent.Config
                 writer.WriteLine(@"[HKEY_LOCAL_MACHINE\SOFTWARE\LogZilla]");
                 writer.WriteLine("");
                 writer.WriteLine(@"[HKEY_LOCAL_MACHINE\SOFTWARE\LogZilla\SyslogAgent]");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.ConfigVersion, SharedConstants.CurrentConfigVersion);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.EventLogPollInterval, SharedConstants.ConfigDefaults.EventLogPollInterval);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
-                WriteRegfileKeyValue( writer, SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds );
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter ?? "");
-                WriteRegfileKeyValue( writer, SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Facility, config.Facility);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Severity, config.Severity);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.BatchInterval, config.BatchInterval);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.Suffix, config.Suffix ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.PrimaryHost, config.PrimaryHost ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SecondaryHost, config.SecondaryHost ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SendToSecondary, config.SendToSecondary);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.PrimaryUseTls, config.PrimaryUseTls);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SecondaryUseTls, config.SecondaryUseTls);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.DebugLevelSetting, config.DebugLevel);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.DebugLogFile, config.DebugLogFilename ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.TailFilename, config.TailFilename ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.TailProgramName, config.TailProgramName ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.PrimaryTlsFileName, Globals.PrimaryTlsFilename ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SecondaryTlsFileName, Globals.SecondaryTlsFilename ?? "");
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.PrimaryBackwardsCompatVer, config.PrimaryBackwardsCompatVer);
-                WriteRegfileKeyValue(writer, SharedConstants.RegistryKey.SecondaryBackwardsCompatVer, config.SecondaryBackwardsCompatVer);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.ConfigVersion, SharedConstants.CurrentConfigVersion);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.EventLogPollInterval, 
+                    SharedConstants.ConfigDefaults.EventLogPollInterval);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.LookupAccounts, config.LookUpAccountIDs);
+                WriteRegfileKeyValue( writer, 
+                    SharedConstants.RegistryKey.IncludeVsIgnoreEventIds, config.IncludeVsIgnoreEventIds );
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.EventIdFilter, config.EventIdFilter ?? "");
+                WriteRegfileKeyValue( writer, 
+                    SharedConstants.RegistryKey.OnlyWhileRunning, config.OnlyWhileRunning );
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.Facility, config.Facility);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.Severity, config.Severity);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.BatchInterval, config.BatchInterval);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.Suffix, config.Suffix ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.PrimaryHost, config.PrimaryHost ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.SecondaryHost, config.SecondaryHost ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.SendToSecondary, config.SendToSecondary);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.PrimaryUseTls, config.PrimaryUseTls);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.SecondaryUseTls, config.SecondaryUseTls);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.DebugLevelSetting, config.DebugLevel);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.DebugLogFile, config.DebugLogFilename ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.TailFilename, config.TailFilename ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.TailProgramName, config.TailProgramName ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.PrimaryTlsFileName, Globals.PrimaryTlsFilename ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.SecondaryTlsFileName, Globals.SecondaryTlsFilename ?? "");
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.PrimaryBackwardsCompatVer, config.PrimaryBackwardsCompatVer);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.SecondaryBackwardsCompatVer, config.SecondaryBackwardsCompatVer);
 
                 writer.WriteLine("");
                 writer.WriteLine(@"[HKEY_LOCAL_MACHINE\SOFTWARE\LogZilla\SyslogAgent\Channels]");
@@ -325,7 +395,9 @@ namespace SyslogAgent.Config
 
                 foreach (var channel_name in config.SelectedEventLogPaths)
                 {
-                    writer.WriteLine(@"[HKEY_LOCAL_MACHINE\{1}\{2}]", SharedConstants.RegistryKey.LogzillaRegistryKey, SharedConstants.RegistryKey.SelectedEventChannelsKey, channel_name);
+                    writer.WriteLine(@"[HKEY_LOCAL_MACHINE\{1}\{2}]", 
+                        SharedConstants.RegistryKey.LogzillaRegistryKey, 
+                        SharedConstants.RegistryKey.SelectedEventChannelsKey, channel_name);
                     WriteRegfileKeyValue(writer, "Enabled", (int)1);
                     writer.WriteLine("");
                 }
@@ -380,11 +452,13 @@ namespace SyslogAgent.Config
                                     break;
 
                                 case SharedConstants.RegistryKey.EventLogPollInterval:
-                                    config.PollInterval = System.Convert.ToInt32(ValuePortion(parts[1]), 16);
+                                    config.PollInterval 
+                                        = System.Convert.ToInt32(ValuePortion(parts[1]), 16);
                                     break;
 
                                 case SharedConstants.RegistryKey.BatchInterval:
-                                    config.BatchInterval = System.Convert.ToInt32( ValuePortion( parts[1]), 16);
+                                    config.BatchInterval 
+                                        = System.Convert.ToInt32( ValuePortion( parts[1]), 16);
                                     break;
 
                                 case SharedConstants.RegistryKey.LookupAccounts:
@@ -404,11 +478,13 @@ namespace SyslogAgent.Config
                                     break;
 
                                 case SharedConstants.RegistryKey.Facility:
-                                    config.Facility = System.Convert.ToInt32(DeQuote(ValuePortion(parts[1])), 16);
+                                    config.Facility 
+                                        = System.Convert.ToInt32(DeQuote(ValuePortion(parts[1])), 16);
                                     break;
 
                                 case SharedConstants.RegistryKey.Severity:
-                                    config.Severity = System.Convert.ToInt32(DeQuote(ValuePortion(parts[1])), 16);
+                                    config.Severity 
+                                        = System.Convert.ToInt32(DeQuote(ValuePortion(parts[1])), 16);
                                     break;
 
                                 case SharedConstants.RegistryKey.Suffix:
@@ -444,7 +520,8 @@ namespace SyslogAgent.Config
                                     break;
 
                                 case SharedConstants.RegistryKey.TailFilename:
-                                    config.TailFilename = DeQuote(parts[1]).Replace("\"", "").Replace("\\\\", "\\");
+                                    config.TailFilename 
+                                        = DeQuote(parts[1]).Replace("\"", "").Replace("\\\\", "\\");
                                     break;
 
                                 case SharedConstants.RegistryKey.TailProgramName:
@@ -464,16 +541,17 @@ namespace SyslogAgent.Config
 
                                 case "Enabled":
                                     // we must be in a channel def
-                                    // [HKEY_LOCAL_MACHINE\SOFTWARE\LogZilla\SyslogAgent\Channels\Microsoft-Client-Licensing-Platform/Admin]
+                                    // [HKEY_LOCAL_MACHINE\SOFTWARE\LogZilla\SyslogAgent
+                                    // \Channels\Microsoft-Client-Licensing-Platform/Admin]
                                     string[] channel_parts = section.Split('\\');
-                                    if (channel_parts.Length > 1 && channel_parts[channel_parts.Length - 2] == "Channels")
+                                    if (channel_parts.Length > 1 
+                                        && channel_parts[channel_parts.Length - 2] == "Channels")
                                     {
                                         channel_list.Add(channel_parts[channel_parts.Length - 1]);
                                     }
                                     break;
 
                                 default:
-                                    // don't know what to do so just skip
                                     break;
                             }
 
@@ -490,8 +568,6 @@ namespace SyslogAgent.Config
 
         public static void LoadEventLogChannels()
         {
-            // this isn't used?
-            //List<string> availableLogPaths = new List<string>(getWindowsEventChannelNames());
             List<string> selectedLogPaths = new List<string>(getSelectedEventChannelNames());
             var event_log_paths_temp = WindowsEventLog.GetWindowsEventChannelNames();
             AllEventLogPaths = excludeDisabledEventLogPaths(event_log_paths_temp);

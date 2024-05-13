@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -46,7 +50,8 @@ namespace SyslogAgent.Config
 
 
                     // Check the status code or other properties of the response if needed
-                    // For now, just returning true to indicate that the certificate matched and the request was successful
+                    // For now, just returning true to indicate that the certificate matched
+                    // and the request was successful
                     return response.IsSuccessStatusCode;
                 }
                 catch( HttpRequestException ex)

@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,6 +13,10 @@ namespace SyslogAgent.Config
 {
     public class WindowsEventLog
     {
+        /* we must use an external DLL to get the list of Windows event log channels,
+         * since as of this version of .NET (4.72) these Windows event APIs are 
+         * not supported */
+
         [DllImport("EventLogInterface.dll", CharSet = CharSet.Unicode)]
         static extern UInt32 GetChannelNames(
             [Out] byte[] output_buffer,
@@ -32,7 +40,8 @@ namespace SyslogAgent.Config
             {
                 if (channels_buffer[i] == 0)
                 {
-                    var name = enc.GetString(channels_buffer, name_start_idx, i - name_start_idx);
+                    var name = enc.GetString(channels_buffer, name_start_idx, 
+                        i - name_start_idx);
                     result.Add(name);
                     name_start_idx = i + 1;
                 }

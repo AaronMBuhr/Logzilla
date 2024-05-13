@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,7 +21,8 @@ namespace EventGenerator
             if (EventLog.SourceExists(LOG_SOURCE_NAME))
                 return;
 
-            EventSourceCreationData creation_data = new EventSourceCreationData(LOG_SOURCE_NAME, "Application")
+            EventSourceCreationData creation_data 
+                = new EventSourceCreationData(LOG_SOURCE_NAME, "Application")
             {
                 MessageResourceFile = MESSAGE_FILENAME,
                 CategoryResourceFile = MESSAGE_FILENAME,

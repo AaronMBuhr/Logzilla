@@ -1,5 +1,4 @@
-﻿
-/* SyslogAgentConfig: configuring a syslog agent for Windows
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
 Copyright © 2021 LogZilla Corp.
 */
 

@@ -193,6 +193,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="message.mc" />
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Agent.rc" />

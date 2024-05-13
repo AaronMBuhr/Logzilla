@@ -4,9 +4,7 @@ Copyright © 2021 LogZilla Corp.
 
 namespace SyslogAgent.Config {
     public interface IMainView {
-        // IValidatedStringView PollInterval { get; }
         IOptionView LookUpAccount { get; }
-        //IOptionView IncludeKeyValuePairs { get; }
         IOptionView SendToSecondary { get; }
         IValidatedOptionView IncludeEventIds { get; }
         IValidatedOptionView IgnoreEventIds { get; }
@@ -29,7 +27,6 @@ namespace SyslogAgent.Config {
         void UpdateDisplay(Configuration config);
         string Status { set; }
         string LogzillaFileVersion { set; }
-        // SelectionListView Logs { get; }
         IOptionListView Facility { get; }
         IOptionListView Severity { get; }
         IOptionListView DebugLevel { get; }

@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;

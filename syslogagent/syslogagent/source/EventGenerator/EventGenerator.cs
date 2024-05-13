@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -41,7 +45,8 @@ namespace EventGenerator
 
         public void WriteFakeEvent(/* string msg_addendum */)
         {
-            EventLog.WriteEntry(EventLogCreator.LOG_SOURCE_NAME, EVENT_MESSAGE /* + msg_addendum */, EVENT_TYPE, EVENT_ID, EVENT_CATEGORY, event_data_);
+            EventLog.WriteEntry(EventLogCreator.LOG_SOURCE_NAME, EVENT_MESSAGE 
+                /* + msg_addendum */, EVENT_TYPE, EVENT_ID, EVENT_CATEGORY, event_data_);
         }
     }
 }

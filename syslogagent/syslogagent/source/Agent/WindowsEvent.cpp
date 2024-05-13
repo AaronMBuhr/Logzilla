@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #include "stdafx.h"
 #include "WindowsEvent.h"
 

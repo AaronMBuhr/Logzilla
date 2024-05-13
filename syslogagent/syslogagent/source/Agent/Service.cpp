@@ -234,7 +234,7 @@ void Service::run(bool running_as_console) {
 			}
 			if (config_.use_log_agent_ && primary_message_queue_->isEmpty() 
 				&& (secondary_message_queue_ == nullptr || secondary_message_queue_->isEmpty())) {
-				Logger::debug2("Saving config to registry");
+				Logger::debug2("Saving config to registry\n");
 				config_.saveToRegistry();
 			}
 			if (_kbhit() || restart_needed) {

@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -8,15 +12,18 @@ using System.Threading.Tasks;
 
 namespace SyslogAgent.Config
 {
-    /// <summary>Base class with implementation of the <see cref="INotifyPropertyChanged"/> interface.</summary>
+    /// <summary>Base class with implementation of the <see cref="INotifyPropertyChanged"/> 
+    /// interface.</summary>
     public abstract class BaseInpc : INotifyPropertyChanged
     {
         /// <inheritdoc cref="INotifyPropertyChanged"/>
         public event PropertyChangedEventHandler PropertyChanged;
 
-        /// <summary>The protected method for raising the event <see cref = "PropertyChanged"/>.</summary>
+        /// <summary>The protected method for raising the event
+        /// <see cref = "PropertyChanged"/>.</summary>
         /// <param name="propertyName">The name of the changed property.
-        /// If the value is not specified, the name of the method in which the call was made is used.</param>
+        /// If the value is not specified, the name of the method in which 
+        /// the call was made is used.</param>
         protected void RaisePropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
@@ -41,7 +48,8 @@ namespace SyslogAgent.Config
         /// After the event is created,
         /// the <see cref = "OnPropertyChanged (string, object, object)" />
         /// method is called. </remarks>
-        protected void Set<T>(ref T propertyFiled, T newValue, [CallerMemberName] string propertyName = null)
+        protected void Set<T>(ref T propertyFiled, T newValue, 
+            [CallerMemberName] string propertyName = null)
         {
             if (!object.Equals(propertyFiled, newValue))
             {
@@ -53,13 +61,18 @@ namespace SyslogAgent.Config
             }
         }
 
-        /// <summary> The protected virtual method is called after the property has been assigned a value and after the event is raised <see cref = "PropertyChanged" />. </summary>
+        /// <summary> The protected virtual method is called after the property has 
+        /// been assigned a value and after the event is raised 
+        /// <see cref = "PropertyChanged" />. </summary>
         /// <param name = "propertyName"> The name of the changed property. </param>
         /// <param name = "oldValue"> The old value of the property. </param>
         /// <param name = "newValue"> The new value of the property. </param>
-        /// <remarks> Can be overridden in derived classes to respond to property value changes. <br/>
-        /// It is recommended to call the base method as the first operator in the overridden method. <br/>
-        /// If the overridden method does not call the base class, then an unwanted change in the base class logic is possible. </remarks>
+        /// <remarks> Can be overridden in derived classes to respond to property 
+        /// value changes. <br/>
+        /// It is recommended to call the base method as the first operator in the 
+        /// overridden method. <br/>
+        /// If the overridden method does not call the base class, then an unwanted 
+        /// change in the base class logic is possible. </remarks>
         protected virtual void OnPropertyChanged(string propertyName, object oldValue, object newValue) { }
     }
 }

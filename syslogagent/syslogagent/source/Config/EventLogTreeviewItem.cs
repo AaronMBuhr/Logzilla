@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -9,67 +13,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 
-#if old
-namespace SyslogAgent.Config
-{
-    public class EventLogTreeviewItem : INotifyPropertyChanged
-    {
-        public string Name { get; set; }
-        public ObservableCollection<EventLogTreeviewItem> Children { get; set; }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        protected Visibility is_checked_;
-
-        public EventLogTreeviewItem()
-        {
-            PropertyChanged += EventLogTreeviewItem_PropertyChanged;
-        }
-
-        private void EventLogTreeviewItem_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            throw new NotImplementedException();
-        }
-
-
-        //public Visibility IsChecked
-        //{
-        //    get { return is_checked_; }
-        //    set
-        //    {
-        //        is_checked_ = value;
-        //        foreach (var child in Children)
-        //        {
-        //            child.IsChecked = value;
-        //        }
-        //        PropertyChanged.Invoke(this, new PropertyChangedEventArgs("IsChecked"));
-        //    }
-        //}
-
-        public Visibility IsChecked
-        {
-            get { return is_checked_; }
-            set
-            {
-                is_checked_ = value;
-                foreach (var child in Children)
-                {
-                    child.IsChecked = value;
-                }
-                OnPropertyChanged();
-            }
-        }
-        
-        protected void OnPropertyChanged([CallerMemberName] string name = "")
-        {
-            PropertyChangedEventHandler handler = PropertyChanged;
-            if (handler != null)
-                handler(this, new PropertyChangedEventArgs(name));
-        }
-    }
-}
-
-#else
 namespace SyslogAgent.Config
 {
     public class EventLogTreeviewItem : BaseInpc
@@ -149,7 +92,8 @@ namespace SyslogAgent.Config
             //is_checked_ = null;
         }
 
-        protected override void OnPropertyChanged(string propertyName, object oldValue, object newValue) {
+        protected override void OnPropertyChanged(string propertyName, object oldValue, 
+            object newValue) {
             if (oldValue == newValue)
                 return;
             if (propertyName == "IsChecked")
@@ -172,4 +116,3 @@ namespace SyslogAgent.Config
     }
 }
 
-#endif

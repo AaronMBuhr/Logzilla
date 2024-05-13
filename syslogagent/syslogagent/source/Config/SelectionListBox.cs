@@ -14,10 +14,12 @@ namespace SyslogAgent.Config {
 
         public void Add(string name, bool isChosen) {
             var panel = new StackPanel {Orientation = Orientation.Horizontal};
-            panel.Children.Add(new CheckBox {IsChecked = isChosen, Margin = new Thickness(1)});
+            panel.Children.Add(new CheckBox {IsChecked = isChosen, Margin 
+                = new Thickness(1)});
             var binding = new Binding {
                 Path = new PropertyPath("Foreground"),
-                RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(ListBoxItem), 1)
+                RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, 
+                typeof(ListBoxItem), 1)
             };
             var text = new TextBlock {
                 Text = name,

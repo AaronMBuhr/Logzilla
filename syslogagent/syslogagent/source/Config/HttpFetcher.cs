@@ -1,4 +1,8 @@
-﻿using System;
+﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright © 2021 LogZilla Corp.
+*/
+
+using System;
 using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
@@ -16,7 +20,8 @@ namespace SyslogAgent.Config
             var handler = new HttpClientHandler();
 
             // Accept all certificates (including self-signed)
-            handler.ServerCertificateCustomValidationCallback = ( sender, cert, chain, policyErrors ) => true;
+            handler.ServerCertificateCustomValidationCallback 
+                = ( sender, cert, chain, policyErrors ) => true;
 
             client = new HttpClient( handler );
         }
@@ -30,7 +35,8 @@ namespace SyslogAgent.Config
             if( authToken != null )
             {
                 request.Headers.Clear();
-                request.Headers.Accept.Add( new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue( "application/json" ) );
+                request.Headers.Accept.Add( 
+                    new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue( "application/json" ) );
                 request.Headers.Add( "Authorization", "token " + authToken );
             }
 

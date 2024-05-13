@@ -18,7 +18,8 @@ namespace SyslogAgent.Config {
         }
 
         public bool IsValid {
-            set { textBox.Foreground = value ? SystemColors.ControlTextBrush : new SolidColorBrush(Color.FromRgb(255, 0, 0)); }
+            set { textBox.Foreground = value ? SystemColors.ControlTextBrush 
+                    : new SolidColorBrush(Color.FromRgb(255, 0, 0)); }
         }
 
         readonly TextBox textBox;

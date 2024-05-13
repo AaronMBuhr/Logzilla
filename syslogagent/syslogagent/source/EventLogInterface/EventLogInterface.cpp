@@ -6,15 +6,20 @@
 
 #pragma comment(lib, "wevtapi.lib")
 
-int ConvertToUtf8(const wchar_t* wide_text, char* utf8_text, int output_buffer_size) {
-    return WideCharToMultiByte(CP_UTF8, 0, wide_text, -1, utf8_text, output_buffer_size, NULL, NULL);
+int ConvertToUtf8(const wchar_t* wide_text, char* utf8_text, 
+    int output_buffer_size) {
+    return WideCharToMultiByte(CP_UTF8, 0, wide_text, -1, utf8_text, 
+        output_buffer_size, NULL, NULL);
 }
 
-DWORD GetChannelNamesInternal(char* output_buffer, int output_buffer_size, char* error_message_buffer, int error_message_buffer_size);
+DWORD GetChannelNamesInternal(char* output_buffer, int output_buffer_size, 
+    char* error_message_buffer, int error_message_buffer_size);
 DWORD IsChannelDisabledInternal(const wchar_t* channel_name);
 
 extern "C" {
-    __declspec(dllexport) DWORD GetChannelNames(unsigned char* output_buffer, int output_buffer_size, unsigned char* error_message_buffer, int error_message_buffer_size) {
+    __declspec(dllexport) DWORD GetChannelNames(unsigned char* output_buffer, 
+        int output_buffer_size, unsigned char* error_message_buffer, 
+        int error_message_buffer_size) {
         return GetChannelNamesInternal(
             (char*)output_buffer, 
             output_buffer_size, 
@@ -26,7 +31,8 @@ extern "C" {
     }
 }
 
-int setErrorMessage(char* error_message_buffer, int error_message_buffer_size, const wchar_t* format, ...) {
+int setErrorMessage(char* error_message_buffer, int error_message_buffer_size, 
+    const wchar_t* format, ...) {
     wchar_t* temp_buffer = (wchar_t*) new wchar_t[error_message_buffer_size];
     va_list args;
     va_start(args, format);
@@ -45,7 +51,8 @@ int setErrorMessage(char* error_message_buffer, int error_message_buffer_size, c
     return result;
 }
 
-DWORD GetChannelNamesInternal(char* output_buffer, int output_buffer_size, char* error_message_buffer, int error_message_buffer_size)
+DWORD GetChannelNamesInternal(char* output_buffer, int output_buffer_size, 
+    char* error_message_buffer, int error_message_buffer_size)
 {
     static const int UTF8_BUFFER_SIZE = 1000;
     EVT_HANDLE hChannels = NULL;
@@ -65,7 +72,8 @@ DWORD GetChannelNamesInternal(char* output_buffer, int output_buffer_size, char*
     if (NULL == hChannels)
     {
         status = GetLastError();
-        setErrorMessage(error_message_buffer, error_message_buffer_size, L"(%d) EvtOpenChannelEnum failed", status);
+        setErrorMessage(error_message_buffer, error_message_buffer_size, 
+            L"(%d) EvtOpenChannelEnum failed", status);
         goto cleanup;
     }
 
@@ -95,23 +103,27 @@ DWORD GetChannelNamesInternal(char* output_buffer, int output_buffer_size, char*
                 else
                 {
                     status = ERROR_OUTOFMEMORY;
-                    setErrorMessage(error_message_buffer, error_message_buffer_size, L"(%d) realloc failed", status);
+                    setErrorMessage(error_message_buffer, error_message_buffer_size, 
+                        L"(%d) realloc failed", status);
                     goto cleanup;
                 }
             }
             else
             {
-                setErrorMessage(error_message_buffer, error_message_buffer_size, L"(%d) EvtNextChannelPath failed", status);
+                setErrorMessage(error_message_buffer, error_message_buffer_size, 
+                    L"(%d) EvtNextChannelPath failed", status);
                 break;
             }
         }
 
         if (output_buffer_idx + dwBufferUsed > output_buffer_size - 1) {
-            setErrorMessage(error_message_buffer, error_message_buffer_size, L"(%d) Buffer too small", ERROR_INSUFFICIENT_BUFFER);
+            setErrorMessage(error_message_buffer, error_message_buffer_size, 
+                L"(%d) Buffer too small", ERROR_INSUFFICIENT_BUFFER);
             break;
         }
         else {
-            int num_chars = ConvertToUtf8(pBuffer, output_buffer + output_buffer_idx, output_buffer_size - output_buffer_idx);
+            int num_chars = ConvertToUtf8(pBuffer, output_buffer + output_buffer_idx, 
+                output_buffer_size - output_buffer_idx);
             output_buffer_idx += num_chars;
         }
     }
@@ -135,14 +147,11 @@ DWORD IsChannelDisabledInternal(const wchar_t* channel_name) {
     DWORD dwBufferSize = 0;
     DWORD dwBufferUsed = 0;
 
-    //FILE* debug_file;
-    //fopen_s(&debug_file, "d:\\temp\\dllimport.log", "w");
-    //fwprintf(debug_file, L"%s\n", channel_name);
-    //fclose(debug_file);
 
     hChannel = EvtOpenChannelConfig(NULL, channel_name, 0);
 
-    if (NULL == hChannel) // Fails with 15007 (ERROR_EVT_CHANNEL_NOT_FOUND) if the channel is not found
+    if (NULL == hChannel) // Fails with 15007 (ERROR_EVT_CHANNEL_NOT_FOUND) 
+                          // if the channel is not found
     {
         auto status = GetLastError();
         if (status == ERROR_SUCCESS) {
@@ -153,7 +162,8 @@ DWORD IsChannelDisabledInternal(const wchar_t* channel_name) {
         goto cleanup;
     }
 
-    if (!EvtGetChannelConfigProperty(hChannel, EvtChannelConfigEnabled, 0, dwBufferSize, pProperty, &dwBufferUsed))
+    if (!EvtGetChannelConfigProperty(hChannel, EvtChannelConfigEnabled, 0, 
+        dwBufferSize, pProperty, &dwBufferUsed))
     {
         status = GetLastError();
         if (ERROR_INSUFFICIENT_BUFFER == status)
@@ -164,7 +174,8 @@ DWORD IsChannelDisabledInternal(const wchar_t* channel_name) {
             {
                 pProperty = pTemp;
                 pTemp = NULL;
-                if (!EvtGetChannelConfigProperty(hChannel, EvtChannelConfigEnabled, 0, dwBufferSize, pProperty, &dwBufferUsed)) {
+                if (!EvtGetChannelConfigProperty(hChannel, EvtChannelConfigEnabled, 
+                    0, dwBufferSize, pProperty, &dwBufferUsed)) {
                     status = GetLastError();
                 }
                 else {

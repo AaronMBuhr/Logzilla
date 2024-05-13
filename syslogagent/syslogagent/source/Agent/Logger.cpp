@@ -1,3 +1,8 @@
+/*
+SyslogAgent: a syslog agent for Windows
+Copyright © 2021 Logzilla Corp.
+*/
+
 #include "stdafx.h"
 #include "Logger.h"
 #include <algorithm>
@@ -22,9 +27,6 @@ vector<string> Logger::LOGLEVEL_ABBREVS_WITHBRACKET;
 
 Logger* Logger::singleton() {
 	static Logger instance;
-	// DEBUGGING
-	//instance.logger_lock_.lock();
-	//instance.logger_lock_.unlock();
 	return &instance;
 }
 
