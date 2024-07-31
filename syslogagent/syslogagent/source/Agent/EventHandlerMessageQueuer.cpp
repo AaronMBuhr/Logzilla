@@ -248,7 +248,8 @@ namespace Syslog_agent {
 				" logformat: %d", logformat);
 		}
 		json_output << ", \"extra_fields\": { "
-			<< " \"_source_tag\": \"windows_agent\""
+			<< " \"_source_type\": \"WindowsAgent\""
+			<< ", \"_source_tag\": \"windows_agent\""
 			<< ", \"log_type\": \"eventlog\""
 			<< ", \"event_id\": \"" << event_id_str << "\""
 			<< ", \"event_log\": \"" << log_name_utf8_ << "\"";

@@ -61,6 +61,10 @@ namespace Syslog_agent {
         std::wregex url_regex(LR"(^(http:\/\/|https:\/\/)?([^\/:]+)(:\d+)?(\/.*)?$)");
         std::wsmatch matches;
 
+        if (api_key_ == L"") {
+			Logger::fatal("NetworkClient::initalize()> API key is empty.\n");
+        }
+
         if (std::regex_search(url, matches, url_regex))
         {
             if (matches.size() >= 3)
@@ -261,6 +265,9 @@ namespace Syslog_agent {
         }
 
         // Construct headers
+        if (api_key_ == L"") {
+			Logger::fatal("NetworkClient::post()> API key is empty.\n");
+		}
         std::wstring headers = L"Authorization: token " + api_key_ 
             + L"\r\n" L"Content-Type: application/json\r\n";
         if (!WinHttpAddRequestHeaders(hRequest_, headers.c_str(), 

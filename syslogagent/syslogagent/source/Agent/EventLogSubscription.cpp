@@ -6,6 +6,7 @@ Copyright © 2021 Logzilla Corp.
 #include "stdafx.h"
 #include "EventLogSubscription.h"
 #include "Logger.h"
+#include "Util.h"
 
 #pragma comment(lib, "wevtapi.lib")
 
@@ -33,6 +34,11 @@ namespace Syslog_agent {
     }
 
     void EventLogSubscription::subscribe(const wstring& bookmark_xml) {
+		Logger::debug("EventLogSubscription::subscribe()> Subscribing to %s\n", Util::wstr2str(channel_).c_str());
+		if (subscription_active_) {
+			Logger::fatal("EventLogSubscription::subscribe()> subscription already active\n");
+			exit(1); // shouldn't be necessary
+		}
         bookmark_xml_ = wstring(bookmark_xml);
         if (bookmark_xml_.empty()) {
             bookmark_ = EvtCreateBookmark(NULL);
@@ -45,12 +51,18 @@ namespace Syslog_agent {
         }
         if (bookmark_ == NULL) {
             Logger::fatal("EventLogSubscription::subscribe()> could not create "
-                " bookmark for %s\n", channel_.c_str());
+                " bookmark for %s\n", Util::wstr2str(channel_).c_str());
             exit(1); // shouldn't be necessary
         }
         EVT_HANDLE new_subscription = EvtSubscribe(NULL, NULL, channel_.c_str(), 
             query_.c_str(), bookmark_, this,
             EventLogSubscription::handleSubscriptionEvent, EvtSubscribeStartAfterBookmark);
+        if (new_subscription == NULL) {
+            auto status = GetLastError();
+			Logger::fatal("EventLogSubscription::subscribe()> could not subscribe to %s (error %d)\n",
+                				Util::wstr2str(channel_).c_str(), status);
+			exit(1); // shouldn't be necessary
+		}
         subscription_active_ = true;
     }
 

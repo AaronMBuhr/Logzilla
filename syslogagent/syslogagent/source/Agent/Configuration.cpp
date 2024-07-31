@@ -83,8 +83,10 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     }
     primary_host_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_HOST, L"localhost");
     primary_api_key_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_API_KEY, L"");
+	Logger::debug2("Configuration::loadFromRegistry() primary api key: %ls\n", primary_api_key_.c_str());
     secondary_host_ = registry.readString(SharedConstants::RegistryKey::SECONDARY_HOST, L"");
     secondary_api_key_ = registry.readString(SharedConstants::RegistryKey::SECONDARY_API_KEY, L"");
+    Logger::debug2("Configuration::loadFromRegistry() secondary api key: %ls\n", secondary_api_key_.c_str());
     suffix_ = registry.readString(SharedConstants::RegistryKey::SUFFIX, L"");
     forward_to_secondary_ = registry.readBool(SharedConstants::RegistryKey::FORWARD_TO_SECONDARY, false);
     primary_use_tls_ = registry.readBool(SharedConstants::RegistryKey::PRIMARY_USE_TLS, false);
