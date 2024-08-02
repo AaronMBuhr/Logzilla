@@ -15,7 +15,11 @@ DWORD WINAPI SubscriptionCallback(EVT_SUBSCRIBE_NOTIFY_ACTION action, PVOID pCon
     return ERROR_SUCCESS;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <log_name>" << std::endl;
+        return 1;
+    }
 
     WCHAR nameBuf[256];
     ULONG nameSize = sizeof(nameBuf) / sizeof(WCHAR);
@@ -30,8 +34,15 @@ int main() {
     }
 
     std::wstring logName;
-    std::wcout << L"Enter the event log name to test (e.g., Application, System, Security): ";
-    std::getline(std::wcin, logName);
+    int wchars_num = MultiByteToWideChar(CP_UTF8, 0, argv[1], -1, NULL, 0);
+    if (wchars_num > 0) {
+        logName.resize(wchars_num);
+        MultiByteToWideChar(CP_UTF8, 0, argv[1], -1, &logName[0], wchars_num);
+    }
+    else {
+        std::cerr << "Failed to convert log name to wide string." << std::endl;
+        return 1;
+    }
 
     wstring query = L"*";
     wstring bookmark_xml = L"";
@@ -55,7 +66,7 @@ int main() {
         bookmark,
         NULL,
         SubscriptionCallback,
-		EvtSubscribeStartAfterBookmark
+        EvtSubscribeStartAfterBookmark
     );
 
     if (hSubscription == NULL) {
