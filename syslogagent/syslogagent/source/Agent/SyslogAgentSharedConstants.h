@@ -15,7 +15,7 @@ Copyright © 2021 Logzilla Corp.
 
 namespace Syslog_agent {
 
-#define SYSLOGAGENT_CURRENT_VERSION L"6.30.3.0"
+#define SYSLOGAGENT_CURRENT_VERSION L"6.30.3.1"
     
     class SharedConstants {
     public:

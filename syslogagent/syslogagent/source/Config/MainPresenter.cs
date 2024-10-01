@@ -337,8 +337,8 @@ namespace SyslogAgent.Config
                  () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, true, 
                  false, "Primary host certificate does not match the .pfx file"),
 
-                 () => ValidateApiKey(true, view.PrimaryHost, view.PrimaryApiKey, 
-                 "Invalid primary API key"),
+                 () => ValidateApiKey(true, view.PrimaryUseTls.IsSelected, view.PrimaryHost, 
+                 view.PrimaryApiKey, "Invalid primary API key"),
 
                  () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, 
                  "Invalid secondary host"),
@@ -350,8 +350,8 @@ namespace SyslogAgent.Config
                  view.SendToSecondary.IsSelected, true, 
                  "Secondary host certificate does not match the .pfx file"),
 
-                 () => ValidateApiKey(view.SecondaryUseTls.IsSelected, view.SecondaryHost, 
-                 view.SecondaryApiKey, "Invalid secondary API key"),
+                 () => ValidateApiKey(view.SecondaryUseTls.IsSelected, view.SecondaryUseTls.IsSelected,
+                 view.SecondaryHost, view.SecondaryApiKey, "Invalid secondary API key"),
 
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
 
@@ -538,7 +538,7 @@ namespace SyslogAgent.Config
             return isMatch ? null : failureMsg;
         }
 
-        static string ValidateApiKey(bool required, IValidatedStringView host, 
+        static string ValidateApiKey(bool required, bool useTls, IValidatedStringView host, 
             IValidatedStringView apiKey, string failureMsg)
         {
             if (!required)
@@ -553,10 +553,10 @@ namespace SyslogAgent.Config
             string url = host.Content.Trim();
             if (!url.Contains("://"))
             {
-                url = "http://" + url; // Prepend with default scheme (http) if no
+                url = (useTls ? "https://" : "http://") + url; // Prepend with default scheme (http) if no
                                        // scheme is specified
             }
-            string result = fetcher.GetSynchronous(url + SharedConstants.ApiPath, apiKey.Content);
+            string result = fetcher.GetSynchronous(url + SharedConstants.ApiPath, apiKey.Content, useTls);
             if (result == null)
             {
                 return failureMsg;

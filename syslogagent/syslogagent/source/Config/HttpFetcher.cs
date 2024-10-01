@@ -13,21 +13,22 @@ namespace SyslogAgent.Config
 
     public class HttpFetcher
     {
-        private static readonly HttpClient client;
+        private static readonly HttpClient clientWithoutTls;
+        private static readonly HttpClient clientWithTls;
 
         static HttpFetcher()
         {
-            var handler = new HttpClientHandler();
+            clientWithoutTls = new HttpClient();
+            var handlerWithTls  = new HttpClientHandler() {
+                ServerCertificateCustomValidationCallback = ( sender, cert, chain, policyErrors ) => true
+            };
+            clientWithTls = new HttpClient( handlerWithTls );
 
-            // Accept all certificates (including self-signed)
-            handler.ServerCertificateCustomValidationCallback 
-                = ( sender, cert, chain, policyErrors ) => true;
-
-            client = new HttpClient( handler );
         }
 
-        public static async Task<string> GetAsync( string url, string authToken )
+        public static async Task<string> GetAsync( string url, string authToken, bool useTls )
         {
+            var client = useTls ? clientWithTls : clientWithoutTls;
             // Create HttpRequestMessage
             var request = new HttpRequestMessage( HttpMethod.Get, url );
 
@@ -58,12 +59,12 @@ namespace SyslogAgent.Config
             }
         }
         
-        public string GetSynchronous(string url, string authToken)
+        public string GetSynchronous(string url, string authToken, bool useTls)
         {
             try
             {
                 // Call the asynchronous method and block until it completes
-                var task = GetAsync( url, authToken );
+                var task = GetAsync( url, authToken, useTls );
                 return task.GetAwaiter().GetResult(); // This will block until the task is complete
             }
             catch( AggregateException ae )
