@@ -106,3 +106,4 @@ ipch/
 ### *.exe
 *.out
 *.app
+.vscode/ 
