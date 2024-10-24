@@ -15,6 +15,7 @@ using System.Linq;
 using System.Text;
 using System.Security.Policy;
 using System.Windows.Forms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace SyslogAgent.Config
 {
@@ -337,7 +338,7 @@ namespace SyslogAgent.Config
                  () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, true, 
                  false, "Primary host certificate does not match the .pfx file"),
 
-                 () => ValidateApiKey(true, view.PrimaryUseTls.IsSelected, view.PrimaryHost, 
+                 () => ValidateApiKey(true, false, view.PrimaryUseTls.IsSelected, view.PrimaryHost, 
                  view.PrimaryApiKey, "Invalid primary API key"),
 
                  () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, 
@@ -350,7 +351,7 @@ namespace SyslogAgent.Config
                  view.SendToSecondary.IsSelected, true, 
                  "Secondary host certificate does not match the .pfx file"),
 
-                 () => ValidateApiKey(view.SecondaryUseTls.IsSelected, view.SecondaryUseTls.IsSelected,
+                 () => ValidateApiKey(view.SecondaryUseTls.IsSelected, true, view.SecondaryUseTls.IsSelected,
                  view.SecondaryHost, view.SecondaryApiKey, "Invalid secondary API key"),
 
                  /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
@@ -538,28 +539,29 @@ namespace SyslogAgent.Config
             return isMatch ? null : failureMsg;
         }
 
-        static string ValidateApiKey(bool required, bool useTls, IValidatedStringView host, 
+        static string ValidateApiKey(bool required, bool is_secondary, bool useTls, IValidatedStringView host, 
             IValidatedStringView apiKey, string failureMsg)
         {
             if (!required)
                 return null;
-            bool isValid = apiKey.IsValid = apiKey.Content.Trim().Length < 1 
-                || Regex.Match(apiKey.Content, @"^[a-zA-Z0-9]{48}$").Success;
-            if (!isValid)
+
+            string certfile_directory = Globals.ExeFilePath;
+            string certfile_path = certfile_directory + (is_secondary
+                ? SharedConstants.SecondaryCertFilename : SharedConstants.PrimaryCertFilename);
+            
+            string result = ApiKeyValidator.ValidateApiKey(
+                required: true,
+                useTls: true,
+                host: host,
+                apiKey: apiKey,
+                pfxPath: certfile_path,
+                failureMsg: "API key validation failed"
+            );
+
+            if (result != null)
             {
-                return failureMsg;
-            }
-            var fetcher = new HttpFetcher();
-            string url = host.Content.Trim();
-            if (!url.Contains("://"))
-            {
-                url = (useTls ? "https://" : "http://") + url; // Prepend with default scheme (http) if no
-                                       // scheme is specified
-            }
-            string result = fetcher.GetSynchronous(url + SharedConstants.ApiPath, apiKey.Content, useTls);
-            if (result == null)
-            {
-                return failureMsg;
+                // Handle validation failure
+                Console.WriteLine(result);
             }
             return null;
         }

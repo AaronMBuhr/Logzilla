@@ -15,7 +15,7 @@ Copyright © 2021 Logzilla Corp.
 
 namespace Syslog_agent {
 
-#define SYSLOGAGENT_CURRENT_VERSION L"6.30.3.1"
+#define SYSLOGAGENT_CURRENT_VERSION L"6.30.5.0"
     
     class SharedConstants {
     public:
@@ -46,8 +46,6 @@ namespace Syslog_agent {
             static constexpr wchar_t const*     TAIL_FILENAME       = L"";
             static constexpr wchar_t const*     TAIL_PROGRAMNAME    = L"";
             static constexpr int                BATCH_INTERVAL      = 1000;
-            static constexpr wchar_t*           PRIMARY_CERT        = L"PrimaryCert.pem";
-            static constexpr wchar_t*           SECONDARY_CERT      = L"SecondaryCert.pem";
 			static constexpr char*              VERSION_DETECT_STR  = "detect";
             static constexpr char*              LOGZILLA_VER        = VERSION_DETECT_STR;
             static constexpr int                POLL_INTERVAL_SEC   = 2;

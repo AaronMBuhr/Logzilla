@@ -17,10 +17,10 @@ namespace Syslog_agent {
 
     class Configuration {
     public:
-        static constexpr const wchar_t* PRIMARY_CERT_FILENAME 
-            = SharedConstants::Defaults::PRIMARY_CERT;
-        static constexpr const wchar_t* SECONDARY_CERT_FILENAME 
-            = SharedConstants::Defaults::SECONDARY_CERT;
+        static constexpr const wchar_t* PRIMARY_CERT_FILENAME
+            = SharedConstants::CERT_FILE_PRIMARY;
+        static constexpr const wchar_t* SECONDARY_CERT_FILENAME
+            = SharedConstants::CERT_FILE_SECONDARY;
 
         wstring api_path_ = SharedConstants::HTTP_API_PATH;
         wstring version_path_ = SharedConstants::LOGZILLA_VERSION_PATH;
