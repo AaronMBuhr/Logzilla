@@ -67,11 +67,17 @@ namespace Syslog_agent {
 
 	Result EventHandlerMessageQueuer::handleEvent(const wchar_t* subscription_name, 
 		EventLogEvent& event) {
+		Logger::debug3("EventHandlerMessageQueuer::handleEvent()>"
+			" subscription_name: %S", subscription_name);
 		event.renderEvent();
+		Logger::debug3("EventHandlerMessageQueuer::handleEvent()> event rendered");
 		char* json_buffer = Globals::instance()->getMessageBuffer("json_buffer");
+		Logger::debug3("EventHandlerMessageQueuer::handleEvent()> json_buffer allocated");
 		int primary_logformat = configuration_.getPrimaryLogformat();
 		if (generateLogMessage(event, primary_logformat, json_buffer, 
 			Globals::MESSAGE_BUFFER_SIZE)) {
+			Logger::debug3("EventHandlerMessageQueuer::handleEvent()>"
+				" generateLogMessage() succeeded");
 			while (primary_message_queue_->isFull()) {
 				primary_message_queue_->removeFront();
 			}
@@ -92,13 +98,13 @@ namespace Syslog_agent {
 				}
 				else {
 					Logger::warn("EventHandlerMessageQueuer::handleEvent()>"
-						" secondary generateLogMessage() failed");
+						" secondary generateLogMessage() failed\n");
 				}
             }
 		}
 		else {
             Logger::warn("EventHandlerMessageQueuer::handleEvent()> primary"
-				" generateLogMessage() failed");
+				" generateLogMessage() failed\n");
         }
 		Globals::instance()->releaseMessageBuffer("json_buffer", json_buffer);
 		return Result((DWORD)ERROR_SUCCESS);
@@ -140,14 +146,18 @@ namespace Syslog_agent {
 	bool EventHandlerMessageQueuer::generateLogMessage(EventLogEvent& event, 
 		const int logformat, char* json_buffer, size_t buflen) {
 
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> start");
 		// figure out some message details
 		auto event_id_str 
 			= event.getXmlDoc().child("Event").child("System").child("EventID").child_value();
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> event_id_str: %s", event_id_str);
 		DWORD event_id;
 		sscanf_s(event_id_str, "%u", &event_id);
 		if (configuration_.include_vs_ignore_eventids_) {
 			if (configuration_.event_id_filter_.find(event_id) 
 				== configuration_.event_id_filter_.end()) {
+				Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> event_id_filter_"
+					" does not contain event_id: %u", event_id);
 				return false;
 			}
 		}
@@ -155,6 +165,8 @@ namespace Syslog_agent {
 		{
 			if (configuration_.event_id_filter_.find(event_id) 
 				!= configuration_.event_id_filter_.end()) {
+				Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> event_id_filter_"
+					" contains event_id: %u", event_id);
 				return false;
 			}
 		}
@@ -162,6 +174,7 @@ namespace Syslog_agent {
 		if (configuration_.severity_ == SharedConstants::Severities::DYNAMIC) {
 			auto level 
 				= event.getXmlDoc().child("Event").child("System").child("Level").child_value();
+			Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> level: %s", level);
 			severity = unixSeverityFromWindowsSeverity(level[0]);
 		}
 		else {
@@ -170,6 +183,7 @@ namespace Syslog_agent {
 
 		auto time_field 
 			= event.getXmlDoc().child("Event").child("System").child("TimeCreated").attribute("SystemTime").value();
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> time_field: %s", time_field);
 
 		// Parse the date-time string
 		// this is more verbose than absolutely necessary because we are 
@@ -208,27 +222,35 @@ namespace Syslog_agent {
 
 		auto provider
 			= event.getXmlDoc().child("Event").child("System").child("Provider").attribute("Name").value();
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> provider: %s", provider);
 		// generate json
 		// we're going to copy the message text into the json so we need
 		// to escape certain characters for valid json
 		auto escaped_buf = Globals::instance()->getMessageBuffer("escaped_buf");
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> escaped_buf allocated");
 		Util::jsonEscape(event.getEventText(), escaped_buf, Globals::MESSAGE_BUFFER_SIZE);
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> event.getEventText() copied to escaped_buf");
 		if (strlen(escaped_buf) == 0) {
+			Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> event.getEventText() is empty");
 			const char* no_msg = "(no event message given)";
 			size_t no_msg_len = strlen(no_msg) + 1;
 			strncpy_s(escaped_buf, Globals::MESSAGE_BUFFER_SIZE, no_msg, no_msg_len);
 		}
 		OStreamBuf<char> ostream_buffer(json_buffer, buflen);
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> ostream_buffer allocated");
 		ostream json_output(&ostream_buffer);
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> json_output allocated");
 		json_output.fill('0');
 		json_output << "{";
 		if (configuration_.host_name_ != "") {
 			json_output << "\"host\": \"" << configuration_.host_name_ << "\", ";
 		}
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> json_output filled with host");
 		json_output
 			<< "\"program\": \"" << provider << "\""
 			<< ", \"severity\": " << ((char)(severity + '0'))
 			<< ", \"facility\": " << configuration_.facility_;
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> json_output filled with program, severity, facility");
 		switch (logformat) {
 		case SharedConstants::LOGFORMAT_HTTPPORT:
 			if (timestamp[0] != 0) {
@@ -247,12 +269,14 @@ namespace Syslog_agent {
 			Logger::fatal("EventHandlerMessageQueuer::generateLogMessage()> Unknown"
 				" logformat: %d", logformat);
 		}
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> json_output filled with message");
 		json_output << ", \"extra_fields\": { "
 			<< " \"_source_type\": \"WindowsAgent\""
 			<< ", \"_source_tag\": \"windows_agent\""
 			<< ", \"log_type\": \"eventlog\""
 			<< ", \"event_id\": \"" << event_id_str << "\""
 			<< ", \"event_log\": \"" << log_name_utf8_ << "\"";
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> json_output filled with extra_fields");
 		if (logformat == SharedConstants::LOGFORMAT_JSONPORT) {
 			json_output
 				<< ", \"program\": \"" << provider << "\""
@@ -267,8 +291,10 @@ namespace Syslog_agent {
 				json_output << ", \"host\": \"" << configuration_.host_name_ << "\" ";
 			}
 			json_output << ", \"message\": \"" << escaped_buf << "\" ";
+			Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> json_output filled with program, severity, facility, ts, host, message");
 		}
 		pugi::xml_node event_data = event.getXmlDoc().child("Event").child("EventData");
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> got event_data");
 		for (pugi::xml_node data_item = event_data.first_child(); data_item;
 			data_item = data_item.next_sibling()) {
 			auto data_name = data_item.attribute("Name").value();
@@ -277,6 +303,7 @@ namespace Syslog_agent {
 				// just in case there's any chars in value to escape:
 				Util::jsonEscape((char*)value, escaped_buf, Globals::MESSAGE_BUFFER_SIZE - 1);
 				json_output << ", \"" << data_name << "\": \"" << escaped_buf << "\"";
+				Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> json_output filled with data_name, value");
 			}
 		}
 		if (logformat == SharedConstants::LOGFORMAT_JSONPORT) {
@@ -291,6 +318,7 @@ namespace Syslog_agent {
 		}
 		json_output << " }" << (char)10 << (char)0;
 
+		Logger::debug3("EventHandlerMessageQueuer::generateLogMessage()> done, returning true");
 		return true;
 	}
 }

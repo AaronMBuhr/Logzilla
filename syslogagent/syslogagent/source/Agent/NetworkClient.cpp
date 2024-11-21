@@ -134,19 +134,19 @@ namespace Syslog_agent {
     bool NetworkClient::loadCertificate(const std::wstring& cert_path)
     {
         // Open the PFX file
-        HANDLE hFile = CreateFile(L"E:\\Source\\Mine\\Logzilla\\syslogagent\\syslogagent\\"
-            "source\\Config\\bin\\x64\\Debug\\primary.pfx", 
-            GENERIC_READ, 
-            FILE_SHARE_READ, 
-            NULL, 
-            OPEN_EXISTING, 
-            FILE_ATTRIBUTE_NORMAL, 
+        HANDLE hFile = CreateFile(cert_path.c_str(),
+            GENERIC_READ,
+            FILE_SHARE_READ,
+            NULL,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL,
             NULL);
         if (hFile == INVALID_HANDLE_VALUE) {
             Logger::critical("NetworkClient::LoadCertificate()> Error %u in CreateFile.\n",
                 GetLastError());
             return false;
         }
+
         DWORD dwFileSize = GetFileSize(hFile, NULL);
         pfxBuffer_ = new BYTE[dwFileSize];
 
@@ -155,6 +155,9 @@ namespace Syslog_agent {
         if (!ReadFile(hFile, pfxBuffer_, dwFileSize, &dwRead, NULL)) {
             Logger::critical("NetworkClient::LoadCertificate()> Error %u in ReadFile.\n",
                 GetLastError());
+            delete[] pfxBuffer_;
+            pfxBuffer_ = nullptr;
+            CloseHandle(hFile);
             return false;
         }
 
@@ -165,30 +168,33 @@ namespace Syslog_agent {
         pfxBlob.pbData = pfxBuffer_;
         pfxBlob.cbData = dwFileSize;
 
-        // hCertStore_ = PFXImportCertStore(&pfxBlob, L"pfx-password", 0);
         hCertStore_ = PFXImportCertStore(&pfxBlob, L"", 0);
         if (!hCertStore_) {
-            Logger::critical("NetworkClient::LoadCertificate()> Error %u in"
-                " PFXImportCertStore.\n",
+            Logger::critical("NetworkClient::LoadCertificate()> Error %u in PFXImportCertStore.\n",
                 GetLastError());
+            delete[] pfxBuffer_;
+            pfxBuffer_ = nullptr;
             return false;
         }
 
         pCertContext_ = CertFindCertificateInStore(
-            hCertStore_, 
-            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 
-            0, 
-            CERT_FIND_ANY, 
-            NULL, 
+            hCertStore_,
+            X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
+            0,
+            CERT_FIND_ANY,
+            NULL,
             NULL);
         if (!pCertContext_) {
-            Logger::critical("NetworkClient::LoadCertificate()> Error %u in"
-                " CertFindCertificateInStore.\n",
+            Logger::critical("NetworkClient::LoadCertificate()> Error %u in CertFindCertificateInStore.\n",
                 GetLastError());
+            delete[] pfxBuffer_;
+            pfxBuffer_ = nullptr;
+            CertCloseStore(hCertStore_, 0);
+            hCertStore_ = nullptr;
             return false;
         }
-        return true;
 
+        return true;
     }
 
 

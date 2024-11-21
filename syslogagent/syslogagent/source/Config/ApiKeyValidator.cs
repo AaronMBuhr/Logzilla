@@ -2,16 +2,18 @@
 using SyslogAgent;
 using System.Text.RegularExpressions;
 using System;
+using System.IO;
 
 public static class ApiKeyValidator
 {
+
     public static string ValidateApiKey(
-        bool required,
-        bool useTls,
-        IValidatedStringView host,
-        IValidatedStringView apiKey,
-        string pfxPath,
-        string failureMsg)
+    bool required,
+    bool useTls,
+    IValidatedStringView host,
+    IValidatedStringView apiKey,
+    string certFilename,
+    string failureMsg)
     {
         if (!required)
             return null;
@@ -25,12 +27,12 @@ public static class ApiKeyValidator
             return failureMsg;
         }
 
-        // Normalize URL
         string url = NormalizeUrl(host.Content, useTls);
+        string pfxPath = useTls ? Path.Combine(Globals.ExeFilePath, certFilename) : null;
 
         try
         {
-            using (var fetcher = new HttpFetcher(useTls ? pfxPath : null))
+            using (var fetcher = new HttpFetcher(pfxPath))
             {
                 var (success, response, error) =
                     fetcher.GetSynchronous(url + SharedConstants.ApiPath, apiKey.Content);
@@ -51,7 +53,7 @@ public static class ApiKeyValidator
         }
     }
 
-    private static string NormalizeUrl(string url, bool useTls)
+    public static string NormalizeUrl(string url, bool useTls)
     {
         url = url.Trim();
         if (!url.Contains("://"))

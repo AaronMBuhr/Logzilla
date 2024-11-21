@@ -25,13 +25,12 @@ namespace SyslogAgent.Config
         }
 
         public string Name { get; set; }
-
         public ObservableCollection<MenuItem> Items { get; set; }
     }
 
-    public partial class MainWindow : IMainView
+    public partial class MainWindow : Window, IMainView
     {
-
+        private readonly MainPresenter presenter;
         public string previous_debug_level_string = "";
         public string previous_debug_log_filename_string = "";
         public ObservableCollection<EventLogGroupMember> logMembers;
@@ -42,6 +41,7 @@ namespace SyslogAgent.Config
 
         void SetParents(EventLogGroupMember parent, ObservableCollection<EventLogGroupMember> children)
         {
+            Logger.LogMethodEntry();
             if (parent.ObservableChildren == null)
                 return;
             foreach (var member in parent.ObservableChildren)
@@ -52,301 +52,215 @@ namespace SyslogAgent.Config
                     SetParents(member, member.ObservableChildren);
                 }
             }
+            Logger.LogMethodExit();
         }
 
         public MainWindow()
         {
-            InitializeComponent();
-            presenter = new MainPresenter(this, new Registry(), new Configuration(), new AgentService());
-            presenter.Load();
-            SetSecondaryUseTLSAvailable(secondaryUseTlsCheck.IsChecked ?? false);
-            SetTailProgramAvailable();
-            primaryBackwardsCompatVerCombo.ItemsSource = SharedConstants.BackwardsCompatVersions;
-            secondaryBackwardsCompatVerCombo.ItemsSource = SharedConstants.BackwardsCompatVersions;
+            using (Logger.LogScope("MainWindow Initialization"))
+            {
+                try
+                {
+                    InitializeComponent();
+                    Logger.LogInfo("Window components initialized");
 
-            var root = presenter.eventLogTreeviewRoot;
-            //root.SetIsCheckedAll(false);
-            treeView.ItemsSource = root.Children;
+                    presenter = new MainPresenter(this, new Registry(), new Configuration(), new AgentService());
+                    Logger.LogInfo("Presenter initialized");
 
+                    presenter.Load();
+                    Logger.LogInfo("Configuration loaded");
+
+                    SetSecondaryUseTLSAvailable(secondaryUseTlsCheck.IsChecked ?? false);
+                    SetTailProgramAvailable();
+                    primaryBackwardsCompatVerCombo.ItemsSource = SharedConstants.BackwardsCompatVersions;
+                    secondaryBackwardsCompatVerCombo.ItemsSource = SharedConstants.BackwardsCompatVersions;
+
+                    var root = presenter.eventLogTreeviewRoot;
+                    treeView.ItemsSource = root.Children;
+                    Logger.LogInfo("Main window initialization complete");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to initialize MainWindow", ex);
+                    throw;
+                }
+            }
         }
 
-        // public IValidatedStringView PollInterval => new ValidatedTextBox(pollIntervalText);
+        // Interface implementations
         public IOptionView LookUpAccount => new ValidatedOptionCheckBox(lookUpAccountCheck);
-        //public IOptionView IncludeKeyValuePairs => new ValidatedOptionCheckBox(includeKeyValueCheck);
         public IOptionView SendToSecondary => new ValidatedOptionCheckBox(sendToSecondaryCheck);
-        public IValidatedOptionView PrimaryUseTls => new ValidatedOptionCheckBox(primaryUseTlsCheck);
-        public IValidatedOptionView SecondaryUseTls => new ValidatedOptionCheckBox(secondaryUseTlsCheck);
         public IValidatedOptionView IncludeEventIds => new ValidatedOptionRadioButton(radioInclude);
         public IValidatedOptionView IgnoreEventIds => new ValidatedOptionRadioButton(radioIgnore);
         public IValidatedStringView EventIdFilter => new ValidatedTextBox(eventIdFilterText);
         public IValidatedOptionView OnlyWhileRunning => new ValidatedOptionRadioButton(radioOnlyWhileRunning);
         public IValidatedOptionView CatchUp => new ValidatedOptionRadioButton(radioCatchUp);
-        public IValidatedStringView Suffix => new ValidatedTextBox(suffixText);
-        public IValidatedStringView PrimaryHost => new ValidatedTextBox( primaryHostText );
-        public IValidatedStringView PrimaryApiKey => new ValidatedTextBox( primaryApiKeyText );
+        public IValidatedStringView PrimaryHost => new ValidatedTextBox(primaryHostText);
+        public IValidatedStringView PrimaryApiKey => new ValidatedTextBox(primaryApiKeyText);
+        public IValidatedOptionView PrimaryUseTls => new ValidatedOptionCheckBox(primaryUseTlsCheck);
         public IValidatedStringView SecondaryHost => new ValidatedTextBox(secondaryHostText);
         public IValidatedStringView SecondaryApiKey => new ValidatedTextBox(secondaryApiKeyText);
-        // public SelectionListView Logs => new SelectionListBox(logsList);
+        public IValidatedOptionView SecondaryUseTls => new ValidatedOptionCheckBox(secondaryUseTlsCheck);
+        public IValidatedStringView Suffix => new ValidatedTextBox(suffixText);
+        public IValidatedStringView BatchInterval => new ValidatedTextBox(batchIntervalText);
         public IOptionListView Facility => new OptionListCombo(facilityCombo);
         public IOptionListView Severity => new OptionListCombo(severityCombo);
         public IOptionListView DebugLevel => new OptionListCombo(debugLevelCombo);
         public IValidatedStringView DebugLogFilename => new ValidatedTextBox(debugLogFilename);
         public IValidatedStringView TailFilename => new ValidatedTextBox(txtTailFilename);
         public IValidatedStringView TailProgramName => new ValidatedTextBox(txtTailProgramName);
-        public IValidatedStringView BatchInterval => new ValidatedTextBox(batchIntervalText);
         public IOptionListView PrimaryBackwardsCompatVer => new OptionListCombo(primaryBackwardsCompatVerCombo);
         public IOptionListView SecondaryBackwardsCompatVer => new OptionListCombo(secondaryBackwardsCompatVerCombo);
-        public string Message { set { txtBlockStatusBarLeft.Text = value; } }
-        public string LogzillaFileVersion { set { tbkLogzillaVersion.Text = "LogZilla Syslog Agent version " + value; } }
 
+        public string Message
+        {
+            set
+            {
+                Logger.LogInfo($"Setting message: {value}");
+                txtBlockStatusBarLeft.Text = value;
+            }
+        }
 
         public string Status
         {
-            set { txtBlockStatusBarRight.Dispatcher.BeginInvoke(new Action(() => { txtBlockStatusBarRight.Text = value; })); }
+            set
+            {
+                Logger.LogInfo($"Setting status: {value}");
+                txtBlockStatusBarRight.Dispatcher.BeginInvoke(new Action(() => { txtBlockStatusBarRight.Text = value; }));
+            }
         }
 
-        public string MessageBlock
+        public string LogzillaFileVersion
         {
-            set { txtBlockStatusBarLeft.Dispatcher.BeginInvoke(new Action(() => { txtBlockStatusBarLeft.Text = value; })); }
+            set
+            {
+                Logger.LogInfo($"Setting LogZilla version: {value}");
+                tbkLogzillaVersion.Text = "LogZilla Syslog Agent version " + value;
+            }
         }
-
 
         public void SetFailureMessage(string message)
         {
+            Logger.LogWarning($"Failure message: {message}");
             txtBlockStatusBarLeft.Text = message;
             txtBlockStatusBarLeft.Foreground = new SolidColorBrush(Color.FromRgb(255, 0, 0));
         }
 
         public void SetSuccessMessage(string message)
         {
+            Logger.LogInfo($"Success message: {message}");
             txtBlockStatusBarLeft.Text = message;
             txtBlockStatusBarLeft.Foreground = SystemColors.ControlTextBrush;
         }
 
+        void SaveButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("SaveOperation"))
+            {
+                Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+                saveButton.IsEnabled = false;
+
+                try
+                {
+                    Logger.LogInfo("About to call presenter.Save()");
+                    presenter.Save();
+                    Logger.LogInfo("Save operation completed successfully");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Save operation failed", ex);
+                    throw;
+                }
+                finally
+                {
+                    Mouse.OverrideCursor = null;
+                    saveButton.IsEnabled = true;
+                    Logger.LogInfo("Save operation cleanup completed");
+                }
+            }
+        }
+
         void ImportButton_OnClick(object sender, RoutedEventArgs e)
         {
-            presenter.Import();
+            using (Logger.LogScope("ImportOperation"))
+            {
+                try
+                {
+                    presenter.Import();
+                    Logger.LogInfo("Import operation completed");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Import operation failed", ex);
+                    throw;
+                }
+            }
         }
 
         void ExportButton_OnClick(object sender, RoutedEventArgs e)
         {
-            presenter.Export();
-        }
-
-        void SaveButton_OnClick( object sender, RoutedEventArgs e )
-        {
-            // Set the cursor to wait
-            Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
-            saveButton.IsEnabled = false;
-
-            try
+            using (Logger.LogScope("ExportOperation"))
             {
-                presenter.Save();
-            }
-            finally
-            {
-                // Reset the cursor to the default arrow cursor
-                Mouse.OverrideCursor = null;
-                saveButton.IsEnabled = true;
-            }
-        }
-
-
-        void RestartButton_OnClick(object sender, RoutedEventArgs e)
-        {
-            presenter.Restart();
-        }
-
-        void SelectAllButton_OnClick(object sender, RoutedEventArgs e)
-        {
-            presenter.SetAllChosen(true);
-        }
-
-        void UnselectAllButton_OnClick(object sender, RoutedEventArgs e)
-        {
-            presenter.SetAllChosen(false);
-        }
-
-        void UIElement_OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            presenter.PreviewInput();
-        }
-
-        void UIElement_OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-        {
-            presenter.PreviewInput();
-        }
-
-        readonly MainPresenter presenter;
-
-        private void DebugLevelChangedEventHandler(object sender, System.Windows.Controls.SelectionChangedEventArgs args)
-        {
-            ComboBoxItem old_box = (ComboBoxItem)debugLevelCombo.SelectedItem;
-            string old_box_value = (string)old_box.Content;
-            ComboBoxItem new_box = (ComboBoxItem)args.AddedItems[0];
-            string new_box_value = (string)new_box.Content;
-            debugLogFilename.IsEnabled = new_box_value != "None";
-            if (previous_debug_level_string == "") // this is the initial load
-            {
-                previous_debug_level_string = old_box_value;
-                previous_debug_log_filename_string = debugLogFilename.Text == "" ? SharedConstants.ConfigDefaults.DebugLogFilename : debugLogFilename.Text;
-                if (new_box_value == "None")
+                try
                 {
-                    debugLogFilename.Text = "";
+                    presenter.Export();
+                    Logger.LogInfo("Export operation completed");
                 }
-            }
-            else
-            {
-                if (previous_debug_level_string == "None" && new_box_value != "None" && debugLogFilename.Text == "")
+                catch (Exception ex)
                 {
-                    previous_debug_level_string = new_box_value;
-                    debugLogFilename.Text = previous_debug_log_filename_string;
-                }
-                else if (previous_debug_level_string != "None" && new_box_value == "None")
-                {
-                    previous_debug_level_string = new_box_value;
-                    previous_debug_log_filename_string = debugLogFilename.Text;
-                    debugLogFilename.Text = "";
+                    Logger.LogError("Export operation failed", ex);
+                    throw;
                 }
             }
         }
 
-        private void ChooseCertFileButton_Click( object sender, RoutedEventArgs e )
+        private void DebugLevelChangedEventHandler(object sender, SelectionChangedEventArgs args)
         {
-            System.Windows.Controls.Button button_clicked = (System.Windows.Controls.Button)sender;
-            bool is_secondary = button_clicked.Name == "chooseSecondaryCertFileButton";
-            using( OpenFileDialog open_file_dialog = new OpenFileDialog() )
+            using (Logger.LogScope("DebugLevelChange"))
             {
-                // Set the default file filter to .pfx files
-                open_file_dialog.Filter = "PFX files (*.pfx)|*.pfx";
-
-                // Optionally set FilterIndex to 1 if you want the first (and in this case, the only) filter option to be selected by default
-                open_file_dialog.FilterIndex = 1;
-
-                DialogResult dialog_result = open_file_dialog.ShowDialog();
-                if( dialog_result == System.Windows.Forms.DialogResult.OK )
+                try
                 {
-                    WriteCertFile( open_file_dialog.FileName, is_secondary );
-                    if( is_secondary )
+                    ComboBoxItem oldBox = (ComboBoxItem)debugLevelCombo.SelectedItem;
+                    string oldBoxValue = (string)oldBox.Content;
+                    ComboBoxItem newBox = (ComboBoxItem)args.AddedItems[0];
+                    string newBoxValue = (string)newBox.Content;
+                    Logger.LogInfo($"Debug level changing from {oldBoxValue} to {newBoxValue}");
+
+                    debugLogFilename.IsEnabled = newBoxValue != "None";
+                    if (previous_debug_level_string == "")
                     {
-                        Globals.SecondaryTlsFilename = open_file_dialog.FileName;
+                        previous_debug_level_string = oldBoxValue;
+                        previous_debug_log_filename_string = debugLogFilename.Text == "" ?
+                            SharedConstants.ConfigDefaults.DebugLogFilename : debugLogFilename.Text;
+                        if (newBoxValue == "None")
+                        {
+                            debugLogFilename.Text = "";
+                        }
                     }
                     else
                     {
-                        Globals.PrimaryTlsFilename = open_file_dialog.FileName;
-                    }
-                }
-                else
-                {
-                    System.Windows.MessageBox.Show( "Cancelled" );
-                }
-            }
-        }
-
-        private string GetCertFileDirectory()
-        {
-            if (File.Exists(Globals.ExeFilePath + SharedConstants.SyslogAgentExeFilename))
-            {
-                return Globals.ExeFilePath;
-            }
-            using (FolderBrowserDialog folder_browser_dialog = new FolderBrowserDialog())
-            {
-                folder_browser_dialog.Description = "Choose the directory with syslogagent.exe";
-                while (true)
-                {
-                    DialogResult dialog_result = folder_browser_dialog.ShowDialog();
-                    if (dialog_result == System.Windows.Forms.DialogResult.OK)
-                    {
-                        string selected_path = folder_browser_dialog.SelectedPath;
-                        if (File.Exists(selected_path + "\\" + SharedConstants.SyslogAgentExeFilename))
+                        if (previous_debug_level_string == "None" && newBoxValue != "None" && debugLogFilename.Text == "")
                         {
-                            Globals.ExeFilePath = selected_path + "\\";
-                            return selected_path + "\\";
+                            previous_debug_level_string = newBoxValue;
+                            debugLogFilename.Text = previous_debug_log_filename_string;
                         }
-                        // otherwise
-                        System.Windows.Forms.MessageBox.Show("syslogagent.exe not found in that directory");
+                        else if (previous_debug_level_string != "None" && newBoxValue == "None")
+                        {
+                            previous_debug_level_string = newBoxValue;
+                            previous_debug_log_filename_string = debugLogFilename.Text;
+                            debugLogFilename.Text = "";
+                        }
                     }
-                    else if (dialog_result == System.Windows.Forms.DialogResult.Cancel)
-                    {
-                        return null;
-                    }
                 }
-            }
-        }
-
-        private void WriteCertFile(string source_filename, bool is_secondary)
-        {
-            string certfile_directory = GetCertFileDirectory();
-            if (certfile_directory == null)
-            {
-                System.Windows.MessageBox.Show("Cancelled");
-                return;
-            }
-            string certfile_path = certfile_directory + (is_secondary ? SharedConstants.SecondaryCertFilename : SharedConstants.PrimaryCertFilename);
-            if (source_filename == certfile_path)
-            {
-                System.Windows.MessageBox.Show("That is the existing cert file. No changes made.");
-                return;
-            }
-            File.Copy(source_filename, certfile_path, true);
-            System.Windows.MessageBox.Show((is_secondary ? "Secondary" : "Primary") + " cert loaded from " + source_filename + ", saved to " + certfile_path);
-        }
-
-        private void TailFilename_OnClick(object sender, RoutedEventArgs e)
-        {
-            using (OpenFileDialog open_file_dialog = new OpenFileDialog())
-            {
-                DialogResult dialog_result = open_file_dialog.ShowDialog();
-                if (dialog_result == System.Windows.Forms.DialogResult.OK)
+                catch (Exception ex)
                 {
-                    txtTailFilename.Text = open_file_dialog.FileName;
-                    txtTailProgramName.IsEnabled = true;
-                }
-                else
-                {
-                    System.Windows.MessageBox.Show("Cancelled");
+                    Logger.LogError("Failed to change debug level", ex);
+                    throw;
                 }
             }
         }
 
-        private void sendToSecondaryCheck_Checked(object sender, RoutedEventArgs e)
-        {
-            SetSecondaryUseTLSAvailable(true);
-        }
-
-        private void sendToSecondaryCheck_Unchecked(object sender, RoutedEventArgs e)
-        {
-            SetSecondaryUseTLSAvailable(false);
-        }
-
-        private void SetSecondaryUseTLSAvailable(bool available)
-        {
-            if (!available)
-                secondaryUseTlsCheck.IsChecked = false;
-            secondaryUseTlsCheck.IsEnabled = available;
-            chooseSecondaryCertFileButton.IsEnabled = available;
-
-        }
-
-
-        private void SetTailProgramAvailable()
-        {
-            txtTailProgramName.IsEnabled = !string.IsNullOrEmpty(txtTailFilename.Text);
-        }
-
-        private void txtTailFilename_LostFocus(object sender, RoutedEventArgs e)
-        {
-            txtTailFilename.Text = txtTailFilename.Text.Trim();
-            if (txtTailFilename.Text == "") { 
-                txtTailProgramName.Text = "";
-                txtTailProgramName.IsEnabled = false;
-            }
-            else
-            {
-                txtTailProgramName.IsEnabled = true;
-            }
-            SetTailProgramAvailable();
-        }
+        // ... [Rest of the original methods with logging added]
 
         public string ChooseImportFileButton()
         {
@@ -356,7 +270,7 @@ namespace SyslogAgent.Config
                 if (import_file_dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
                     return import_file_dialog.FileName;
-    }
+                }
             }
             return null;
         }
@@ -373,157 +287,515 @@ namespace SyslogAgent.Config
                 {
                     return save_file_dialog.FileName;
                 }
-                else
-                {
-                    return null;
-                }
+                return null;
             }
         }
 
         public void UpdateDisplay(Configuration config)
         {
-            LookUpAccount.IsSelected = config.LookUpAccountIDs;
-            SendToSecondary.IsSelected = config.SendToSecondary;
-            PrimaryUseTls.IsSelected = config.PrimaryUseTls;
-            SecondaryUseTls.IsSelected = config.SecondaryUseTls;
-            if (config.IncludeVsIgnoreEventIds)
+            using (Logger.LogScope("UpdateDisplay"))
             {
-                radioInclude.IsChecked = true;
-                radioIgnore.IsChecked = false;
+                try
+                {
+                    Logger.LogInfo("Updating display with new configuration");
+                    LookUpAccount.IsSelected = config.LookUpAccountIDs;
+                    SendToSecondary.IsSelected = config.SendToSecondary;
+                    PrimaryUseTls.IsSelected = config.PrimaryUseTls;
+                    SecondaryUseTls.IsSelected = config.SecondaryUseTls;
+
+                    if (config.IncludeVsIgnoreEventIds)
+                    {
+                        radioInclude.IsChecked = true;
+                        radioIgnore.IsChecked = false;
+                    }
+                    else
+                    {
+                        radioInclude.IsChecked = false;
+                        radioIgnore.IsChecked = true;
+                    }
+
+                    EventIdFilter.Content = config.EventIdFilter;
+                    Suffix.Content = config.Suffix;
+                    PrimaryHost.Content = config.PrimaryHost;
+                    PrimaryApiKey.Content = config.PrimaryApiKey;
+                    SecondaryHost.Content = config.SecondaryHost;
+                    SecondaryApiKey.Content = config.SecondaryApiKey;
+                    Facility.Option = config.Facility;
+                    Severity.Option = config.Severity;
+                    DebugLevel.Option = config.DebugLevel;
+                    DebugLogFilename.Content = config.DebugLogFilename;
+                    TailFilename.Content = config.TailFilename;
+                    TailProgramName.Content = config.TailProgramName;
+                    BatchInterval.Content = Convert.ToString(config.BatchInterval);
+
+                    presenter.RecheckEventPaths(config.SelectedEventLogPaths);
+                    Logger.LogInfo("Display update completed");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to update display", ex);
+                    throw;
+                }
+            }
+        }
+
+        private void sendToSecondaryCheck_Checked(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("SecondaryCheckChange"))
+            {
+                Logger.LogInfo("Secondary server option enabled");
+                SetSecondaryUseTLSAvailable(true);
+            }
+        }
+
+        private void sendToSecondaryCheck_Unchecked(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("SecondaryCheckChange"))
+            {
+                Logger.LogInfo("Secondary server option disabled");
+                SetSecondaryUseTLSAvailable(false);
+            }
+        }
+
+        private void SetSecondaryUseTLSAvailable(bool available)
+        {
+            Logger.LogMethodEntry();
+            Logger.LogInfo($"Setting secondary TLS availability: {available}");
+
+            if (!available)
+                secondaryUseTlsCheck.IsChecked = false;
+            secondaryUseTlsCheck.IsEnabled = available;
+            chooseSecondaryCertFileButton.IsEnabled = available;
+
+            Logger.LogMethodExit();
+        }
+
+        private void SetTailProgramAvailable()
+        {
+            Logger.LogMethodEntry();
+            bool isEnabled = !string.IsNullOrEmpty(txtTailFilename.Text);
+            Logger.LogInfo($"Setting tail program availability: {isEnabled}");
+            txtTailProgramName.IsEnabled = isEnabled;
+            Logger.LogMethodExit();
+        }
+
+        private string GetCertFileDirectory()
+        {
+            using (Logger.LogScope("GetCertFileDirectory"))
+            {
+                if (File.Exists(Globals.ExeFilePath + SharedConstants.SyslogAgentExeFilename))
+                {
+                    Logger.LogInfo($"Found existing exe path: {Globals.ExeFilePath}");
+                    return Globals.ExeFilePath;
+                }
+
+                using (FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog())
+                {
+                    folderBrowserDialog.Description = "Choose the directory with syslogagent.exe";
+                    while (true)
+                    {
+                        Logger.LogInfo("Prompting user to select directory");
+                        DialogResult dialogResult = folderBrowserDialog.ShowDialog();
+
+                        if (dialogResult == System.Windows.Forms.DialogResult.OK)
+                        {
+                            string selectedPath = folderBrowserDialog.SelectedPath;
+                            Logger.LogInfo($"User selected path: {selectedPath}");
+
+                            if (File.Exists(selectedPath + "\\" + SharedConstants.SyslogAgentExeFilename))
+                            {
+                                Globals.ExeFilePath = selectedPath + "\\";
+                                Logger.LogInfo($"Valid exe path found: {Globals.ExeFilePath}");
+                                return selectedPath + "\\";
+                            }
+
+                            Logger.LogWarning("syslogagent.exe not found in selected directory");
+                            System.Windows.Forms.MessageBox.Show("syslogagent.exe not found in that directory");
+                        }
+                        else if (dialogResult == System.Windows.Forms.DialogResult.Cancel)
+                        {
+                            Logger.LogInfo("User cancelled directory selection");
+                            return null;
+                        }
+                    }
+                }
+            }
+        }
+
+        private void WriteCertFile(string sourceFilename, bool isSecondary)
+        {
+            using (Logger.LogScope("WriteCertFile"))
+            {
+                Logger.LogInfo($"Writing {(isSecondary ? "secondary" : "primary")} cert file");
+                Logger.LogInfo($"Source filename: {sourceFilename}");
+
+                string certfileDirectory = GetCertFileDirectory();
+                if (certfileDirectory == null)
+                {
+                    Logger.LogWarning("Cert file directory selection cancelled");
+                    System.Windows.MessageBox.Show("Cancelled");
+                    return;
+                }
+
+                string certfilePath = certfileDirectory + (isSecondary ?
+                    SharedConstants.SecondaryCertFilename :
+                    SharedConstants.PrimaryCertFilename);
+
+                if (sourceFilename == certfilePath)
+                {
+                    Logger.LogInfo("Source file is same as destination - no changes needed");
+                    System.Windows.MessageBox.Show("That is the existing cert file. No changes made.");
+                    return;
+                }
+
+                try
+                {
+                    File.Copy(sourceFilename, certfilePath, true);
+                    Logger.LogInfo($"Successfully copied cert file to: {certfilePath}");
+                    System.Windows.MessageBox.Show(
+                        $"{(isSecondary ? "Secondary" : "Primary")} cert loaded from {sourceFilename}, saved to {certfilePath}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError($"Failed to copy cert file", ex);
+                    throw;
+                }
+            }
+        }
+
+        private void primaryHost_LostFocus(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("PrimaryHost_LostFocus"))
+            {
+                HandleHostLostFocus(sender, true);
+            }
+        }
+
+        private void secondaryHost_LostFocus(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("SecondaryHost_LostFocus"))
+            {
+                HandleHostLostFocus(sender, false);
+            }
+        }
+
+        private void HandleHostLostFocus(object sender, bool isPrimary)
+        {
+            var textBox = sender as System.Windows.Controls.TextBox;
+            if (textBox == null) return;
+
+            string currentText = textBox.Text;
+            string hostType = isPrimary ? "Primary" : "Secondary";
+            Logger.LogInfo($"{hostType} host text changed to: {currentText}");
+
+            var tlsCheckBox = isPrimary ? primaryUseTlsCheck : secondaryUseTlsCheck;
+
+            if (currentText.StartsWith("http:"))
+            {
+                Logger.LogInfo($"Setting TLS off for HTTP protocol on {hostType} host");
+                tlsCheckBox.IsChecked = false;
+            }
+            else if (currentText.StartsWith("https:"))
+            {
+                Logger.LogInfo($"Setting TLS on for HTTPS protocol on {hostType} host");
+                tlsCheckBox.IsChecked = true;
             }
             else
             {
-                radioInclude.IsChecked = false;
-                radioIgnore.IsChecked = true;
+                string prefix = tlsCheckBox.IsChecked == true ? "https://" : "http://";
+                Logger.LogInfo($"Adding {prefix} prefix to {hostType} host");
+                textBox.Text = prefix + currentText;
             }
-            EventIdFilter.Content = config.EventIdFilter;
-            Suffix.Content = config.Suffix;
-            PrimaryHost.Content = config.PrimaryHost;
-            PrimaryApiKey.Content = config.PrimaryApiKey;
-            SecondaryHost.Content = config.SecondaryHost;
-            SecondaryApiKey.Content = config.SecondaryApiKey;
-            Facility.Option = config.Facility;
-            Severity.Option = config.Severity;
-            DebugLevel.Option = config.DebugLevel;
-            DebugLogFilename.Content = config.DebugLogFilename;
-            TailFilename.Content = config.TailFilename;
-            TailProgramName.Content = config.TailProgramName;
-            BatchInterval.Content = Convert.ToString(config.BatchInterval);
-            presenter.RecheckEventPaths(config.SelectedEventLogPaths);
         }
 
-        private void primaryHost_LostFocus( object sender, RoutedEventArgs e )
+        private void primaryUseTlsCheck_Checked(object sender, RoutedEventArgs e)
         {
-            // Your logic here
-            // For example, you can retrieve the current text of the TextBox like this:
-            var textBox = sender as System.Windows.Controls.TextBox;
-            if( textBox != null )
+            using (Logger.LogScope("PrimaryTLS_Checked"))
             {
-                string currentText = textBox.Text;
-                if (currentText.StartsWith("http:"))
+                try
                 {
-                    primaryUseTlsCheck.IsChecked = false;
-                }
-                else if (currentText.StartsWith("https:"))
-                {
-                    primaryUseTlsCheck.IsChecked = true;
-                }
-                else
-                {
-                    if (primaryUseTlsCheck.IsChecked == true)
+                    if (primaryHostText.Text.StartsWith("http://"))
                     {
-                        textBox.Text = "https://" + currentText;
+                        Logger.LogInfo("Converting HTTP to HTTPS for primary host");
+                        primaryHostText.Text = "https://" + primaryHostText.Text.Substring(7);
                     }
-                    else
+                    else if (!primaryHostText.Text.StartsWith("https://"))
                     {
-                        textBox.Text = "http://" + currentText;
+                        Logger.LogInfo("Adding HTTPS prefix to primary host");
+                        primaryHostText.Text = "https://" + primaryHostText.Text;
                     }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to process primary TLS check", ex);
+                    throw;
                 }
             }
         }
 
-        private void secondaryHost_LostFocus( object sender, RoutedEventArgs e )
+        private void primaryUseTlsCheck_Unchecked(object sender, RoutedEventArgs e)
         {
-            // Your logic here
-            // For example, you can retrieve the current text of the TextBox like this:
-            var textBox = sender as System.Windows.Controls.TextBox;
-            if( textBox != null )
+            using (Logger.LogScope("PrimaryTLS_Unchecked"))
             {
-                string currentText = textBox.Text;
-                if( currentText.StartsWith( "http:" ) )
+                try
                 {
-                    secondaryUseTlsCheck.IsChecked = false;
-                }
-                else if( currentText.StartsWith( "https:" ) )
-                {
-                    secondaryUseTlsCheck.IsChecked = true;
-                }
-                else
-                {
-                    if( secondaryUseTlsCheck.IsChecked == true )
+                    if (primaryHostText.Text.StartsWith("https://"))
                     {
-                        textBox.Text = "https://" + currentText;
+                        Logger.LogInfo("Converting HTTPS to HTTP for primary host");
+                        primaryHostText.Text = "http://" + primaryHostText.Text.Substring(8);
                     }
-                    else
+                    else if (!primaryHostText.Text.StartsWith("http://"))
                     {
-                        textBox.Text = "http://" + currentText;
+                        Logger.LogInfo("Adding HTTP prefix to primary host");
+                        primaryHostText.Text = "http://" + primaryHostText.Text;
                     }
                 }
-            }
-        }
-
-
-        private void primaryUseTlsCheck_Checked( object sender, RoutedEventArgs e )
-        {
-            // Logic for when the CheckBox is checked
-            if (primaryHostText.Text.StartsWith("http://"))
-            {
-                primaryHostText.Text = "https://" + primaryHostText.Text.Substring(7);
-            }
-            else if (!primaryHostText.Text.StartsWith("https://"))
-            {
-                primaryHostText.Text = "https://" + primaryHostText.Text;
-            }
-        }
-
-        private void primaryUseTlsCheck_Unchecked( object sender, RoutedEventArgs e )
-        {
-            // Logic for when the CheckBox is unchecked
-            if (primaryHostText.Text.StartsWith("https://"))
-            {
-                primaryHostText.Text = "http://" + primaryHostText.Text.Substring(8);
-            }
-            else if (!primaryHostText.Text.StartsWith("http://"))
-            {
-                primaryHostText.Text = "http://" + primaryHostText.Text;
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to process primary TLS uncheck", ex);
+                    throw;
+                }
             }
         }
 
         private void secondaryUseTlsCheck_Checked(object sender, RoutedEventArgs e)
         {
-            if (secondaryHostText.Text.StartsWith("http://"))
+            using (Logger.LogScope("SecondaryTLS_Checked"))
             {
-                secondaryHostText.Text = "https://" + secondaryHostText.Text.Substring(7);
-            }
-            else if (!secondaryHostText.Text.StartsWith("https://"))
-            {
-                secondaryHostText.Text = "https://" + secondaryHostText.Text;
+                try
+                {
+                    if (secondaryHostText.Text.StartsWith("http://"))
+                    {
+                        Logger.LogInfo("Converting HTTP to HTTPS for secondary host");
+                        secondaryHostText.Text = "https://" + secondaryHostText.Text.Substring(7);
+                    }
+                    else if (!secondaryHostText.Text.StartsWith("https://"))
+                    {
+                        Logger.LogInfo("Adding HTTPS prefix to secondary host");
+                        secondaryHostText.Text = "https://" + secondaryHostText.Text;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to process secondary TLS check", ex);
+                    throw;
+                }
             }
         }
 
         private void secondaryUseTlsCheck_Unchecked(object sender, RoutedEventArgs e)
         {
-            if (secondaryHostText.Text.StartsWith("https://"))
+            using (Logger.LogScope("SecondaryTLS_Unchecked"))
             {
-                secondaryHostText.Text = "http://" + secondaryHostText.Text.Substring(8);
-            }
-            else if (!secondaryHostText.Text.StartsWith("http://"))
-            {
-                secondaryHostText.Text = "http://" + secondaryHostText.Text;
+                try
+                {
+                    if (secondaryHostText.Text.StartsWith("https://"))
+                    {
+                        Logger.LogInfo("Converting HTTPS to HTTP for secondary host");
+                        secondaryHostText.Text = "http://" + secondaryHostText.Text.Substring(8);
+                    }
+                    else if (!secondaryHostText.Text.StartsWith("http://"))
+                    {
+                        Logger.LogInfo("Adding HTTP prefix to secondary host");
+                        secondaryHostText.Text = "http://" + secondaryHostText.Text;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to process secondary TLS uncheck", ex);
+                    throw;
+                }
             }
         }
 
+        private void TailFilename_OnClick(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("TailFilename_Selection"))
+            {
+                using (OpenFileDialog openFileDialog = new OpenFileDialog())
+                {
+                    Logger.LogInfo("Opening file dialog for tail file selection");
+                    DialogResult dialogResult = openFileDialog.ShowDialog();
+
+                    if (dialogResult == System.Windows.Forms.DialogResult.OK)
+                    {
+                        Logger.LogInfo($"Selected tail file: {openFileDialog.FileName}");
+                        txtTailFilename.Text = openFileDialog.FileName;
+                        txtTailProgramName.IsEnabled = true;
+                    }
+                    else
+                    {
+                        Logger.LogInfo("Tail file selection cancelled");
+                        System.Windows.MessageBox.Show("Cancelled");
+                    }
+                }
+            }
+        }
+
+        private void txtTailFilename_LostFocus(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("TailFilename_LostFocus"))
+            {
+                try
+                {
+                    txtTailFilename.Text = txtTailFilename.Text.Trim();
+                    Logger.LogInfo($"Tail filename after trim: {txtTailFilename.Text}");
+
+                    if (txtTailFilename.Text == "")
+                    {
+                        Logger.LogInfo("Tail filename is empty, disabling program name");
+                        txtTailProgramName.Text = "";
+                        txtTailProgramName.IsEnabled = false;
+                    }
+                    else
+                    {
+                        Logger.LogInfo("Tail filename is not empty, enabling program name");
+                        txtTailProgramName.IsEnabled = true;
+                    }
+
+                    SetTailProgramAvailable();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error processing tail filename focus change", ex);
+                    throw;
+                }
+            }
+        }
+
+        private void ChooseCertFileButton_Click(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("CertFile_Selection"))
+            {
+                try
+                {
+                    System.Windows.Controls.Button buttonClicked = (System.Windows.Controls.Button)sender;
+                    bool isSecondary = buttonClicked.Name == "chooseSecondaryCertFileButton";
+                    Logger.LogInfo($"Selecting cert file for {(isSecondary ? "secondary" : "primary")} server");
+
+                    using (OpenFileDialog openFileDialog = new OpenFileDialog())
+                    {
+                        openFileDialog.Filter = "PFX files (*.pfx)|*.pfx";
+                        openFileDialog.FilterIndex = 1;
+
+                        Logger.LogInfo("Opening file dialog for cert file selection");
+                        DialogResult dialogResult = openFileDialog.ShowDialog();
+
+                        if (dialogResult == System.Windows.Forms.DialogResult.OK)
+                        {
+                            Logger.LogInfo($"Selected cert file: {openFileDialog.FileName}");
+                            WriteCertFile(openFileDialog.FileName, isSecondary);
+
+                            if (isSecondary)
+                            {
+                                Globals.SecondaryTlsFilename = openFileDialog.FileName;
+                                Logger.LogInfo($"Set secondary TLS filename: {openFileDialog.FileName}");
+                            }
+                            else
+                            {
+                                Globals.PrimaryTlsFilename = openFileDialog.FileName;
+                                Logger.LogInfo($"Set primary TLS filename: {openFileDialog.FileName}");
+                            }
+                        }
+                        else
+                        {
+                            Logger.LogInfo("Cert file selection cancelled");
+                            System.Windows.MessageBox.Show("Cancelled");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error during cert file selection", ex);
+                    throw;
+                }
+            }
+        }
+
+        void SelectAllButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("SelectAll"))
+            {
+                try
+                {
+                    Logger.LogInfo("Setting all event log items to selected");
+                    presenter.SetAllChosen(true);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to select all items", ex);
+                    throw;
+                }
+            }
+        }
+
+        void UnselectAllButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("UnselectAll"))
+            {
+                try
+                {
+                    Logger.LogInfo("Setting all event log items to unselected");
+                    presenter.SetAllChosen(false);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to unselect all items", ex);
+                    throw;
+                }
+            }
+        }
+
+        void UIElement_OnPreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            using (Logger.LogScope("PreviewMouseDown"))
+            {
+                try
+                {
+                    Logger.LogInfo("Mouse down preview detected, notifying presenter");
+                    presenter.PreviewInput();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error handling mouse down preview", ex);
+                    throw;
+                }
+            }
+        }
+
+        void UIElement_OnPreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            using (Logger.LogScope("PreviewKeyDown"))
+            {
+                try
+                {
+                    Logger.LogInfo("Key down preview detected, notifying presenter");
+                    presenter.PreviewInput();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Error handling key down preview", ex);
+                    throw;
+                }
+            }
+        }
+
+        void RestartButton_OnClick(object sender, RoutedEventArgs e)
+        {
+            using (Logger.LogScope("RestartOperation"))
+            {
+                try
+                {
+                    Logger.LogInfo("Initiating restart operation");
+                    presenter.Restart();
+                    Logger.LogInfo("Restart operation completed");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to restart", ex);
+                    throw;
+                }
+            }
+        }
     }
-
-
 }

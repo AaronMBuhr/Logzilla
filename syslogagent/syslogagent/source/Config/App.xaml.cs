@@ -4,21 +4,37 @@ Copyright © 2021 LogZilla Corp.
 
 using System;
 using System.Windows;
+using System.Linq;
 
-namespace SyslogAgent.Config {
-    public partial class App {
-        void App_OnStartup(object sender, StartupEventArgs e) {
+namespace SyslogAgent.Config
+{
+    public partial class App
+    {
+        void App_OnStartup(object sender, StartupEventArgs e)
+        {
+            // Handle debug argument
+            bool showDebugWindow = e.Args.Contains("-d");
+
+            // Initialize debug window but don't show it yet
+            var debugWindow = DebugWindow.Instance;
+            if (showDebugWindow)
+            {
+                debugWindow.Show();
+            }
+
             DispatcherUnhandledException += ShowUnhandledException;
         }
 
-        void ShowUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e) {
+        void ShowUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
             var showException = e.Exception.InnerException ?? e.Exception;
             var result = MessageBox.Show("An unexpected exception has occured: "
                 + showException.Message + Environment.NewLine + Environment.NewLine
                 + "Continuing may result in undefined behavior" + Environment.NewLine
-                +" Do you want to continue?", "Unexpected Exception", MessageBoxButton.YesNo);
+                + " Do you want to continue?", "Unexpected Exception", MessageBoxButton.YesNo);
             e.Handled = true;
-            if (result == MessageBoxResult.No) {
+            if (result == MessageBoxResult.No)
+            {
                 Shutdown();
             }
         }

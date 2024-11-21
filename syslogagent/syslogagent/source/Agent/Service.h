@@ -18,7 +18,7 @@ namespace Syslog_agent {
 
 #define VERSION_MAJOR	    	"6"
 #define VERSION_MINOR			"30"
-#define VERSION_FIXVERSION      "5"
+#define VERSION_FIXVERSION      "6"
 #define VERSION_MINORFIXVERSION "0"
 #define APP_NAME    			"LZ Syslog Agent"
 #define SERVICE_NAME			L"LZ Syslog Agent"

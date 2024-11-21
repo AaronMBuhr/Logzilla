@@ -142,17 +142,18 @@ namespace SyslogAgent.Config
             saveSelectedEventChannelNames(config.SelectedEventLogPaths);
             disableMissingEventLogNames(config.SelectedEventLogPaths);
 
-                foreach (var deprecated_key in deprecatedRegistryEntries)
-                {
-                    try
-                    {  // if this doesn't work just go on, it won't affect operation
-                        mainKey.DeleteValue(deprecated_key);
-                    }
-                    catch { }
+            foreach (var deprecated_key in deprecatedRegistryEntries)
+            {
+                try
+                {  // if this doesn't work just go on, it won't affect operation
+                    mainKey.DeleteValue(deprecated_key);
                 }
-
-                removeOldSubkeys();
+                catch { }
             }
+
+            removeOldSubkeys();
+        }
+        
 
         byte GetBinary(string key, byte defaultValue)
         {

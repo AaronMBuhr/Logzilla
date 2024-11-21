@@ -82,6 +82,9 @@
     <Compile Include="CertificateChecker.cs" />
     <Compile Include="Communications.cs" />
     <Compile Include="Configuration.cs" />
+    <Compile Include="DebugWindow.xaml.cs">
+      <DependentUpon>DebugWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="EventLogCandidate.cs" />
     <Compile Include="EventLogGroupMember.cs" />
     <Compile Include="EventLogTreeviewItem.cs" />
@@ -90,6 +93,7 @@
     <Compile Include="HttpFetcher.cs" />
     <Compile Include="ICheckedTreeView.cs" />
     <Compile Include="IThreeStateOptionView.cs" />
+    <Compile Include="Logger.cs" />
     <Compile Include="OptionListCombo.cs" />
     <Compile Include="MainPresenter.cs" />
     <Compile Include="IMainView.cs" />
@@ -112,6 +116,10 @@
     <Compile Include="ValidatedOptionRadioButton.cs" />
     <Compile Include="ValidatedTextBox.cs" />
     <Compile Include="WindowsEventLog.cs" />
+    <Page Include="DebugWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

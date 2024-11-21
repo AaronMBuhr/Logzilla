@@ -21,7 +21,14 @@ namespace SyslogAgent.Config
             {
                 try
                 {
-                    _certificate = new X509Certificate2(pfxPath, pfxPassword);
+                    // Add proper flags for certificate handling
+                    _certificate = new X509Certificate2(
+                        pfxPath,
+                        pfxPassword,
+                        X509KeyStorageFlags.MachineKeySet |
+                        X509KeyStorageFlags.EphemeralKeySet
+                    );
+
                     var handler = new HttpClientHandler
                     {
                         ServerCertificateCustomValidationCallback = ValidateServerCertificate
@@ -30,6 +37,7 @@ namespace SyslogAgent.Config
                 }
                 catch (Exception ex)
                 {
+                    _certificate?.Dispose();
                     throw new Exception($"Failed to initialize HTTPS client: {ex.Message}");
                 }
             }
@@ -38,7 +46,6 @@ namespace SyslogAgent.Config
                 _client = new HttpClient();
             }
 
-            // Set reasonable timeout
             _client.Timeout = TimeSpan.FromSeconds(30);
         }
 

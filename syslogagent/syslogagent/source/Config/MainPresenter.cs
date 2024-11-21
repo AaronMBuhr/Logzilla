@@ -252,13 +252,40 @@ namespace SyslogAgent.Config
 
         public void Save()
         {
-            if (!Validate())
+            using (Logger.LogScope("Save Operation"))
             {
-                return;
+                Logger.LogInfo("Starting save operation");
+
+                try
+                {
+                    // Log validation start
+                    Logger.LogInfo("Starting configuration validation");
+                    if (!Validate())
+                    {
+                        Logger.LogWarning("Validation failed - save operation aborted");
+                        return;
+                    }
+                    Logger.LogInfo("Validation successful");
+
+                    // Log configuration loading
+                    Logger.LogInfo("Loading configuration from view");
+                    config_ = LoadConfigurationFromView();
+                    Logger.LogInfo("Configuration loaded successfully");
+
+                    // Log registry write
+                    Logger.LogInfo("Writing configuration to registry");
+                    registry_.WriteConfigToRegistry(config_);
+                    Logger.LogInfo("Registry write completed");
+
+                    view.SetSuccessMessage("Data saved successfully.");
+                    Logger.LogInfo("Save operation completed successfully");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Save operation failed", ex);
+                    throw;
+                }
             }
-            config_ = LoadConfigurationFromView();
-            registry_.WriteConfigToRegistry(config_);
-            view.SetSuccessMessage("Data saved successfully.");
         }
 
         public void Import()
@@ -324,73 +351,98 @@ namespace SyslogAgent.Config
             return 0;
         }
 
-        
+
         bool Validate()
         {
-
-            var validationFunctions = new List<Func<string>>
+            using (Logger.LogScope("Validation"))
             {
-                 () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host"),
+                try
+                {
+                    // Create validation functions with descriptive names
+                    var validationFunctions = new List<(string name, Func<string> validator)>
+            {
+                ("Primary Host", () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host")),
 
-                 () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls, 
-                 true, "Primary host"),
+                ("Primary Host Connectivity", () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls,
+                    true, "Primary host")),
 
-                 () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, true, 
-                 false, "Primary host certificate does not match the .pfx file"),
+                ("Primary TLS Certificate", () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, true,
+                    false, "Primary host certificate does not match the .pfx file")),
 
-                 () => ValidateApiKey(true, false, view.PrimaryUseTls.IsSelected, view.PrimaryHost, 
-                 view.PrimaryApiKey, "Invalid primary API key"),
+                ("Primary API Key", () => ValidateApiKey(true, view.PrimaryUseTls.IsSelected, view.PrimaryHost,
+                    view.PrimaryApiKey, SharedConstants.PrimaryCertFilename, "Invalid primary API key")),
 
-                 () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected, 
-                 "Invalid secondary host"),
 
-                 () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls, 
-                 view.SendToSecondary.IsSelected, "Secondary host"),
+                ("Secondary Host", () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected,
+                    "Invalid secondary host")),
 
-                 () => ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost, 
-                 view.SendToSecondary.IsSelected, true, 
-                 "Secondary host certificate does not match the .pfx file"),
+                ("Secondary Host Connectivity", () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls,
+                    view.SendToSecondary.IsSelected, "Secondary host")),
 
-                 () => ValidateApiKey(view.SecondaryUseTls.IsSelected, true, view.SecondaryUseTls.IsSelected,
-                 view.SecondaryHost, view.SecondaryApiKey, "Invalid secondary API key"),
+                ("Secondary TLS Certificate", () => ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost,
+                    view.SendToSecondary.IsSelected, true,
+                    "Secondary host certificate does not match the .pfx file")),
 
-                 /* () => ValidateInterval(view.PollInterval, "Invalid poll interval"), */
+                ("Secondary API Key", () => ValidateApiKey(view.SendToSecondary.IsSelected, view.SecondaryUseTls.IsSelected,
+                    view.SecondaryHost, view.SecondaryApiKey, SharedConstants.SecondaryCertFilename, "Invalid secondary API key")),
 
-                 () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds, 
-                 view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids"),
+                ("Event ID Selection", () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds,
+                    view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids")),
 
-                 () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter"),
+                ("Event IDs", () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter")),
 
-                 () => ValidateFilename(view.DebugLogFilename, "Invalid debug log filename"),
+                ("Debug Log Filename", () => ValidateFilename(view.DebugLogFilename, "Invalid debug log filename")),
 
-                 () => ValidateFilename(view.TailFilename, "Invalid tail filename"),
+                ("Tail Filename", () => ValidateFilename(view.TailFilename, "Invalid tail filename")),
 
-                 () => ValidatedSuffix(view.Suffix, "Invalid JSON"),
+                ("JSON Suffix", () => ValidatedSuffix(view.Suffix, "Invalid JSON")),
 
-                 () => ValidatePrimaryTLS(view.PrimaryUseTls, "Push \"Select Primary Cert\"" +
-                 " to choose a certificate file"),
+                ("Primary TLS Configuration", () => ValidatePrimaryTLS(view.PrimaryUseTls, "Push \"Select Primary Cert\"" +
+                    " to choose a certificate file")),
 
-                 () => ValidateSecondaryTLS(view.SecondaryUseTls, "Push \"Select Secondary Cert\"" +
-                 " to choose a certificate file"),
+                ("Secondary TLS Configuration", () => ValidateSecondaryTLS(view.SecondaryUseTls, "Push \"Select Secondary Cert\"" +
+                    " to choose a certificate file")),
 
-                 // () => ValidateEventLogs(view.Logs, "Select at least one event log"),
-
-                 () => ValidateTailProgramName(view.TailProgramName, view.TailFilename.Content, 
-                 "Set a short program name for the tail log messages")
+                ("Tail Program Name", () => ValidateTailProgramName(view.TailProgramName, view.TailFilename.Content,
+                    "Set a short program name for the tail log messages"))
             };
 
-            foreach (var fn in validationFunctions)
-            {
-                string msg = null;
-                if ((msg = fn()) != null)
+                    // Run each validation function
+                    foreach (var (name, validator) in validationFunctions)
+                    {
+                        Logger.LogInfo($"Starting validation: {name}");
+
+                        try
+                        {
+                            string validationResult = validator();
+
+                            if (validationResult != null)
+                            {
+                                Logger.LogWarning($"Validation failed for {name}: {validationResult}");
+                                view.SetFailureMessage(validationResult);
+                                return false;
+                            }
+
+                            Logger.LogInfo($"Validation passed: {name}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogError($"Exception during validation of {name}", ex);
+                            view.SetFailureMessage($"Error validating {name}: {ex.Message}");
+                            return false;
+                        }
+                    }
+
+                    Logger.LogInfo("All validations passed successfully");
+                    return true;
+                }
+                catch (Exception ex)
                 {
-                    view.SetFailureMessage(msg);
+                    Logger.LogError("Unexpected error during validation", ex);
+                    view.SetFailureMessage($"Unexpected error during validation: {ex.Message}");
                     return false;
                 }
             }
-
-            return true;
-
         }
 
         static string ValidateInterval(IValidatedStringView interval, string failureMsg)
@@ -539,31 +591,86 @@ namespace SyslogAgent.Config
             return isMatch ? null : failureMsg;
         }
 
-        static string ValidateApiKey(bool required, bool is_secondary, bool useTls, IValidatedStringView host, 
-            IValidatedStringView apiKey, string failureMsg)
+        public static string ValidateApiKey(
+            bool required,
+            bool useTls,
+            IValidatedStringView host,
+            IValidatedStringView apiKey,
+            string pfxPath,
+            string failureMsg)
         {
-            if (!required)
-                return null;
-
-            string certfile_directory = Globals.ExeFilePath;
-            string certfile_path = certfile_directory + (is_secondary
-                ? SharedConstants.SecondaryCertFilename : SharedConstants.PrimaryCertFilename);
-            
-            string result = ApiKeyValidator.ValidateApiKey(
-                required: true,
-                useTls: true,
-                host: host,
-                apiKey: apiKey,
-                pfxPath: certfile_path,
-                failureMsg: "API key validation failed"
-            );
-
-            if (result != null)
+            using (Logger.LogScope("API Key Validation"))
             {
-                // Handle validation failure
-                Console.WriteLine(result);
+                try
+                {
+                    if (!required)
+                    {
+                        Logger.LogInfo("API Key validation not required - skipping");
+                        return null;
+                    }
+
+                    Logger.LogInfo($"Starting API key validation for host: {host.Content}");
+                    Logger.LogInfo($"TLS Enabled: {useTls}, PFX Path: {pfxPath}");
+
+                    // Validate API key format
+                    Logger.LogInfo("Validating API key format");
+                    bool isValid = !string.IsNullOrWhiteSpace(apiKey.Content) &&
+                        Regex.IsMatch(apiKey.Content.Trim(), @"^[a-zA-Z0-9]{48}$");
+
+                    if (!isValid)
+                    {
+                        Logger.LogWarning("API key format validation failed");
+                        return failureMsg;
+                    }
+
+                    // Normalize URL
+                    Logger.LogInfo("Normalizing URL");
+                    string url = ApiKeyValidator.NormalizeUrl(host.Content, useTls);
+                    Logger.LogInfo($"Normalized URL: {url}");
+
+                    // Log handle count before certificate operations
+                    var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
+                    Logger.LogInfo($"Process handle count before HttpFetcher creation: {currentProcess.HandleCount}");
+
+                    try
+                    {
+                        Logger.LogInfo("Creating HttpFetcher instance");
+                        using (var fetcher = new HttpFetcher(useTls ? pfxPath : null))
+                        {
+                            Logger.LogInfo($"Process handle count after HttpFetcher creation: {currentProcess.HandleCount}");
+
+                            Logger.LogInfo("Initiating API validation request");
+                            var (success, response, error) =
+                                fetcher.GetSynchronous(url + SharedConstants.ApiPath, apiKey.Content);
+
+                            Logger.LogInfo($"Process handle count after request: {currentProcess.HandleCount}");
+
+                            if (!success)
+                            {
+                                Logger.LogWarning($"API validation failed: {error}");
+                                return failureMsg;
+                            }
+
+                            Logger.LogInfo("API validation successful");
+                            return null;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError("API validation error", ex);
+                        return failureMsg;
+                    }
+                    finally
+                    {
+                        Logger.LogInfo($"Process handle count at end of validation: {currentProcess.HandleCount}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Unexpected error during API key validation", ex);
+                    return failureMsg;
+                }
             }
-            return null;
         }
 
 
