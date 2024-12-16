@@ -4,8 +4,8 @@ Copyright © 2021 LogZilla Corp.
 
 using Newtonsoft.Json;
 using System;
-using System.IO;
 using System.Diagnostics;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Controls;
@@ -16,14 +16,25 @@ using System.Text;
 using System.Security.Policy;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using System.Runtime.InteropServices;
 
 namespace SyslogAgent.Config
 {
+
     public class MainPresenter
     {
+        // Windows error codes:
+        private const uint ERROR_SUCCESS = 0;
+        private const uint ERROR_INVALID_ACCESS = 12;
+        private const uint ERROR_INVALID_DATA = 13;
+        private const uint ERROR_ACCESS_DENIED = 5;
+        private const uint ERROR_PATH_NOT_FOUND = 3;
+        private const uint ERROR_NO_DATA = 232;
+        private const uint ERROR_INVALID_FUNCTION = 1;
+
         protected Registry registry_;
         protected Configuration config_;
-        public MainPresenter(IMainView view, Registry registry, Configuration configuration, 
+        public MainPresenter(IMainView view, Registry registry, Configuration configuration,
             ServiceModel serviceModel)
         {
             this.view = view;
@@ -41,7 +52,7 @@ namespace SyslogAgent.Config
             try
             {
                 string file_path = Globals.ExeFilePath + SharedConstants.SyslogAgentExeFilename;
-                FileVersionInfo verInfo = FileVersionInfo.GetVersionInfo(Globals.ExeFilePath 
+                FileVersionInfo verInfo = FileVersionInfo.GetVersionInfo(Globals.ExeFilePath
                     + SharedConstants.SyslogAgentExeFilename);
                 return verInfo.ProductVersion;
             }
@@ -51,7 +62,7 @@ namespace SyslogAgent.Config
             }
         }
 
-        public void AddTreeviewItemPath(string leaf_path, EventLogTreeviewItem parent, 
+        public void AddTreeviewItemPath(string leaf_path, EventLogTreeviewItem parent,
             IList<string> path_parts)
         {
             if (path_parts.Count < 1)
@@ -132,16 +143,17 @@ namespace SyslogAgent.Config
             }
         }
 
-        public void CheckAllEventPaths( EventLogTreeviewItem parent )
+        public void CheckAllEventPaths(EventLogTreeviewItem parent)
         {
             parent.IsChecked = true;
-            foreach( var child in parent.Children )
+            foreach (var child in parent.Children)
             {
-                CheckAllEventPaths( child );
+                CheckAllEventPaths(child);
             }
         }
 
-        public void RecheckEventPaths(IEnumerable<string> path_names) {
+        public void RecheckEventPaths(IEnumerable<string> path_names)
+        {
             this.eventLogTreeviewRoot.SetIsCheckedAll(false);
             CheckEventPaths(this.eventLogTreeviewRoot, path_names);
         }
@@ -195,11 +207,11 @@ namespace SyslogAgent.Config
             view.DebugLogFilename.Content = config_.DebugLogFilename;
             view.TailFilename.Content = config_.TailFilename;
             view.TailProgramName.Content = config_.TailProgramName;
-            view.PrimaryBackwardsCompatVer.Option 
-                = Array.IndexOf(SharedConstants.BackwardsCompatVersions, 
+            view.PrimaryBackwardsCompatVer.Option
+                = Array.IndexOf(SharedConstants.BackwardsCompatVersions,
                 config_.PrimaryBackwardsCompatVer);
-            view.SecondaryBackwardsCompatVer.Option 
-                = Array.IndexOf(SharedConstants.BackwardsCompatVersions, 
+            view.SecondaryBackwardsCompatVer.Option
+                = Array.IndexOf(SharedConstants.BackwardsCompatVersions,
                 config_.SecondaryBackwardsCompatVer);
             view.LogzillaFileVersion = GetLogzillaFileVersion();
 
@@ -211,7 +223,7 @@ namespace SyslogAgent.Config
 
         public void SetAllChosen(bool isChosen)
         {
-            CheckAllEventPaths( this.eventLogTreeviewRoot );
+            CheckAllEventPaths(this.eventLogTreeviewRoot);
         }
 
         Configuration LoadConfigurationFromView()
@@ -239,9 +251,9 @@ namespace SyslogAgent.Config
             config.DebugLogFilename = view.DebugLogFilename.Content;
             config.TailFilename = view.TailFilename.Content;
             config.TailProgramName = view.TailProgramName.Content;
-            config.PrimaryBackwardsCompatVer 
+            config.PrimaryBackwardsCompatVer
                 = SharedConstants.BackwardsCompatVersions[view.PrimaryBackwardsCompatVer.Option];
-            config.SecondaryBackwardsCompatVer 
+            config.SecondaryBackwardsCompatVer
                 = SharedConstants.BackwardsCompatVersions[view.SecondaryBackwardsCompatVer.Option];
 
             var selected_logs = GetSelectedLogPaths(this.eventLogTreeviewRoot);
@@ -293,14 +305,17 @@ namespace SyslogAgent.Config
             try
             {
                 string import_file_name = view.ChooseImportFileButton();
-                if ((import_file_name ?? "") == "") { 
+                if ((import_file_name ?? "") == "")
+                {
                     view.SetFailureMessage("Import aborted.");
                     return;
                 }
                 Registry.ReadRegistryImportFile(ref config_, import_file_name);
                 view.UpdateDisplay(config_);
                 view.SetSuccessMessage("Configuration imported");
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 view.SetFailureMessage("Configuration error: " + ex.Message);
             }
         }
@@ -340,7 +355,7 @@ namespace SyslogAgent.Config
             view.Status = "Agent service is " + status;
         }
 
-        static string GetLogzillaServerVersion( string logzilla_server_url, string apiKey)
+        static string GetLogzillaServerVersion(string logzilla_server_url, string apiKey)
         {
             return null;
         }
@@ -351,7 +366,6 @@ namespace SyslogAgent.Config
             return 0;
         }
 
-
         bool Validate()
         {
             using (Logger.LogScope("Validation"))
@@ -359,58 +373,80 @@ namespace SyslogAgent.Config
                 try
                 {
                     // Create validation functions with descriptive names
-                    var validationFunctions = new List<(string name, Func<string> validator)>
+                    var validationFunctions = new List<(int index, string name, Func<string> validator)>
             {
-                ("Primary Host", () => ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host")),
+                (1, "Primary Host", () =>
+                    ValidateInternetHost(view.PrimaryHost, true, "Invalid primary host")),
 
-                ("Primary Host Connectivity", () => ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls,
+                (2, "Primary Host Connectivity", () =>
+                    ValidateHostConnectivity(view.PrimaryHost, view.PrimaryUseTls,
                     true, "Primary host")),
 
-                ("Primary TLS Certificate", () => ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, true,
+                (3, "Primary TLS Certificate", () =>
+                    ValidateTlsCertificate(view.PrimaryUseTls, view.PrimaryHost, true,
                     false, "Primary host certificate does not match the .pfx file")),
 
-                ("Primary API Key", () => ValidateApiKey(true, view.PrimaryUseTls.IsSelected, view.PrimaryHost,
+                (4, "Primary API Key", () =>
+                    ValidateApiKeyInternal(true, view.PrimaryUseTls.IsSelected, view.PrimaryHost,
                     view.PrimaryApiKey, SharedConstants.PrimaryCertFilename, "Invalid primary API key")),
 
-
-                ("Secondary Host", () => ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected,
+                (5, "Secondary Host", () =>
+                    ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected,
                     "Invalid secondary host")),
 
-                ("Secondary Host Connectivity", () => ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls,
+                (6, "Secondary Host Connectivity", () =>
+                    ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls,
                     view.SendToSecondary.IsSelected, "Secondary host")),
 
-                ("Secondary TLS Certificate", () => ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost,
+                (7, "Secondary TLS Certificate", () =>
+                    ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost,
                     view.SendToSecondary.IsSelected, true,
                     "Secondary host certificate does not match the .pfx file")),
 
-                ("Secondary API Key", () => ValidateApiKey(view.SendToSecondary.IsSelected, view.SecondaryUseTls.IsSelected,
-                    view.SecondaryHost, view.SecondaryApiKey, SharedConstants.SecondaryCertFilename, "Invalid secondary API key")),
+                (8, "Secondary API Key", () =>
+                    ValidateApiKeyInternal(view.SendToSecondary.IsSelected, view.SecondaryUseTls.IsSelected,
+                    view.SecondaryHost, view.SecondaryApiKey, SharedConstants.SecondaryCertFilename,
+                    "Invalid secondary API key")),
 
-                ("Event ID Selection", () => ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds,
+                (9, "Event ID Selection", () =>
+                    ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds,
                     view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids")),
 
-                ("Event IDs", () => ValidateEventIds(view.EventIdFilter, "Invalid event id filter")),
+                (10, "Event IDs", () =>
+                    ValidateEventIds(view.EventIdFilter, "Invalid event id filter")),
 
-                ("Debug Log Filename", () => ValidateFilename(view.DebugLogFilename, "Invalid debug log filename")),
+                (11, "Debug Log Filename", () =>
+                    ValidateFilename(view.DebugLogFilename, "Invalid debug log filename")),
 
-                ("Tail Filename", () => ValidateFilename(view.TailFilename, "Invalid tail filename")),
+                (12, "Tail Filename", () =>
+                    ValidateFilename(view.TailFilename, "Invalid tail filename")),
 
-                ("JSON Suffix", () => ValidatedSuffix(view.Suffix, "Invalid JSON")),
+                (13, "JSON Suffix", () =>
+                    ValidatedSuffix(view.Suffix, "Invalid JSON")),
 
-                ("Primary TLS Configuration", () => ValidatePrimaryTLS(view.PrimaryUseTls, "Push \"Select Primary Cert\"" +
+                (14, "Primary TLS Configuration", () =>
+                    ValidatePrimaryTLS(view.PrimaryUseTls, "Push \"Select Primary Cert\"" +
                     " to choose a certificate file")),
 
-                ("Secondary TLS Configuration", () => ValidateSecondaryTLS(view.SecondaryUseTls, "Push \"Select Secondary Cert\"" +
+                (15, "Secondary TLS Configuration", () =>
+                    ValidateSecondaryTLS(view.SecondaryUseTls, "Push \"Select Secondary Cert\"" +
                     " to choose a certificate file")),
 
-                ("Tail Program Name", () => ValidateTailProgramName(view.TailProgramName, view.TailFilename.Content,
+                (16, "Tail Program Name", () =>
+                    ValidateTailProgramName(view.TailProgramName, view.TailFilename.Content,
                     "Set a short program name for the tail log messages"))
             };
 
-                    // Run each validation function
-                    foreach (var (name, validator) in validationFunctions)
+                    // Run each validation function unless it's skipped
+                    foreach (var (index, name, validator) in validationFunctions)
                     {
-                        Logger.LogInfo($"Starting validation: {name}");
+                        if (App.SkippedValidations.Contains(index))
+                        {
+                            Logger.LogInfo($"Skipping validation {index}: {name} due to command line argument -s{index}");
+                            continue;
+                        }
+
+                        Logger.LogInfo($"Starting validation {index}: {name}");
 
                         try
                         {
@@ -418,22 +454,22 @@ namespace SyslogAgent.Config
 
                             if (validationResult != null)
                             {
-                                Logger.LogWarning($"Validation failed for {name}: {validationResult}");
+                                Logger.LogWarning($"Validation {index} failed for {name}: {validationResult}");
                                 view.SetFailureMessage(validationResult);
                                 return false;
                             }
 
-                            Logger.LogInfo($"Validation passed: {name}");
+                            Logger.LogInfo($"Validation {index} passed: {name}");
                         }
                         catch (Exception ex)
                         {
-                            Logger.LogError($"Exception during validation of {name}", ex);
+                            Logger.LogError($"Exception during validation {index} of {name}", ex);
                             view.SetFailureMessage($"Error validating {name}: {ex.Message}");
                             return false;
                         }
                     }
 
-                    Logger.LogInfo("All validations passed successfully");
+                    Logger.LogInfo("All non-skipped validations passed successfully");
                     return true;
                 }
                 catch (Exception ex)
@@ -456,69 +492,69 @@ namespace SyslogAgent.Config
 
         static string ValidateFilename(IValidatedStringView filename, string failureMsg)
         {
-            bool isValid = filename.IsValid = filename.Content.Trim().Length < 1 
+            bool isValid = filename.IsValid = filename.Content.Trim().Length < 1
                 || Regex.Match(filename.Content, @"^[\:\\\w\-. ]+$").Success;
             return isValid ? null : failureMsg;
         }
 
-        static string ValidateStringLength(IValidatedStringView value, int minLen, 
+        static string ValidateStringLength(IValidatedStringView value, int minLen,
             int maxLen, string failureMsg)
         {
-            bool isValid = value.IsValid = !(value.Content.Length < minLen 
+            bool isValid = value.IsValid = !(value.Content.Length < minLen
                 || value.Content.Length > maxLen);
             return isValid ? null : failureMsg;
         }
 
-    public static string ValidateInternetHost(IValidatedStringView host, bool required, 
-        string failureMsg)
-    {
-        if (!required) return null;
-
-        string host_address = host.Content.Trim();
-        if (host_address == "")
+        public static string ValidateInternetHost(IValidatedStringView host, bool required,
+            string failureMsg)
         {
-            if (required)
+            if (!required) return null;
+
+            string host_address = host.Content.Trim();
+            if (host_address == "")
             {
-                host.IsValid = false;
-                return failureMsg;
+                if (required)
+                {
+                    host.IsValid = false;
+                    return failureMsg;
+                }
+                else
+                {
+                    return null;
+                }
             }
-            else
+
+            // Regex to validate IP address with optional port
+            var regex_valid_ip
+                    = @"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.)"
+                    + @"{3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(:\d{1,5})?$";
+
+            // Regex to validate hostname with optional port
+            var regex_valid_host = @"^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*"
+                        + @"([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])(:\d{1,5})?$";
+
+            // Remove protocol prefix if exists to validate the host or IP address
+            if (host_address.StartsWith("http://") || host_address.StartsWith("https://"))
             {
-                return null;
+                host_address = host_address.Substring(host_address.IndexOf("://") + 3);
             }
+
+            // Check if the host address is valid
+            bool isValid = host.IsValid = Regex.Match(host_address, regex_valid_ip).Success
+                || Regex.Match(host_address, regex_valid_host).Success;
+
+            // Return null if valid, otherwise return the failure message
+            return isValid ? null : failureMsg;
         }
 
-        // Regex to validate IP address with optional port
-        var regex_valid_ip 
-                = @"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.)"
-                + @"{3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(:\d{1,5})?$";
-
-        // Regex to validate hostname with optional port
-        var regex_valid_host = @"^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*"
-                    + @"([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])(:\d{1,5})?$";
-
-        // Remove protocol prefix if exists to validate the host or IP address
-        if (host_address.StartsWith("http://") || host_address.StartsWith("https://"))
-        {
-            host_address = host_address.Substring(host_address.IndexOf("://") + 3);
-        }
-
-        // Check if the host address is valid
-        bool isValid = host.IsValid = Regex.Match(host_address, regex_valid_ip).Success
-            || Regex.Match(host_address, regex_valid_host).Success;
-
-        // Return null if valid, otherwise return the failure message
-        return isValid ? null : failureMsg;
-    }
-
-    static string ValidateHostConnectivity(IValidatedStringView host, 
-        IValidatedOptionView useTls, bool required, string failureMsg)
+        static string ValidateHostConnectivity(IValidatedStringView host,
+            IValidatedOptionView useTls, bool required, string failureMsg)
         {
             if (!required)
                 return null;
 
             string url = host.Content.Trim();
-            if( !url.Contains( "://" ) )
+            if (!url.Contains("://"))
             {
                 url = "http://" + url; // Prepend with default scheme (http) if no
                                        // scheme is specified
@@ -530,23 +566,23 @@ namespace SyslogAgent.Config
             string path;
             try
             {
-                var uri = new Uri( url );
+                var uri = new Uri(url);
 
                 scheme = uri.Scheme; // http or https
                 hostpart = uri.Host; // Hostname
                 port = uri.IsDefaultPort ? (scheme == "https" ? 443 : 80) : uri.Port;
-                    // Port (if specified and not the default for the scheme)
+                // Port (if specified and not the default for the scheme)
                 path = uri.AbsolutePath; // Path (if specified)
 
             }
-            catch( UriFormatException )
+            catch (UriFormatException)
             {
                 return failureMsg;
             }
 
             if (port == 0)
-            { 
-                return failureMsg; 
+            {
+                return failureMsg;
             }
 
             if (scheme == "https")
@@ -567,31 +603,40 @@ namespace SyslogAgent.Config
             {
                 return failureMsg;
             }
-    
+
             string errMsg = Communications.TestTcpConnection(hostpart, port);
             return (errMsg == null ? null : $"{failureMsg} {errMsg}");
         }
 
-        static string ValidateTlsCertificate(IValidatedOptionView useTls, 
+        static string ValidateTlsCertificate(IValidatedOptionView useTls,
             IValidatedStringView host, bool is_required, bool is_secondary, string failureMsg)
         {
-            if ( !useTls.IsSelected || !is_required)
+            if (!useTls.IsSelected || !is_required)
             {
                 return null;
             }
             string certfile_directory = Globals.ExeFilePath;
-            string certfile_path = certfile_directory + ( is_secondary 
-                ? SharedConstants.SecondaryCertFilename : SharedConstants.PrimaryCertFilename );
+            string certfile_path = certfile_directory + (is_secondary
+                ? SharedConstants.SecondaryCertFilename : SharedConstants.PrimaryCertFilename);
             string pfx_password = ""; // can add this functionality later if desired
-            var checker = new CertificateChecker( certfile_path, pfx_password );
-            bool isMatch = checker.CheckRemoteCertificateSynchronous( 
-                (host.Content.StartsWith( "https://" ) ? "" : "https://") + host.Content );
+            var checker = new CertificateChecker(certfile_path, pfx_password);
+            bool isMatch = checker.CheckRemoteCertificateSynchronous(
+                (host.Content.StartsWith("https://") ? "" : "https://") + host.Content);
 
 
             return isMatch ? null : failureMsg;
         }
 
-        public static string ValidateApiKey(
+        [DllImport("EventLogInterface.dll", CharSet = CharSet.Unicode)]
+        public static extern uint ValidateApiKey(
+            string url,
+            string apiKey,
+            string certPath,
+            StringBuilder errorBuffer,
+            int errorBufferSize
+        );
+
+        public static string ValidateApiKeyInternal(
             bool required,
             bool useTls,
             IValidatedStringView host,
@@ -615,7 +660,7 @@ namespace SyslogAgent.Config
                     // Validate API key format
                     Logger.LogInfo("Validating API key format");
                     bool isValid = !string.IsNullOrWhiteSpace(apiKey.Content) &&
-                        Regex.IsMatch(apiKey.Content.Trim(), @"^[a-zA-Z0-9]{48}$");
+                        Regex.IsMatch(apiKey.Content.Trim(), @"^[a-zA-Z0-9-]{48,54}$");
 
                     if (!isValid)
                     {
@@ -625,66 +670,79 @@ namespace SyslogAgent.Config
 
                     // Normalize URL
                     Logger.LogInfo("Normalizing URL");
-                    string url = ApiKeyValidator.NormalizeUrl(host.Content, useTls);
+                    string url = host.Content;
+                    if (!url.Contains("://"))
+                    {
+                        url = (useTls ? "https://" : "http://") + url;
+                    }
                     Logger.LogInfo($"Normalized URL: {url}");
 
-                    // Log handle count before certificate operations
-                    var currentProcess = System.Diagnostics.Process.GetCurrentProcess();
-                    Logger.LogInfo($"Process handle count before HttpFetcher creation: {currentProcess.HandleCount}");
+                    Logger.LogInfo($"API Key length: {apiKey.Content.Length}");
+                    Logger.LogInfo($"API Key: {apiKey.Content}");
+                    Logger.LogInfo($"API Key regex match: {Regex.IsMatch(apiKey.Content.Trim(), @"^[a-zA-Z0-9]{48,54}$")}");
 
-                    try
+                    // Validate API key
+                    Logger.LogInfo("Validating API key");
+                    StringBuilder errorBuffer = new StringBuilder(1000);
+                    uint result = ValidateApiKey(url, apiKey.Content, pfxPath, errorBuffer, errorBuffer.Capacity);
+                    switch (result)
                     {
-                        Logger.LogInfo("Creating HttpFetcher instance");
-                        using (var fetcher = new HttpFetcher(useTls ? pfxPath : null))
-                        {
-                            Logger.LogInfo($"Process handle count after HttpFetcher creation: {currentProcess.HandleCount}");
-
-                            Logger.LogInfo("Initiating API validation request");
-                            var (success, response, error) =
-                                fetcher.GetSynchronous(url + SharedConstants.ApiPath, apiKey.Content);
-
-                            Logger.LogInfo($"Process handle count after request: {currentProcess.HandleCount}");
-
-                            if (!success)
-                            {
-                                Logger.LogWarning($"API validation failed: {error}");
-                                return failureMsg;
-                            }
-
-                            Logger.LogInfo("API validation successful");
+                        case ERROR_SUCCESS:
+                            Logger.LogInfo("API key validation successful");
                             return null;
-                        }
+
+                        case ERROR_INVALID_ACCESS:
+                            failureMsg = "API key validation failed: Unauthorized";
+                            Logger.LogWarning(failureMsg);
+                            return failureMsg;
+
+                        case ERROR_INVALID_DATA:
+                            failureMsg = "API key validation failed: wrong key";
+                            Logger.LogWarning(failureMsg);
+                            return failureMsg;
+
+                        case ERROR_ACCESS_DENIED:
+                            failureMsg = "API key validation failed: Forbidden";
+                            Logger.LogWarning(failureMsg);
+                            return failureMsg;
+
+                        case ERROR_PATH_NOT_FOUND:
+                            failureMsg = "LogZilla server not found";
+                            Logger.LogWarning(failureMsg);
+                            return failureMsg;
+
+                        case ERROR_NO_DATA:
+                            failureMsg = "No response from LogZilla server";
+                            Logger.LogWarning(failureMsg);
+                            return failureMsg;
+
+                        default:
+                            failureMsg = $"API key validation failed: Unexpected error code {result}";
+                            Logger.LogWarning(failureMsg);
+                            return failureMsg;
                     }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError("API validation error", ex);
-                        return failureMsg;
-                    }
-                    finally
-                    {
-                        Logger.LogInfo($"Process handle count at end of validation: {currentProcess.HandleCount}");
-                    }
+
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError("Unexpected error during API key validation", ex);
+                    failureMsg = "Unexpected error during API key validation" + (string.IsNullOrEmpty(failureMsg) ? "" : ": " + failureMsg);
+                    Logger.LogError(failureMsg, ex);
                     return failureMsg;
                 }
             }
         }
 
-
-        static string ValidateIgnoreVsIncludeEventIds( IValidatedStringView eventIds, 
-            IValidatedOptionView includeEventIds, IValidatedOptionView ignoreEventIds, string failureMsg )
+        static string ValidateIgnoreVsIncludeEventIds(IValidatedStringView eventIds,
+            IValidatedOptionView includeEventIds, IValidatedOptionView ignoreEventIds, string failureMsg)
         {
-            bool isValid = eventIds.Content.Trim().Length < 1 
+            bool isValid = eventIds.Content.Trim().Length < 1
                 || (includeEventIds.IsSelected ^ ignoreEventIds.IsSelected);
             return isValid ? null : failureMsg;
         }
 
         static string ValidateEventIds(IValidatedStringView eventIds, string failureMsg)
         {
-            bool isValid = eventIds.IsValid = Regex.Match(eventIds.Content, 
+            bool isValid = eventIds.IsValid = Regex.Match(eventIds.Content,
                 @"^([0-9]{1,5},)*([0-9]{1,5})?$").Success;
             return isValid ? null : failureMsg;
         }
@@ -736,11 +794,11 @@ namespace SyslogAgent.Config
             return failureMsg;
         }
 
-        static string ValidateTailProgramName(IValidatedStringView tailProgram, 
+        static string ValidateTailProgramName(IValidatedStringView tailProgram,
             string tailFilename, string failureMsg)
         {
-            bool isValid = tailProgram.IsValid 
-                = (string.IsNullOrEmpty(tailFilename) 
+            bool isValid = tailProgram.IsValid
+                = (string.IsNullOrEmpty(tailFilename)
                 ? true : tailProgram.Content.Trim() != string.Empty);
             return isValid ? null : failureMsg;
         }
@@ -751,4 +809,3 @@ namespace SyslogAgent.Config
 
     }
 }
-
