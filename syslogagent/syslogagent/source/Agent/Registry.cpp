@@ -196,16 +196,34 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
         KEY_READ, &channel_key);
     if (status != ERROR_SUCCESS) {
         DWORD error = GetLastError();
-        // save stack space, use same buf
         Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
         Logger::recoverable_error("Registry::readBookmark()> error %d,"
             " could not open channel %s\n", error, reinterpret_cast<char*>(tempbuf));
         return wstring();
     }
-    DWORD xml_size = sizeof tempbuf;
-    status = RegQueryValueEx(channel_key, 
-        SharedConstants::RegistryKey::CHANNEL_BOOKMARK, nullptr, nullptr, 
+
+    // Check if value exists first
+    DWORD xml_size = 0;
+    status = RegQueryValueEx(channel_key,
+        SharedConstants::RegistryKey::CHANNEL_BOOKMARK, nullptr, nullptr,
+        nullptr, &xml_size);
+
+    if (status == ERROR_FILE_NOT_FOUND) {
+        // Value doesn't exist - this might be normal
+        RegCloseKey(channel_key);
+        return wstring();
+    }
+
+    if (status == ERROR_SUCCESS && xml_size > sizeof(tempbuf)) {
+        Logger::warn("Registry::readBookmark()> bookmark for channel %s too large\n", channel);
+        RegCloseKey(channel_key);
+        return wstring();
+    }
+
+    status = RegQueryValueEx(channel_key,
+        SharedConstants::RegistryKey::CHANNEL_BOOKMARK, nullptr, nullptr,
         (LPBYTE)&tempbuf, &xml_size);
+
     if (status != ERROR_SUCCESS) {
         DWORD error = GetLastError();
         char warnbuf[1024];
@@ -213,8 +231,8 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
         Logger::warn("Registry::readBookmark()> error %d, could not read"
             " bookmark for %s\n", error, warnbuf);
         tempbuf[0] = 0;
-        // fall through to close channel
     }
+
     RegCloseKey(channel_key);
     return wstring(tempbuf);
 }
