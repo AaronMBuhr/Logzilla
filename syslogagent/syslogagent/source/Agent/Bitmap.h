@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright ï¿½ 2021 Logzilla Corp.
 */
 
 #pragma once
@@ -31,9 +31,9 @@ private:
 	int number_of_bits_;
 	int number_of_words_;
 	std::vector<size_t> bitmap_;
-	std::mutex in_use_;
+	mutable std::mutex in_use_;
 
-	int getAndOptionallyClearFirstOne(bool do_clear);
+	int getAndOptionallyClearFirstOne(bool do_clear) const;
 	int getAndOptionallySetFirstZero(bool do_set);
 };
 

@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright ï¿½ 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -8,7 +8,8 @@ Copyright © 2021 Logzilla Corp.
 
 using namespace std;
 
-WindowsTimer::WindowsTimer() : is_timer_running_(false)  {
+WindowsTimer::WindowsTimer() : is_timer_running_(false) {
+	// Create a private timer (not shared between processes)
 	windows_timer_ = CreateWaitableTimer(NULL, true, NULL);
 }
 

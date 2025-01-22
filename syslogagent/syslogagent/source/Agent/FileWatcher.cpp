@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright c 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -204,8 +204,10 @@ Result FileWatcher::process() {
 
 	LARGE_INTEGER current_file_size;
 	if (0 == GetFileSizeEx(file_handle, &current_file_size)) {
-		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, 
-			"could not check file size %s, error %d", filename_multibyte_, GetLastError());
+		char filename_buf[1024];
+		Util::wstr2str(filename_buf, sizeof(filename_buf), filename_.c_str());
+		CloseHandle(file_handle);
+		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s", filename_buf);
 	}
 
 	if (current_file_size.QuadPart == last_file_size_) {
@@ -282,8 +284,10 @@ Result FileWatcher::process() {
 	last_file_position_ = new_file_pos.LowPart;
 
 	if (0 == GetFileSizeEx(file_handle, &current_file_size)) {
+		char filename_buf[1024];
+		Util::wstr2str(filename_buf, sizeof(filename_buf), filename_.c_str());
 		CloseHandle(file_handle);
-		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s", Util::wstr2str(filename_).c_str());
+		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s", filename_buf);
 	}
 	last_file_size_ = current_file_size.LowPart;
 
@@ -292,4 +296,3 @@ Result FileWatcher::process() {
 	Logger::debug2("FileWatcher::process() success, file %s, %d lines processed\n", filename_multibyte_, lines_processed);
 	return Result(ResultCodes::Success);
 }
-

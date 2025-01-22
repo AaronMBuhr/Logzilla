@@ -1,48 +1,76 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 #pragma once
 
+#include <atomic>
+#include <chrono>
 #include <memory>
+#include <string>
+#include <Windows.h>
+#include <WinSvc.h>
 #include "Configuration.h"
+#include "INetworkClient.h"
 #include "MessageQueue.h"
-#include "NetworkClient.h"
 #include "WindowsTimer.h"
+
+using namespace std;
 
 namespace Syslog_agent {
 
-    class SyslogSender {
-    public:
-        SyslogSender(
-            Configuration& config,
-            shared_ptr<MessageQueue> primary_queue,
-            shared_ptr<MessageQueue> secondary_queue,
-            shared_ptr<NetworkClient> primary_network_client,
-            shared_ptr<NetworkClient> secondary_network_client
-        );
-        static WindowsTimer enqueue_timer_; // TODO : this probably shouldn't be static
-        void run() const;
-        static void stop() { 
-            Logger::log(Logger::DEBUG2, "SyslogSender::stop() stop requested\n");
-            SyslogSender::stop_requested_ = true;
-        }
+class SyslogSender {
+public:
+    static constexpr uint32_t MAX_MESSAGE_SIZE = 65536;         // Maximum size of a message batch in bytes
+    static constexpr uint32_t BATCH_SIZE_THRESHOLD = 100;       // Messages per batch
+    static constexpr uint32_t MIN_BATCH_INTERVAL = 100;         // Minimum ms between batches
+    static constexpr uint32_t MAX_BATCH_SIZE = 100;            // Maximum messages in a single batch
 
-    private:
-        static constexpr int MAX_MESSAGE_SIZE = 65535;
-        static const char message_header_[];
-        static const char message_separator_[];
-        static const char message_trailer_[];
-        Configuration& config_;
-        shared_ptr<MessageQueue> primary_queue_;
-        shared_ptr<MessageQueue> secondary_queue_;
-        shared_ptr<NetworkClient> primary_network_client_;
-        shared_ptr<NetworkClient> secondary_network_client_;
-        volatile static bool stop_requested_;
-        unique_ptr<char[]> message_buffer_;
+    SyslogSender(Configuration& config,
+        shared_ptr<MessageQueue> primary_queue,
+        shared_ptr<MessageQueue> secondary_queue,
+        shared_ptr<INetworkClient> primary_network_client,
+        shared_ptr<INetworkClient> secondary_network_client);
 
-        int sendMessageBatch(shared_ptr<MessageQueue> msg_queue, shared_ptr
-            <NetworkClient> network_client, char* buf) const;
-    };
-}
+    ~SyslogSender() = default;
+
+    // Prevent copying
+    SyslogSender(const SyslogSender&) = delete;
+    SyslogSender& operator=(const SyslogSender&) = delete;
+
+    void run() const;
+
+    static void stop() {
+        stop_requested_ = true;
+    }
+
+    static bool isStopRequested() {
+        return stop_requested_;
+    }
+
+protected:
+    int sendMessageBatch(shared_ptr<MessageQueue> msg_queue,
+        shared_ptr<INetworkClient> network_client,
+        char* buf,
+        int64_t& oldest_message_time) const;
+
+private:
+    static volatile bool stop_requested_;
+    static WindowsTimer enqueue_timer_;
+
+    static const char event_header_[];
+    static const char message_separator_[];
+    static const char message_trailer_[];
+
+    Configuration& config_;
+    shared_ptr<MessageQueue> primary_queue_;
+    shared_ptr<MessageQueue> secondary_queue_;
+    shared_ptr<INetworkClient> primary_network_client_;
+    shared_ptr<INetworkClient> secondary_network_client_;
+    unique_ptr<char[]> message_buffer_;
+    mutable int64_t primary_oldest_message_time_;
+    mutable int64_t secondary_oldest_message_time_;
+};
+
+} // namespace Syslog_agent

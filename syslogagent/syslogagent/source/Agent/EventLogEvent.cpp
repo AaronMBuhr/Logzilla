@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright ï¿½ 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -19,9 +19,9 @@ namespace Syslog_agent {
 
     EventLogEvent::~EventLogEvent() {
         if (xml_buffer_)
-            Globals::instance()->releaseMessageBuffer("xml_buffer_", xml_buffer_);
+            Globals::instance()->releaseMessageBuffer(xml_buffer_);
         if (text_buffer_)
-            Globals::instance()->releaseMessageBuffer("text_buffer_", text_buffer_);
+            Globals::instance()->releaseMessageBuffer(text_buffer_);
     }
 
     void EventLogEvent::renderXml() {
@@ -43,7 +43,7 @@ namespace Syslog_agent {
         if (!succeeded) {
             auto err = GetLastError();
             Logger::recoverable_error("EventLogEvent::RenderXml()> error %d\n", err);
-            Globals::instance()->releaseMessageBuffer("xml_buffer_w", reinterpret_cast<char*>(xml_buffer_w));
+            Globals::instance()->releaseMessageBuffer(reinterpret_cast<char*>(xml_buffer_w));
             return;
         }
         if (buffer_size_needed < (Globals::MESSAGE_BUFFER_SIZE / sizeof(wchar_t))) {
@@ -58,7 +58,7 @@ namespace Syslog_agent {
         else {
             xml_buffer_[0] = 0;
         }
-        Globals::instance()->releaseMessageBuffer("xml_buffer_w", reinterpret_cast<char*>(xml_buffer_w));
+        Globals::instance()->releaseMessageBuffer(reinterpret_cast<char*>(xml_buffer_w));
     }
 
     void EventLogEvent::renderEvent() {
@@ -85,7 +85,7 @@ namespace Syslog_agent {
             int status = GetLastError();
             Logger::recoverable_error("EventPublisher::openMetadata()> EvtOpenPublisherMetadata "
                 "failed with %d for %s\n", status, publisher_name);
-            Globals::instance()->releaseMessageBuffer("text_buffer_w", reinterpret_cast<char*>(text_buffer_w));
+            Globals::instance()->releaseMessageBuffer(reinterpret_cast<char*>(text_buffer_w));
             return;
         }
         DWORD buffer_size_needed;
@@ -105,6 +105,6 @@ namespace Syslog_agent {
             utf8_size, nullptr, nullptr);
         text_buffer_[len] = 0;
         EvtClose(metadata_handle);
-        Globals::instance()->releaseMessageBuffer("text_buffer_w", reinterpret_cast<char*>(text_buffer_w));
+        Globals::instance()->releaseMessageBuffer(reinterpret_cast<char*>(text_buffer_w));
     }
 }

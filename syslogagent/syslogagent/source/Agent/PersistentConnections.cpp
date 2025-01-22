@@ -41,14 +41,17 @@ void PersistentConnections::connectThread() {
 	while (!stop_requested_) {
 		bool connected = false;
 		for (auto& client_ptr : network_clients_) {
-			//Logger::debug2("PersistentConnections::connectThread(): checking connection %s: %d\n", client_ptr->connectionNameUtf8().c_str(), client_ptr->connect());
 			if (!client_ptr->isConnected()) {
+				Logger::debug2("PersistentConnections::connectThread(): connection %s is disconnected, attempting reconnect\n", 
+					client_ptr->connectionNameUtf8().c_str());
 				int connection_result = client_ptr->connect();
 				if (connection_result) {
-					//Logger::debug("PersistentConnections::connectThread(): connection to %s received result %d\n", client_ptr->connectionNameUtf8().c_str(), connection_result);
+					Logger::debug("PersistentConnections::connectThread(): connection to %s failed with result %d\n", 
+						client_ptr->connectionNameUtf8().c_str(), connection_result);
 				}
 				else {
-					Logger::debug("PersistentConnections::connectThread(): reconnected to %s\n", client_ptr->connectionNameUtf8().c_str());
+					Logger::debug("PersistentConnections::connectThread(): reconnected to %s\n", 
+						client_ptr->connectionNameUtf8().c_str());
 					connected = true;
 					Syslog_agent::SyslogSender::enqueue_event_.signal();
 				}

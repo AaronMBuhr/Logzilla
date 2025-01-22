@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright ? 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -221,7 +221,7 @@ void Logger::setLogFile(const wstring const_log_path_and_filename) {
 	// if no drive and no leading backslash then use the exe dir
 	if (log_path_and_filename.substr(1, 1) != L":"
 		&& log_path_and_filename.substr(0, 1) != L"\\") {
-		wstring path_str = Util::getThisPath();
+		wstring path_str = Syslog_agent::Util::getThisPath();
 		log_path_and_filename = path_str + L"\\" + log_path_and_filename;
 	}
 	singleton()->log_path_and_filename_ = log_path_and_filename;

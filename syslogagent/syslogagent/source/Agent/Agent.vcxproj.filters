@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source Files">
@@ -63,9 +63,6 @@
     <ClInclude Include="WindowsEvent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="NetworkClient.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MessageQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -93,6 +90,9 @@
     <ClInclude Include="Globals.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="IEventHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ChannelEventHandlerBase.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -106,6 +106,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="external\pugixml\src\pugixml.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpNetworkClient.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="JsonNetworkClient.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="INetworkClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -158,9 +167,6 @@
     <ClCompile Include="TLS.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="NetworkClient.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="FileWatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -180,6 +186,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="external\pugixml\src\pugixml.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="JsonNetworkClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HttpNetworkClient.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

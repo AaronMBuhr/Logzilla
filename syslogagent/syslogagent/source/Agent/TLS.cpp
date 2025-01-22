@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright c 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -8,7 +8,7 @@ Copyright © 2021 Logzilla Corp.
 #include "gnutls\gnutls.h"
 
 #include "Logger.h"
-#include "NetworkClient.h"
+#include "INetworkClient.h"
 #include "TLS.h"
 
 #pragma comment(lib, "libgnutls-30.lib")
@@ -163,8 +163,8 @@ void TLS::setServerCertPem(const char * const server_cert_pem) {
 void TLS::setupTlsForConnection() {
 
     if (gnutls_check_version("3.6.6") == NULL) {
-        Logger::fatal("TLS::setupTlsForConnection() GnuTLS 3.4.6 or later"
-            " is required\n");
+        Logger::critical("TLS::setupTlsForConnection() GnuTLS 3.6.6 or later is required\n");
+        throw std::runtime_error("GnuTLS version requirement not met");
     }
 
     /* for backwards compatibility with gnutls < 3.3.0 */
@@ -213,18 +213,15 @@ bool TLS::doHandshake(SOCKET socket) {
             status = gnutls_session_get_verify_cert_status(session_);
             CHECK(gnutls_certificate_verification_status_print(status,
                 type, &out, 0));
-            Logger::fatal("TLS::setupTlsForConnection() error cert verify"
-                " output: %s\n", out.data);
+            Logger::critical("TLS::setupTlsForConnection() Certificate verification failed: %s\n", out.data);
             // gnutls_free(out.data);
         }
-        Logger::fatal("TLS::setupTlsForConnection() *** Handshake failed:"
-            " %s\n", gnutls_strerror(ret));
+        Logger::critical("TLS::setupTlsForConnection() Handshake failed: %s\n", gnutls_strerror(ret));
         return false;
     }
     else {
         desc = gnutls_session_get_desc(session_);
-        Logger::debug("TLS::testForHostAddress() TLS succeeded, session"
-            " info: %s\n", desc);
+        Logger::info("TLS::setupTlsForConnection() TLS connection established: %s\n", desc);
         gnutls_free(desc);
         return true;
     }

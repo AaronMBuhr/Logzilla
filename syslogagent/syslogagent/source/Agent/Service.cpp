@@ -1,7 +1,11 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include "Util.h"
 
 #include "stdafx.h"
 #include <conio.h>
@@ -10,11 +14,13 @@ Copyright © 2021 Logzilla Corp.
 #include <memory>
 #include <sstream>
 #include <string>
-#include <tchar.h>
 #include <time.h>
 #include <vector>
 #include <windows.h>
-
+#include <atomic>
+#include "INetworkClient.h"
+#include "HttpNetworkClient.h"
+#include "JsonNetworkClient.h"
 #include "Logger.h"
 #include "Configuration.h"
 #include "EventHandlerMessageQueuer.h"
@@ -24,293 +30,585 @@ Copyright © 2021 Logzilla Corp.
 #include "Service.h"
 #include "SyslogAgentSharedConstants.h"
 #include "SyslogSender.h"
-#include "Util.h"
 
-using namespace Syslog_agent;
+using std::shared_ptr;
+using std::unique_ptr;
+using std::vector;
+using std::string;
+using std::thread;
+using std::make_shared;
+using std::atomic;
 
+namespace Syslog_agent {
 
-std::atomic<bool> Service::fatal_shutdown_in_progress = false; 
+// Static member initialization
+std::atomic<bool> Service::fatal_shutdown_in_progress = false;
 unique_ptr<thread> Service::send_thread_ = nullptr;
 Configuration Service::config_;
 shared_ptr<MessageQueue> Service::primary_message_queue_ = nullptr;
 shared_ptr<MessageQueue> Service::secondary_message_queue_ = nullptr;
-shared_ptr<NetworkClient> Service::primary_network_client_ = nullptr;
-shared_ptr<NetworkClient> Service::secondary_network_client_ = nullptr;
+shared_ptr<INetworkClient> Service::primary_network_client_ = nullptr;
+shared_ptr<INetworkClient> Service::secondary_network_client_ = nullptr;
 volatile bool Service::shutdown_requested_ = false;
 volatile bool Service::service_shutdown_requested_ = false;
 WindowsEvent Service::shutdown_event_{ L"LogZilla_SyslogAgent_Service_Shutdown" };
 shared_ptr<FileWatcher> Service::filewatcher_ = nullptr;
 vector<EventLogSubscription> Service::subscriptions_;
 
+namespace {
+    // Helper function to safely clean up network clients
+    void cleanupNetworkClient(shared_ptr<INetworkClient>& client) {
+        if (client) {
+            try {
+                client->close();
+                client.reset();
+            }
+            catch (const ::std::exception& e) {
+                Logger::debug2("Exception during network client cleanup: %s\n", e.what());
+            }
+        }
+    }
+
+    // Helper function to safely clean up message queues
+    void cleanupMessageQueue(shared_ptr<MessageQueue>& queue) {
+        if (queue) {
+            try {
+                while (!queue->isEmpty()) {
+                    queue->removeFront();
+                }
+                queue.reset();
+            }
+            catch (const ::std::exception& e) {
+                Logger::debug2("Exception during message queue cleanup: %s\n", e.what());
+            }
+        }
+    }
+} // end anonymous namespace
+
+void Service::loadConfiguration(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting) {
+    config_.loadFromRegistry(running_from_console, override_log_level, override_log_level_setting);
+}
 
 void sendMessagesThread() {
-	Logger::debug2("sendMessagesThread()> starting\n");
-	try {
-		SyslogSender sender(
-			Service::config_,
-			Service::primary_message_queue_,
-			Service::secondary_message_queue_,
-			Service::primary_network_client_,
-			Service::secondary_network_client_);
-		Logger::debug2("sendMessagesThread()> sender running\n");
-		sender.run();
-	}
-	catch (std::exception& exception) {
-		Logger::critical("%s\n", exception.what());
-	}
-	Logger::debug2("sendMessagesThread()> exiting\n");
-}
+    Logger::debug2("sendMessagesThread()> starting\n");
+    try {
+        if (!Service::primary_message_queue_ || !Service::primary_network_client_) {
+            throw ::std::runtime_error("Required primary components not initialized");
+        }
 
+        SyslogSender sender(
+            Service::config_,
+            Service::primary_message_queue_,
+            Service::secondary_message_queue_,
+            Service::primary_network_client_,
+            Service::secondary_network_client_);
+        Logger::debug2("sendMessagesThread()> sender running\n");
+        sender.run();
+    }
+    catch (const ::std::exception& exception) {
+        Logger::fatal("Fatal error in sender thread: %s\n", exception.what());
+        Service::fatalErrorHandler("Sender thread encountered fatal error");
+    }
+    Logger::debug2("sendMessagesThread()> exiting\n");
+}
 
 void Service::run(bool running_as_console) {
+    try {
+        Logger::setFatalErrorHandler(Service::fatalErrorHandler);
 
-	Logger::setFatalErrorHandler(Service::fatalErrorHandler);
+        Logger::debug("Service::run()> loading setup file (if present)\n");
+        Registry::loadSetupFile();
 
-	Logger::debug("Service::run()> loading setup file (if present)\n");
-	Registry::loadSetupFile();
+        config_.setUseLogAgent(true);
 
-	config_.use_log_agent_ = true;
-
-	if (config_.tail_filename_ != L"") {
-		string program_name = Util::wstr2str(config_.tail_program_name_);
-		Logger::debug("Service::run()> starting file watcher for %s\n", 
-			Util::wstr2str(config_.tail_filename_).c_str());
-		filewatcher_ = make_shared<FileWatcher>(
-			config_,
-			config_.tail_filename_.c_str(),
-			config_.MAX_TAIL_FILE_LINE_LENGTH,
-			program_name.c_str(),
-			config_.host_name_.c_str(),
-			(config_.severity_ == SharedConstants::Severities::DYNAMIC 
-				? SharedConstants::Severities::INFORMATIONAL : config_.severity_),
-			config_.facility_
-			);
-	}
-
-	Logger::debug("Service::run()> starting message queue\n");
-	Service::primary_message_queue_ 
-		= make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, 
-			Service::MESSAGE_BUFFERS_CHUNK_SIZE);
-
-	Logger::debug("Service::run()> starting network clients\n");
-	Service::primary_network_client_ = make_shared<NetworkClient>();
-	Logger::debug2("Service::run()> initializing primary_network_client\n");
-
-	if (!Service::primary_network_client_->initialize(&config_, 
-		config_.primary_api_key_, config_.primary_host_)) {
-		Logger::fatal("Could not initialize primary network client\n");
-	}
-
-	// read primary cert file
-	Logger::debug2("Service::run()> checking for primary tls\n");
-	if (config_.primary_use_tls_) {
-		wstring primary_cert_path = Util::getThisPath(true) 
-			+ config_.PRIMARY_CERT_FILENAME;
-		if (!primary_network_client_->loadCertificate(primary_cert_path)) {
-			Logger::fatal("Could not read primary cert from %s\n", 
-				Util::wstr2str(primary_cert_path).c_str());
-		}
-	}
-
-	string logzilla_version;
-
-	Logger::info("Service::run()> getting primary LogZilla version...\n");
-	logzilla_version = primary_network_client_->getLogzillaVersion();
-	if (logzilla_version == "") {
-		Logger::info("Error getting version.\n");
-        Logger::critical("Could not get primary LogZilla version\n");
-    }
-	else {
-		Logger::info("LogZilla version %s\n", logzilla_version.c_str());
-		if (logzilla_version[0] == 'v') {
-			logzilla_version = logzilla_version.substr(1);
-		}
-		config_.setPrimaryLogzillaVersion(logzilla_version);
-	}
-
-	Logger::debug2("Service::run()> checking for secondary host\n");
-	if (config_.hasSecondaryHost()) {
-		Logger::debug2("Service::run()> has secondary host, making"
-			" message queue and client\n");
-		Service::secondary_message_queue_ 
-			= make_shared<MessageQueue>(Service::MESSAGE_QUEUE_SIZE, 
-				Service::MESSAGE_BUFFERS_CHUNK_SIZE);
-		Service::secondary_network_client_ = make_shared<NetworkClient>();
-		Logger::debug2("Service::run()> initializing"
-			" secondary_network_client\n");
-		if (!Service::secondary_network_client_->initialize(&config_, 
-			config_.secondary_api_key_, config_.secondary_host_)) {
-			Logger::fatal("Could not initialize secondary network client\n");
-		}
-
-		// read secondary cert file
-		Logger::debug2("Service::run()> checking for secondary tls\n");
-		if (config_.secondary_use_tls_) {
-			wstring secondary_cert_path = Util::getThisPath(true) 
-				+ config_.SECONDARY_CERT_FILENAME;
-			if (!secondary_network_client_->loadCertificate(secondary_cert_path)) {
-                Logger::fatal("Could not read secondary cert from %s\n", 
-					Util::wstr2str(secondary_cert_path).c_str());
+        // Initialize file watcher if configured
+        if (!config_.getTailFilename().empty()) {
+            char program_name_buf[1024];
+            char filename_buf[1024];
+            Util::wstr2str(program_name_buf, sizeof(program_name_buf), config_.getTailProgramName().c_str());
+            Util::wstr2str(filename_buf, sizeof(filename_buf), config_.getTailFilename().c_str());
+            
+            // Convert filename to wide string
+            wstring wfilename;
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, filename_buf, -1, nullptr, 0);
+            if (wlen > 0) {
+                vector<wchar_t> wbuf(wlen);
+                MultiByteToWideChar(CP_UTF8, 0, filename_buf, -1, wbuf.data(), wlen);
+                wfilename = wbuf.data();
             }
-		}
 
-		Logger::info("Service::run()> getting secondary LogZilla version...\n");
-		logzilla_version = secondary_network_client_->getLogzillaVersion();
-		if (logzilla_version == "") {
-			Logger::info("Error getting version.\n");
-			Logger::critical("Could not get secondary LogZilla version\n");
-		}
-		else {
-			Logger::info("LogZilla version %s\n", logzilla_version.c_str());
-			if (logzilla_version[0] == 'v') {
-				logzilla_version = logzilla_version.substr(1);
-			}
-			config_.setSecondaryLogzillaVersion(logzilla_version);
-		}
+            string program_name = program_name_buf;
+            if (program_name.length() == 0) {
+                Logger::info("Service::run()> starting file tail on %s\n",
+                    filename_buf);
+            } else {
+                Logger::info("Service::run()> starting file tail on %s for program %s\n",
+                    filename_buf, program_name.c_str());
+            }
+            filewatcher_ = make_shared<FileWatcher>(
+                config_,
+                wfilename.c_str(),
+                config_.MAX_TAIL_FILE_LINE_LENGTH,
+                program_name.c_str(),
+                config_.getHostNameConfig().c_str(),
+                (config_.getSeverity() == SharedConstants::Severities::DYNAMIC 
+                    ? SharedConstants::Severities::INFORMATIONAL : config_.getSeverity()),
+                config_.getFacility()
+                );
+        }
 
-	}
-	else {
-		Service::secondary_message_queue_ = nullptr;
-		Service::secondary_network_client_ = nullptr;
-	}
+        // Initialize message queues and network clients
+        bool initialization_successful = initializeNetworkComponents();
+        if (!initialization_successful) {
+            Logger::fatal("Failed to initialize network components\n");
+            return;
+        }
 
-	Logger::debug2("Service::run()> pushing network clients\n");
+        // Start sender thread
+        Logger::debug2("Service::run()> starting sender thread\n");
+        send_thread_ = make_unique<thread>(sendMessagesThread);
+        bool first_loop = true;
+        int restart_needed = 0;
+        Logger::debug2("Service::run()> starting heartbeat monitoring\n");
 
-	vector<shared_ptr<NetworkClient>> clients;
-	clients.push_back(primary_network_client_);
-	if (secondary_network_client_) {
-		clients.push_back(secondary_network_client_);
-	}
+        // Initialize event log subscriptions
+        if (config_.getUseLogAgent()) {
+            auto logs = config_.getLogs();
+            subscriptions_.reserve(logs.size());
+            initializeEventLogSubscriptions(logs);
+        }
 
-	Logger::debug2("Service::run()> starting sender thread\n");
-	thread sender(sendMessagesThread);
-	bool first_loop = true;
-	int restart_needed = 0;
-	Logger::debug2("Service::run()> starting heartbeat monitoring\n");
+        Logger::debug("Service::run()> starting main loop\n");
+        mainLoop(running_as_console, first_loop, restart_needed);
 
-	Logger::debug("Service::run()> starting event log subscriptions\n");
-	if (config_.use_log_agent_) {
-		subscriptions_.reserve(config_.logs_.size());
-		for (auto& log : config_.logs_) {
-			unique_ptr<EventHandlerMessageQueuer> handler
-				= make_unique<EventHandlerMessageQueuer>(
-					config_,
-					primary_message_queue_,
-					secondary_message_queue_,
-					const_cast<const wchar_t*>(log.name_.c_str()));
-			EventLogSubscription subscription(
-				log.name_,
-				log.channel_,
-				wstring(L"*"),
-				(config_.only_while_running_ ? L"" : log.bookmark_),
-				std::move(handler));
-			subscriptions_.push_back(std::move(subscription));
-			auto bookmark = Registry::readBookmark(log.channel_.c_str());
-			subscriptions_.back().subscribe(bookmark);
-		}
-	}
-
-	Logger::debug("Service::run()> starting main loop\n");
-
-	while (!shutdown_requested_) {
-		Logger::debug2("service run first !shutdown_requested\n");
-		auto this_run_time = time(nullptr);
-
-		if (filewatcher_ != nullptr) {
-			Result tail_result = filewatcher_->process();
-			if (!tail_result.isSuccess() && tail_result.statusCode() != FileWatcher::NoNewData) {
-				Logger::debug("FileWatcher result: %s\n", tail_result.what());
-			}
-		}
-
-		first_loop = false;
-		Logger::debug("waiting for key hit/shutdown requested...\n");
-		for (auto i = 0; i < config_.event_log_poll_interval_; i++) {
-			if (shutdown_requested_) {
-				break;
-			}
-			if (primary_message_queue_->length() > 0) {
-				Logger::debug("Primary Queue length==%d\n", primary_message_queue_->length());
-			}
-			if (config_.use_log_agent_ && primary_message_queue_->isEmpty() 
-				&& (secondary_message_queue_ == nullptr || secondary_message_queue_->isEmpty())) {
-				Logger::debug2("Saving config to registry\n");
-				config_.saveToRegistry();
-			}
-			if (_kbhit() || restart_needed) {
-				if (restart_needed) {
-					Logger::debug("restart needed\n");
-				}
-				else {
-					Logger::debug("key hit\n");
-				}
-				shutdown_requested_ = true;
-				break;
-			}
-			if (!shutdown_requested_) {
-				shutdown_event_.wait(1000);
-			}
-		}
-		Logger::debug2("no key hit & no shutdown requested...\n");
-	}
-
-	for (auto& sub : subscriptions_) {
-		sub.cancelSubscription();
-		auto channel = sub.getChannel();
-		auto bookmark = sub.getBookmark();
-		Registry::writeBookmark(channel.c_str(), bookmark.c_str());
-	}
-
-	Logger::debug("service run joining sender\n");
-	SyslogSender::stop();
-	sender.join();
-
-	// handle restart only for automated restarts, not for manual shutdown...
-	if (!shutdown_requested_ && (!service_shutdown_requested_) && restart_needed) {
-		if (running_as_console) {
-			Logger::debug("restart needed but running as console, exiting\n");
-		}
-		Logger::debug("attempting to restart\n");
-		Sleep(5000);
-		exit(1);
-	}
-	else {
-		Logger::debug("LZ Syslog Agent exiting\n");
-	}
-
-	Sleep(2000); // to allow any overlapping callbacks to finish
-	Logger::debug("service run exiting\n");
-
+        // Cleanup phase
+        cleanupAndShutdown(running_as_console, restart_needed);
+    }
+    catch (const ::std::exception& e) {
+        Logger::fatal("Fatal error in service run: %s\n", e.what());
+        fatalErrorHandler("Service encountered fatal error");
+    }
 }
 
+bool Service::initializeNetworkComponents() {
+    // Initialize message queues first
+    primary_message_queue_ = make_shared<MessageQueue>(MESSAGE_QUEUE_SIZE, MESSAGE_BUFFERS_CHUNK_SIZE);
+    Logger::debug2("Service::initializeNetworkComponents()> initialized primary message queue\n");
+
+    bool isJsonPort = false;
+    // For version check, always use HTTP ports
+    unsigned int port = config_.getPrimaryUseTls() ? 443 : 80;
+
+    // First create a temporary HTTP client just for version checking
+    shared_ptr<HttpNetworkClient> temp_client = make_shared<HttpNetworkClient>();
+    if (!temp_client->initialize(&config_, 
+        config_.getPrimaryApiKey().c_str(),
+        config_.getPrimaryHost().c_str(),
+        config_.getPrimaryUseTls(),
+        port)) {
+        Logger::fatal("Failed to initialize temporary primary network client\n");
+        return false;
+    }
+
+    // Connect the temporary client before version check
+    Logger::debug2("Service::run()> connecting temporary client for version check\n");
+    if (!temp_client->connect()) {
+        Logger::fatal("Failed to connect temporary client for version check\n");
+        return false;
+    }
+
+    // Get version and determine format
+    if (!getAndSetLogZillaVersion(temp_client, true)) {
+        Logger::fatal("Failed to get version from primary server\n");
+        return false;
+    }
+
+    // Now create the actual client based on the format
+    int format = config_.getPrimaryLogformat();
+    if (format == SharedConstants::LOGFORMAT_JSONPORT) {
+        Logger::debug2("Using JSON client for port %d\n", port);
+        primary_network_client_ = make_shared<JsonNetworkClient>(
+            config_.getPrimaryHost(),
+            config_.getPrimaryPort()
+        );
+        isJsonPort = true;
+    } else {
+        Logger::debug2("Using HTTP client for port %d\n", port);
+        primary_network_client_ = make_shared<HttpNetworkClient>();
+    }
+        
+    Logger::debug2("Service::run()> initializing primary_network_client\n");
+
+    // Create URL with /incoming path for sending events
+    wstring url = config_.getPrimaryHost() + SharedConstants::HTTP_API_PATH;
+    if (!primary_network_client_->initialize(&config_, 
+        config_.getPrimaryApiKey().c_str(),
+        url.c_str(),
+        config_.getPrimaryUseTls(),
+        config_.getPrimaryPort())) {
+        Logger::fatal("Failed to initialize primary network client\n");
+        return false;
+    }
+
+    Logger::debug2("Service::run()> connecting primary_network_client\n");
+    if (!primary_network_client_->connect()) {
+        Logger::fatal("Failed to connect primary network client\n");
+        return false;
+    }
+
+    // Initialize primary certificate if needed
+    if (config_.getPrimaryUseTls() && !initializePrimaryCertificate()) {
+        Logger::fatal("Failed to initialize primary certificate\n");
+        return false;
+    }
+
+    // Initialize secondary components if configured
+    if (config_.hasSecondaryHost()) {
+        if (!initializeSecondaryComponents()) {
+            Logger::fatal("Failed to initialize secondary components\n");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool Service::initializeSecondaryComponents() {
+    if (!config_.hasSecondaryHost()) {
+        Logger::debug2("No secondary host configured\n");
+        return true;
+    }
+
+    bool isJsonPort = false;
+    unsigned int port = config_.getSecondaryPort();
+    if (port == 0) {
+        Logger::fatal("Secondary port is not configured\n");
+        return false;
+    }
+
+    // First create a temporary HTTP client just for version checking
+    shared_ptr<HttpNetworkClient> temp_client = make_shared<HttpNetworkClient>();
+    if (!temp_client->initialize(&config_, 
+        config_.getSecondaryApiKey().c_str(),
+        config_.getSecondaryHost().c_str(),
+        config_.getSecondaryUseTls(),
+        port)) {
+        Logger::fatal("Failed to initialize temporary secondary network client\n");
+        return false;
+    }
+
+    // Connect the temporary client before version check
+    Logger::debug2("Service::run()> connecting temporary client for version check\n");
+    if (!temp_client->connect()) {
+        Logger::fatal("Failed to connect temporary client for version check\n");
+        return false;
+    }
+
+    // Get version and determine format
+    if (!getAndSetLogZillaVersion(temp_client, false)) {
+        Logger::fatal("Failed to get version from secondary server\n");
+        return false;
+    }
+
+    // Now create the actual client based on the format
+    int format = config_.getSecondaryLogformat();
+    if (format == SharedConstants::LOGFORMAT_JSONPORT) {
+        Logger::debug2("Using JSON client for secondary port %d\n", port);
+        secondary_network_client_ = make_shared<JsonNetworkClient>(
+            config_.getSecondaryHost(),
+            config_.getSecondaryPort()
+        );
+        isJsonPort = true;
+    } else {
+        Logger::debug2("Using HTTP client for secondary port %d\n", port);
+        secondary_network_client_ = make_shared<HttpNetworkClient>();
+    }
+
+    Logger::debug2("Service::run()> initializing secondary_network_client\n");
+    wstring url = config_.getSecondaryHost() + SharedConstants::HTTP_API_PATH;
+    if (!secondary_network_client_->initialize(&config_, 
+        config_.getSecondaryApiKey().c_str(),
+        url.c_str(),
+        config_.getSecondaryUseTls(),
+        config_.getSecondaryPort())) {
+        Logger::fatal("Failed to initialize secondary network client\n");
+        return false;
+    }
+
+    Logger::debug2("Service::run()> connecting secondary_network_client\n");
+    if (!secondary_network_client_->connect()) {
+        Logger::fatal("Failed to connect secondary network client\n");
+        return false;
+    }
+
+    return true;
+}
+
+bool Service::initializePrimaryCertificate() {
+    if (config_.getPrimaryUseTls()) {
+        wstring primary_cert_path = Util::getThisPath(true) 
+            + Configuration::PRIMARY_CERT_FILENAME;
+        Logger::info("Service::onStart()> using primary cert path %ls\n",
+            primary_cert_path.c_str());
+
+        // Only HTTP clients support certificates
+        if (auto http_client = std::dynamic_pointer_cast<HttpNetworkClient>(primary_network_client_)) {
+            if (!http_client->loadCertificate(primary_cert_path.c_str())) {
+                Logger::fatal("Could not read primary cert from %ls\n", 
+                    primary_cert_path.c_str());
+                return false;
+            }
+        } else {
+            Logger::fatal("TLS requested but client does not support certificates\n");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Service::getAndSetLogZillaVersion(const shared_ptr<INetworkClient>& client, bool isPrimary) {
+    // Use stack buffer for version and avoid string allocations
+    char version_buffer[256];
+    size_t bytes_written = 0;
+
+    Logger::info("Service::run()> getting %s LogZilla version...\n", isPrimary ? "primary" : "secondary");
+    if (!client->getLogzillaVersion(version_buffer, sizeof(version_buffer), bytes_written)) {
+        Logger::fatal("Could not get %s LogZilla version\n", isPrimary ? "primary" : "secondary");
+        return false;
+    }
+
+    // Ensure null termination for safe string operations
+    if (bytes_written >= sizeof(version_buffer)) {
+        bytes_written = sizeof(version_buffer) - 1;
+    }
+    version_buffer[bytes_written] = '\0';
+
+    Logger::info("LogZilla version %s\n", version_buffer);
+    
+    // Skip 'v' prefix if present
+    const char* version_str = version_buffer;
+    if (version_buffer[0] == 'v') {
+        version_str++;
+    }
+
+    if (isPrimary) {
+        config_.setPrimaryLogzillaVersion(version_str);
+    } else {
+        config_.setSecondaryLogzillaVersion(version_str);
+    }
+
+    return true;
+}
+
+void Service::initializeEventLogSubscriptions(const vector<LogConfiguration>& logs) {
+    try {
+        for (auto& log : logs) {
+            // Validate log name before conversion
+            if (log.name_.empty()) {
+                Logger::fatal("Invalid event log configuration: empty log name\n");
+                throw std::runtime_error("Empty log name");
+            }
+
+            // Use a larger buffer for conversion
+            char log_name_buf[4096];
+            size_t bytes_written = Util::wstr2str(log_name_buf, sizeof(log_name_buf), log.name_.c_str());
+            
+            if (bytes_written == 0) {
+                Logger::fatal("Failed to convert log name to UTF-8: %s\n", 
+                    GetLastError() == ERROR_INSUFFICIENT_BUFFER ? "buffer too small" : "conversion error");
+                throw std::runtime_error("Failed to convert log name to UTF-8");
+            }
+
+            unique_ptr<EventHandlerMessageQueuer> handler
+                = make_unique<EventHandlerMessageQueuer>(
+                    config_,
+                    primary_message_queue_,
+                    secondary_message_queue_,
+                    const_cast<const wchar_t*>(log.name_.c_str()));
+
+            // Get bookmark - try registry first, then config, then use empty string
+            wstring bookmark = Registry::readBookmark(log.channel_.c_str());
+            if (bookmark.empty() && !config_.getOnlyWhileRunning()) {
+                bookmark = log.bookmark_;
+            }
+
+            const wstring query(L"*");
+            const wstring log_name(log.name_);
+            const wstring log_channel(log.channel_);
+            EventLogSubscription subscription(
+                log_name,
+                log_channel,
+                query,
+                bookmark,
+                std::move(handler));
+
+            subscriptions_.push_back(std::move(subscription));
+            try {
+                // Subscribe with the appropriate flag based on whether we have a bookmark
+                subscriptions_.back().subscribe(bookmark);
+            }
+            catch (const ::std::exception& e) {
+                Logger::recoverable_error("Failed to subscribe to event log '%s': %s\n", 
+                    log_name_buf, e.what());
+            }
+        }
+    }
+    catch (const ::std::exception& e) {
+        Logger::fatal("Error initializing event log subscriptions: %s\n", e.what());
+        throw;
+    }
+}
+
+void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_needed) {
+    while (!shutdown_requested_) {
+        Logger::debug2("service run first !shutdown_requested\n");
+        auto this_run_time = time(nullptr);
+
+        // Process file watcher if configured
+        if (filewatcher_ != nullptr) {
+            Result tail_result = filewatcher_->process();
+            if (!tail_result.isSuccess() && tail_result.statusCode() != FileWatcher::NoNewData) {
+                Logger::debug("FileWatcher result: %s\n", tail_result.what());
+            }
+        }
+
+        first_loop = false;
+        Logger::debug("waiting for key hit/shutdown requested...\n");
+
+        // Main service loop with periodic checks
+        bool loop_interrupted = false;
+        for (auto i = 0; i < config_.getEventLogPollIntervalValue(); i++) {
+            if (checkForShutdown(running_as_console, restart_needed)) {
+                loop_interrupted = true;
+                break;
+            }
+
+            // Handle queue status and configuration saves
+            handleQueueStatusAndConfig();
+
+            // Wait for next check interval
+            if (!shutdown_requested_) {
+                shutdown_event_.wait(1000);
+            }
+        }
+
+        if (loop_interrupted) {
+            break;
+        }
+
+        Logger::debug2("no key hit & no shutdown requested...\n");
+    }
+}
+
+bool Service::checkForShutdown(bool running_as_console, int& restart_needed) {
+    if (shutdown_requested_) {
+        return true;
+    }
+
+    if (restart_needed || (running_as_console && _kbhit())) {
+        if (restart_needed) {
+            Logger::debug("restart needed\n");
+        }
+        else {
+            Logger::debug("key hit\n");
+        }
+        shutdown_requested_ = true;
+        return true;
+    }
+
+    return false;
+}
+
+void Service::handleQueueStatusAndConfig() {
+    if (primary_message_queue_->length() > 0) {
+        Logger::debug("Primary Queue length==%d\n", primary_message_queue_->length());
+    }
+
+    if (config_.getUseLogAgent() && primary_message_queue_->isEmpty() 
+        && (secondary_message_queue_ == nullptr || secondary_message_queue_->isEmpty())) {
+        Logger::debug2("Saving config to registry\n");
+        config_.saveToRegistry();
+    }
+}
+
+void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
+    // Save bookmarks before shutdown
+    for (auto& sub : subscriptions_) {
+        try {
+            sub.cancelSubscription();
+            auto channel = sub.getChannel();
+            auto bookmark = sub.getBookmark();
+            Registry::writeBookmark(channel.c_str(), bookmark.c_str());
+        }
+        catch (const ::std::exception& e) {
+            Logger::debug2("Exception during subscription cleanup: %s\n", e.what());
+        }
+    }
+
+    Logger::debug("service run joining sender\n");
+    SyslogSender::stop();
+    
+    if (send_thread_ && send_thread_->joinable()) {
+        try {
+            send_thread_->join();
+        }
+        catch (const ::std::exception& e) {
+            Logger::debug2("Exception during thread join: %s\n", e.what());
+        }
+    }
+
+    // Clean up network clients and message queues
+    cleanupNetworkClient(primary_network_client_);
+    cleanupNetworkClient(secondary_network_client_);
+    cleanupMessageQueue(primary_message_queue_);
+    cleanupMessageQueue(secondary_message_queue_);
+
+    // Handle restart scenario
+    if (!shutdown_requested_ && (!service_shutdown_requested_) && restart_needed) {
+        if (running_as_console) {
+            Logger::debug("restart needed but running as console, exiting\n");
+        }
+        else {
+            Logger::debug("attempting to restart\n");
+            Sleep(5000);
+            exit(1);
+        }
+    }
+    else {
+        Logger::debug("LZ Syslog Agent exiting\n");
+    }
+
+    Sleep(2000); // to allow any overlapping callbacks to finish
+    Logger::debug("service run exiting\n");
+}
 
 void Service::shutdown() {
-	Logger::info("Service shutdown requested\n");
-	service_shutdown_requested_ = true;
-	shutdown_requested_ = true;
-	shutdown_event_.signal();
+    Logger::info("Service shutdown requested\n");
+    service_shutdown_requested_ = true;
+    shutdown_requested_ = true;
+    shutdown_event_.signal();
 }
-
 
 void Service::fatalErrorHandler(const char* msg) {
-	// Check if a fatal shutdown is already in progress
-	if (fatal_shutdown_in_progress.exchange(true)) {
-		// Fatal shutdown already in progress, return immediately to avoid recursion or repeated shutdown attempts
-		return;
-	}
+    // Check if a fatal shutdown is already in progress
+    bool expected = false;
+    if (!fatal_shutdown_in_progress.compare_exchange_strong(expected, true)) {
+        // Fatal shutdown already in progress, return immediately to avoid recursion 
+        return;
+    }
 
-	// Perform a graceful shutdown if possible
-	// (Implement this method to try to shut down your application components safely)
-	try {
-		shutdown();
-	}
-	catch (...) {
-		// Catch all exceptions to avoid any throw from leaving the fatal handler
-	}
-	Sleep(5000); // Wait for 5 seconds to allow the graceful shutdown to complete
+    try {
+        Logger::fatal("Fatal error: %s\n", msg);
+        shutdown();
+    }
+    catch (...) {
+        // Catch all exceptions to avoid any throw from leaving the fatal handler
+    }
 
-	// Forcefully exit the application if the graceful shutdown didn't work or isn't possible
-	// Use _exit instead of exit to avoid calling static destructors or atexit handlers
-	_exit(1);
+    Sleep(5000); // Wait for 5 seconds to allow the graceful shutdown to complete
+
+    // Forcefully exit the application if the graceful shutdown didn't work
+    _exit(1);
 }
 
+} // namespace Syslog_agent

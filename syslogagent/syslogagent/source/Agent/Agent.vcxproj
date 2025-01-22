@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -58,18 +58,19 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>Syslog$(ProjectName)</TargetName>
-    <IncludePath>$(ProjectDir)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UnitTesting|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>Syslog$(ProjectName)</TargetName>
+    <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>Syslog$(ProjectName)</TargetName>
     <LibraryPath>$(ProjectDir)\lib;$(LibraryPath)</LibraryPath>
-    <IncludePath>$(ProjectDir)\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -78,11 +79,12 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>D:\Source\Logzilla\syslogagent_with_forwarder\syslogagent\source\Agent\include\libgnutls-30;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;winhttp.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreLinkEvent>
       <Command>mc message.mc</Command>
@@ -94,11 +96,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_UNITTEST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;winhttp.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreLinkEvent>
       <Command>mc message.mc</Command>
@@ -113,14 +116,16 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <ForcedIncludeFiles>windows_includes.h</ForcedIncludeFiles>
       <AdditionalIncludeDirectories>D:\Source\Logzilla\syslogagent_with_forwarder\syslogagent\source\Agent\include;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>winhttp.lib;ntdll.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;ntdll.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreLinkEvent>
       <Command>mc message.mc</Command>
@@ -134,6 +139,8 @@
     <ClInclude Include="external\pugixml\src\pugiconfig.hpp" />
     <ClInclude Include="external\pugixml\src\pugixml.hpp" />
     <ClInclude Include="Globals.h" />
+    <ClInclude Include="IEventHandler.h" />
+    <ClInclude Include="INetworkClient.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="ArrayQueue.h" />
     <ClInclude Include="Bitmap.h" />
@@ -141,7 +148,6 @@
     <ClInclude Include="FileWatcher.h" />
     <ClInclude Include="message.h" />
     <ClInclude Include="MessageQueue.h" />
-    <ClInclude Include="NetworkClient.h" />
     <ClInclude Include="OStreamBuf.h" />
     <ClInclude Include="RecordNumber.h" />
     <ClInclude Include="Configuration.h" />
@@ -158,6 +164,8 @@
     <ClInclude Include="Util.h" />
     <ClInclude Include="WindowsEvent.h" />
     <ClInclude Include="WindowsTimer.h" />
+    <ClInclude Include="HttpNetworkClient.h" />
+    <ClInclude Include="JsonNetworkClient.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Agent.cpp" />
@@ -173,7 +181,6 @@
     <ClCompile Include="Configuration.cpp" />
     <ClCompile Include="FileWatcher.cpp" />
     <ClCompile Include="MessageQueue.cpp" />
-    <ClCompile Include="NetworkClient.cpp" />
     <ClCompile Include="RecordNumber.cpp" />
     <ClCompile Include="Result.cpp" />
     <ClCompile Include="LogConfiguration.cpp" />
@@ -190,6 +197,8 @@
     <ClCompile Include="Util.cpp" />
     <ClCompile Include="WindowsEvent.cpp" />
     <ClCompile Include="WindowsTimer.cpp" />
+    <ClCompile Include="HttpNetworkClient.cpp" />
+    <ClCompile Include="JsonNetworkClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="message.mc" />

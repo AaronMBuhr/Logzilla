@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -111,7 +111,7 @@ int wmain(int argc, wchar_t *argv[]) {
 
 static int run_as_console() {
     try {
-        Service().run(true);
+        Service::run(true);
     }
     catch (std::exception& exception) {
         Logger::log(Logger::CRITICAL, "%s\n", exception.what());
@@ -357,7 +357,7 @@ void service_start(DWORD argc, wchar_t **argv) {
         if (!service_report_status(SERVICE_RUNNING, NO_ERROR, 0))
             return;
         //Service::loadConfiguration(false, false, Logger::LogLevel::ALWAYS);
-        Service().run(false);
+        Service::run(false);
     }
     catch (Result& exception) {
         service_report_status(SERVICE_STOPPED, exception.statusCode(), 0);
@@ -444,8 +444,8 @@ void service_addEventSource(const wchar_t* path)
         L"EventMessageFile",       // value name 
         0,                        // must be zero 
         REG_EXPAND_SZ,            // value type 
-        (LPBYTE)path + sizeof(wchar_t),           // pointer to value data 
-        (DWORD) (wcslen(path) - 2)*sizeof(wchar_t))) {       // length of value data 
+        reinterpret_cast<const BYTE*>(path),           // pointer to value data 
+        static_cast<DWORD>(wcslen(path) * sizeof(wchar_t)))) {       // length of value data 
         Result::logLastError("service_addEventSource()", "RegSetValueEx");
         RegCloseKey(hk);
         return;

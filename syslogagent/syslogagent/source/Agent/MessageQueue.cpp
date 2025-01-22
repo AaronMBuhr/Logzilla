@@ -1,11 +1,10 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
 #include "MessageQueue.h"
-
 
 MessageQueue::MessageQueue(
 	uint32_t message_queue_size,
@@ -19,135 +18,165 @@ MessageQueue::MessageQueue(
 	send_buffers_ = make_unique<BitmappedObjectPool<MessageBuffer>>(message_buffers_chunk_size, MESSAGE_QUEUE_SLACK_PERCENT);
 }
 
+void MessageQueue::releaseMessageBuffers(Message& message) {
+	for (uint32_t i = 0; i < message.buffer_count; ++i) {
+		if (message.message_buffers[i]) {
+			send_buffers_->markAsUnused(message.message_buffers[i]);
+			message.message_buffers[i] = nullptr;
+		}
+	}
+	message.buffer_count = 0;
+}
 
 bool MessageQueue::enqueue(const char* message_content, const uint32_t message_len) {
-	if (isFull()) {
+	if (message_len == 0) {
 		return false;
 	}
-	
-	std::unique_lock<std::recursive_mutex> lock(queue_mutex_, std::defer_lock);
 
-	while (true) {
-		lock.lock();
-		if (!isFull()) {
-			break;
-		}
-		lock.unlock();
-		notify_cv_.wait(lock); // Wait for notification
+	const int num_chunks = (message_len + MESSAGE_BUFFER_SIZE - 1) / MESSAGE_BUFFER_SIZE;
+	if (num_chunks > MAX_BUFFERS_PER_MESSAGE) {
+		Logger::recoverable_error("MessageQueue::enqueue() : message requires %d chunks, exceeds maximum %d\n", 
+			num_chunks, MAX_BUFFERS_PER_MESSAGE);
+		return false;
 	}
 
-	Message message;
-	ZeroMemory(&message, sizeof(message));
-	int leftover = message_len % MESSAGE_BUFFER_SIZE;
-	int num_chunks = message_len / MESSAGE_BUFFER_SIZE + (leftover == 0 ? 0 : 1);
-	char* bufptr = const_cast<char*>(message_content);
+	std::unique_lock<std::recursive_mutex> lock(queue_mutex_);
+	while (isFull()) {
+		notify_cv_.wait(lock);
+	}
+
+	Message message = {};
 	message.data_length = message_len;
-	for (int c = 0; c < num_chunks; ++c) {
-		MessageBuffer* buffer = send_buffers_->getAndMarkNextUnused();
-		int buffer_size = (leftover == 0 || c < num_chunks - 1) ? MESSAGE_BUFFER_SIZE : leftover;
-		memcpy(buffer->buffer, bufptr, buffer_size);
-		message.message_buffers[c] = buffer;
-		bufptr += MESSAGE_BUFFER_SIZE;
-	}
+	
+	try {
+		const char* src_ptr = message_content;
+		uint32_t remaining = message_len;
+		
+		for (int i = 0; i < num_chunks; ++i) {
+			MessageBuffer* buffer = send_buffers_->getAndMarkNextUnused();
+			if (!buffer) {
+				Logger::recoverable_error("MessageQueue::enqueue() : failed to allocate buffer %d of %d\n", 
+					i, num_chunks);
+				releaseMessageBuffers(message);
+				return false;
+			}
+			
+			const uint32_t chunk_size = (std::min)(remaining, static_cast<uint32_t>(MESSAGE_BUFFER_SIZE));
+			memcpy(buffer->buffer, src_ptr, chunk_size);
+			
+			message.message_buffers[i] = buffer;
+			message.buffer_count++;
+			
+			src_ptr += chunk_size;
+			remaining -= chunk_size;
+		}
 
-	bool result = send_buffers_queue_->enqueue(std::move(message));
-	return result;
+		if (!send_buffers_queue_->enqueue(std::move(message))) {
+			Logger::recoverable_error("MessageQueue::enqueue() : failed to enqueue message\n");
+			releaseMessageBuffers(message);
+			return false;
+		}
+
+		return true;
+	}
+	catch (...) {
+		releaseMessageBuffers(message);
+		throw;
+	}
 }
 
 int MessageQueue::dequeue(char* message_content, const uint32_t max_len) {
-	std::unique_lock<std::recursive_mutex> lock(queue_mutex_);
-
-	if (send_buffers_queue_->isEmpty()) {
-		return -1;  // Early exit if the queue is empty
+	if (!message_content || max_len == 0) {
+		return -1;
 	}
 
-	Message message;
+	std::unique_lock<std::recursive_mutex> lock(queue_mutex_);
+
+	Message message = {};
 	if (!send_buffers_queue_->peek(message)) {
-		Logger::critical("MessageQueue::dequeue() : could not peek queue\n");
-		return -1;
+		return -1;  // Queue is empty
 	}
 
 	if (message.data_length > max_len) {
-		Logger::critical("MessageQueue::dequeue() : message data size %d exceeds dequeue size %d\n", message.data_length, max_len);
+		Logger::recoverable_error("MessageQueue::dequeue() : message size %d exceeds buffer size %d\n", 
+			message.data_length, max_len);
 		return -1;
 	}
+
+	char* dest_ptr = message_content;
+	uint32_t remaining = message.data_length;
+
+	for (uint32_t i = 0; i < message.buffer_count; ++i) {
+		const uint32_t chunk_size = (std::min)(remaining, static_cast<uint32_t>(MESSAGE_BUFFER_SIZE));
+		memcpy(dest_ptr, message.message_buffers[i]->buffer, chunk_size);
+		dest_ptr += chunk_size;
+		remaining -= chunk_size;
+	}
+
+	const uint32_t bytes_copied = message.data_length;
 
 	if (!send_buffers_queue_->removeFront()) {
-		Logger::critical("MessageQueue::dequeue() : could not release peeked message\n");
+		Logger::recoverable_error("MessageQueue::dequeue() : failed to remove message from queue\n");
 		return -1;
 	}
 
-	uint32_t total_copied = 0;
-	for (uint32_t i = 0; i < message.data_length && total_copied < max_len; i += MESSAGE_BUFFER_SIZE) {
-		uint32_t chunk_size = message.data_length - total_copied;
-		if (MESSAGE_BUFFER_SIZE < chunk_size) {
-			chunk_size = MESSAGE_BUFFER_SIZE;
-		}
-		memcpy(message_content + total_copied, message.message_buffers[i / MESSAGE_BUFFER_SIZE]->buffer, chunk_size);
-		send_buffers_->markAsUnused(message.message_buffers[i / MESSAGE_BUFFER_SIZE]);
-		total_copied += chunk_size;
-	}
-
+	releaseMessageBuffers(message);
 	notify_cv_.notify_one();
-	return total_copied;
+	
+	return bytes_copied;
 }
-
-
 
 int MessageQueue::peek(char* message_content, const uint32_t max_len, 
 	const uint32_t item_index) const {
-	Message message;
-	bool error = false;
-	if (send_buffers_queue_->isEmpty()) {
+	if (!message_content || max_len == 0) {
 		return -1;
 	}
+
+	std::lock_guard<std::recursive_mutex> lock(queue_mutex_);
+
+	Message message = {};
 	if (!send_buffers_queue_->peek(message, item_index)) {
-		Logger::critical("MessageQueue::dequeue() : could not peek queue\n");
-		error = true;
+		Logger::debug2("MessageQueue::peek() Queue is empty or index %d out of range\n", item_index);
+		return -1;  // Queue is empty or index out of range
 	}
-	if (!error && message.data_length > max_len) {
-		Logger::critical("MessageQueue::dequeue() : message data size %d exceeds "
-			"dequeue size %d\n", message.data_length, max_len);
-		error = true;
-	}
-	if (error) {
+
+	if (message.data_length > max_len) {
+		Logger::recoverable_error("MessageQueue::peek() : message size %d exceeds buffer size %d\n", 
+			message.data_length, max_len);
 		return -1;
 	}
-	int leftover = message.data_length % MESSAGE_BUFFER_SIZE;
-	int num_chunks = message.data_length / MESSAGE_BUFFER_SIZE + (leftover == 0 ? 0 : 1);
-	char* bufptr = const_cast<char*>(message_content);
-	for (int c = 0; c < num_chunks; ++c) {
-		int copy_size = (leftover == 0 || c < num_chunks - 1) ? MESSAGE_BUFFER_SIZE : leftover;
-		memcpy(bufptr, message.message_buffers[c]->buffer, copy_size);
-		bufptr += MESSAGE_BUFFER_SIZE;
+
+	char* dest_ptr = message_content;
+	uint32_t remaining = message.data_length;
+
+	for (uint32_t i = 0; i < message.buffer_count; ++i) {
+		const uint32_t chunk_size = (std::min)(remaining, static_cast<uint32_t>(MESSAGE_BUFFER_SIZE));
+		memcpy(dest_ptr, message.message_buffers[i]->buffer, chunk_size);
+		dest_ptr += chunk_size;
+		remaining -= chunk_size;
 	}
+
+	Logger::debug2("MessageQueue::peek() Successfully peeked message at index %d with length %d\n", 
+		item_index, message.data_length);
+
 	return message.data_length;
-
 }
-
 
 bool MessageQueue::removeFront() {
-	Message message;
-	if (send_buffers_queue_->isEmpty()) {
-		return false;
-	}
-	bool was_error = false;
-	std::unique_lock<std::recursive_mutex> lock(queue_mutex_);
+	std::lock_guard<std::recursive_mutex> lock(queue_mutex_);
+
+	Message message = {};
 	if (!send_buffers_queue_->peek(message)) {
-		Logger::critical("MessageQueue::dequeue() : could not peek queue\n");
-		was_error = true;
+		return false;  // Queue is empty
 	}
-	else {
-		send_buffers_queue_->removeFront();
-		int leftover = message.data_length % MESSAGE_BUFFER_SIZE;
-		int num_chunks = message.data_length / MESSAGE_BUFFER_SIZE + (leftover == 0 ? 0 : 1);
-		for (int c = 0; c < num_chunks; ++c) {
-			send_buffers_->markAsUnused(message.message_buffers[c]);
-		}
-	}
-	if (was_error) {
+
+	if (!send_buffers_queue_->removeFront()) {
+		Logger::recoverable_error("MessageQueue::removeFront() : failed to remove message from queue\n");
 		return false;
 	}
+
+	releaseMessageBuffers(message);
+	notify_cv_.notify_one();
+	
 	return true;
 }
-

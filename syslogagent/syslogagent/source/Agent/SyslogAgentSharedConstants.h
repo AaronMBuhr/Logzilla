@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright Â© 2021 Logzilla Corp.
 */
 
 /* SyslogAgentSharedContants.h
@@ -15,7 +15,7 @@ Copyright © 2021 Logzilla Corp.
 
 namespace Syslog_agent {
 
-#define SYSLOGAGENT_CURRENT_VERSION L"6.30.7.0"
+#define SYSLOGAGENT_CURRENT_VERSION L"6.31.0.0"
     
     class SharedConstants {
     public:
@@ -29,6 +29,20 @@ namespace Syslog_agent {
         // Version strings
         static constexpr wchar_t const* CURRENT_VERSION         = SYSLOGAGENT_CURRENT_VERSION;
         static constexpr wchar_t const* CURRENT_CONFIG_VERSION  = L"6.30.0.0";
+
+        // HTTP settings
+        static constexpr bool USE_HTTP2                = true;  // Enable HTTP/2 if available
+        static constexpr bool USE_COMPRESSION          = true;  // Enable compression if available
+        static constexpr int  HTTP2_PING_TIMEOUT_MS   = 60000; // Keep HTTP/2 connections alive for 60 seconds
+
+        // Retry settings
+        static constexpr int MAX_RETRY_ATTEMPTS = 3;
+        static constexpr int INITIAL_RETRY_DELAY_MS = 1000;    // 1 second
+        static constexpr int MAX_RETRY_DELAY_MS = 8000;        // 8 seconds
+
+        // Certificate settings
+        static constexpr int CERT_EXPIRY_WARNING_DAYS = 30;    // Warn when cert within 30 days of expiry
+        static constexpr bool LENIENT_CERT_DATE_CHECK = false; // Default to strict date checking
 
         // Default values
         class Defaults {
@@ -46,7 +60,7 @@ namespace Syslog_agent {
             static constexpr wchar_t const*     TAIL_FILENAME       = L"";
             static constexpr wchar_t const*     TAIL_PROGRAMNAME    = L"";
             static constexpr int                BATCH_INTERVAL      = 1000;
-			static constexpr char*              VERSION_DETECT_STR  = "detect";
+            static constexpr char*              VERSION_DETECT_STR  = "detect";
             static constexpr char*              LOGZILLA_VER        = VERSION_DETECT_STR;
             static constexpr int                POLL_INTERVAL_SEC   = 2;
         };
@@ -120,10 +134,14 @@ namespace Syslog_agent {
             static constexpr wchar_t const* PRIMARY_PORT                = L"SendToPort"; // deprecated
             static constexpr wchar_t const* PRIMARY_API_KEY             = L"PrimaryLogZillaApiKey";
             static constexpr wchar_t const* PRIMARY_USE_TLS             = L"PrimaryUseTLS";
+            static constexpr wchar_t const* PRIMARY_USE_HTTP2           = L"PrimaryUseHTTP2";
+            static constexpr wchar_t const* PRIMARY_USE_COMPRESSION     = L"PrimaryUseCompression";
             static constexpr wchar_t const* SECONDARY_HOST              = L"Syslog1";
             static constexpr wchar_t const* SECONDARY_PORT              = L"SendToBackupPort";
             static constexpr wchar_t const* SECONDARY_API_KEY           = L"SecondaryLogZillaApiKey";
             static constexpr wchar_t const* SECONDARY_USE_TLS           = L"SecondaryUseTLS";
+            static constexpr wchar_t const* SECONDARY_USE_HTTP2         = L"SecondaryUseHTTP2";
+            static constexpr wchar_t const* SECONDARY_USE_COMPRESSION   = L"SecondaryUseCompression";
             static constexpr wchar_t const* FACILITY                    = L"Facility";
             static constexpr wchar_t const* SEVERITY                    = L"Severity";
             static constexpr wchar_t const* SUFFIX                      = L"Suffix";
