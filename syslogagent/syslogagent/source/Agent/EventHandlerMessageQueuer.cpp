@@ -304,8 +304,8 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
     // Start JSON object
     json_output << "{";
 
-    // Add host if configured
-    const std::string& hostname = this->configuration_.getHostName();
+    // Add host and program to main JSON structure
+    string hostname = configuration_.getHostName();
     if (!hostname.empty()) {
         if (!checkBufferSpace("hostname", hostname.length() + 10)) {
             return false;
@@ -432,11 +432,12 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
     json_output << ", \"extra_fields\":{ "
         << "\"severity\":\"" << (data.severity + '0') << "\""
         << ", \"facility\":\"" << configuration_.getFacility() << "\""
-        << ", \"_source_type\":\"WindowsAgent\""
         << ", \"_source_tag\":\"windows_agent\""
         << ", \"log_type\":\"eventlog\""
         << ", \"event_id\":\"" << data.event_id << "\""
-        << ", \"event_log\":\"" << log_name_utf8_ << "\"";
+        << ", \"event_log\":\"" << log_name_utf8_ << "\""
+        << ", \"host\":\"" << hostname << "\""
+        << ", \"program\":\"" << data.provider << "\"";
 
     // Add event data fields to extra_fields
     if (level != FormatLevel::MINIMUM && data.event_data_count > 0) {
@@ -467,7 +468,7 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
         if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
             return false;
         }
-        json_output << ", \"first_occurrence\":\"" << data.timestamp << data.microsec << "\"";
+        json_output << ", \"first_occurrence\":\"" << data.timestamp << "." << data.microsec << "\"";
     }
 
     // For JSON port format, duplicate fields inside extra_fields
@@ -475,17 +476,16 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
         if (!checkBufferSpace("json_extra_fields", 200)) {
             return false;
         }
-        json_output
-            << ", \"program\":\"" << data.provider << "\""
-            << ", \"severity\":\"" << (data.severity + '0') << "\""
-            << ", \"facility\":\"" << configuration_.getFacility() << "\""
-            << ", \"_source_type\":\"WindowsAgent\"";
+        json_output << ", \"program\":\"" << data.provider << "\"";
+        json_output << ", \"facility\":\"" << configuration_.getFacility() << "\"";
+        json_output << ", \"severity\":\"" << (data.severity + '0') << "\"";
+        //json_output << ", \"_source_type\":\"WindowsAgent\"";
 
         if (data.timestamp[0] != '\0') {
             json_output << ", \"ts\":\"" << data.timestamp << "." << data.microsec << "\"";
         }
-        if (!configuration_.getHostName().empty()) {
-            json_output << ", \"host\":\"" << configuration_.getHostName() << "\"";
+        if (!hostname.empty()) {
+            json_output << ", \"host\":\"" << hostname << "\"";
         }
         json_output << ", \"message\":\"" << data.message << "\"";
     }
@@ -521,14 +521,15 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
         final_pos, buflen, usage_percent);
             
     // FATAL check - if we're within 1% of buffer size, something's wrong
-    if (static_cast<double>(final_pos) / buflen > BUFFER_WARNING_THRESHOLD) {
-        Logger::fatal("CRITICAL: JSON buffer usage at %zu/%zu bytes (%.1f%%) - buffer nearly full! "
-            "This indicates a serious issue with message sizing. Original message length: %zu, "
-            "Format level: %d, Current message: %.200s", 
-            final_pos, buflen, usage_percent,
-            strlen(data.message), static_cast<int>(level), json_buffer);
-        throw std::runtime_error("JSON buffer critically full");
-    }
+    // (this was for debugging, taking it out for now)
+    //if (static_cast<double>(final_pos) / buflen > BUFFER_WARNING_THRESHOLD) {
+    //    Logger::fatal("CRITICAL: JSON buffer usage at %zu/%zu bytes (%.1f%%) - buffer nearly full! "
+    //        "This indicates a serious issue with message sizing. Original message length: %zu, "
+    //        "Format level: %d, Current message: %.200s", 
+    //        final_pos, buflen, usage_percent,
+    //        strlen(data.message), static_cast<int>(level), json_buffer);
+    //    throw std::runtime_error("JSON buffer critically full");
+    //}
             
     return static_cast<size_t>(final_pos) < buflen;
 }
