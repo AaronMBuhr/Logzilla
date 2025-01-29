@@ -20,13 +20,6 @@ namespace Syslog_agent {
 
     class EventHandlerMessageQueuer : public IEventHandler {
     public:
-        // Message format levels for fallback strategy
-        enum class FormatLevel {
-            FULL,           // All fields including full message
-            TRUNCATED_MSG,  // All fields but truncated message
-            MINIMUM        // Absolute minimum required fields
-        };
-
         struct EventData {
             static constexpr size_t MAX_PROVIDER_LEN = 256;
             static constexpr size_t MAX_EVENT_ID_LEN = 32;
@@ -67,7 +60,7 @@ namespace Syslog_agent {
             }
 
             void parseFrom(EventLogEvent& event, const Configuration& config);
-            
+
             // Helper function to safely copy strings
             static void safeCopyString(char* dest, size_t destSize, const char* src) {
                 if (!src) {
@@ -84,7 +77,7 @@ namespace Syslog_agent {
             // Helper to add event data pair
             bool addEventData(const char* key, const char* value) {
                 if (event_data_count >= MAX_EVENT_DATA_PAIRS) return false;
-                
+
                 // Find unused slot
                 for (size_t i = 0; i < MAX_EVENT_DATA_PAIRS; i++) {
                     if (!event_data[i].used) {
@@ -117,7 +110,7 @@ namespace Syslog_agent {
         // Estimates final message size before generation
         size_t estimateMessageSize(const EventData& data, int logformat) const;
         bool generateLogMessage(EventLogEvent& event, const int logformat, char* json_buffer, size_t buflen);
-        bool tryGenerateJson(const EventData& data, int logformat, char* json_buffer, size_t buflen, FormatLevel level);
+        bool generateJson(const EventData& data, int logformat, char* json_buffer, size_t buflen);
         static unsigned char unixSeverityFromWindowsSeverity(char windows_severity_num);
 
         Configuration& configuration_;

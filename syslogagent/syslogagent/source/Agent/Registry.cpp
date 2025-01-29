@@ -215,7 +215,7 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
     }
 
     if (status == ERROR_SUCCESS && xml_size > sizeof(tempbuf)) {
-        Logger::warn("Registry::readBookmark()> bookmark for channel %s too large\n", channel);
+        Logger::warning("Registry::readBookmark()> bookmark for channel %s too large\n", channel);
         RegCloseKey(channel_key);
         return wstring();
     }
@@ -228,7 +228,7 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
         DWORD error = GetLastError();
         char warnbuf[1024];
         Util::toPrintableAscii(warnbuf, sizeof(warnbuf), channel, ' ');
-        Logger::warn("Registry::readBookmark()> error %d, could not read"
+        Logger::warning("Registry::readBookmark()> error %d, could not read"
             " bookmark for %s\n", error, warnbuf);
         tempbuf[0] = 0;
     }

@@ -74,10 +74,10 @@ bool JsonNetworkClient::connect()
     }
 
     if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, (char*)&receive_timeout_, sizeof(receive_timeout_)) == SOCKET_ERROR) {
-        Logger::warn("JsonNetworkClient::connect() failed to set receive timeout: %d\n", WSAGetLastError());
+        Logger::warning("JsonNetworkClient::connect() failed to set receive timeout: %d\n", WSAGetLastError());
     }
     if (setsockopt(socket_, SOL_SOCKET, SO_SNDTIMEO, (char*)&send_timeout_, sizeof(send_timeout_)) == SOCKET_ERROR) {
-        Logger::warn("JsonNetworkClient::connect() failed to set send timeout: %d\n", WSAGetLastError());
+        Logger::warning("JsonNetworkClient::connect() failed to set send timeout: %d\n", WSAGetLastError());
     }
 
     char host_utf8[256];
@@ -101,7 +101,7 @@ bool JsonNetworkClient::connect()
             is_connected_ = true;
             return true;
         }
-        Logger::warn("JsonNetworkClient::connect() direct connection failed: %d\n", WSAGetLastError());
+        Logger::warning("JsonNetworkClient::connect() direct connection failed: %d\n", WSAGetLastError());
     }
 
     // If direct connection failed or hostname was not an IP, fall back to DNS

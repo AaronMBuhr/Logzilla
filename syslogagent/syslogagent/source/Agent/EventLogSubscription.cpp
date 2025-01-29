@@ -73,7 +73,7 @@ namespace Syslog_agent {
             bookmark_ = EvtCreateBookmark(bookmark_xml_.c_str());
             if (bookmark_ == NULL) {
                 auto error = GetLastError();
-                Logger::warn("EventLogSubscription::subscribe()> Failed to create bookmark for %s (error %d), falling back to all events from start\n",
+                Logger::warning("EventLogSubscription::subscribe()> Failed to create bookmark for %s (error %d), falling back to all events from start\n",
                     channel_buf, error);
                 flags = EvtSubscribeStartAtOldestRecord;
                 bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking

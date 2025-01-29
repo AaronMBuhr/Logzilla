@@ -164,7 +164,7 @@ bool HttpNetworkClient::connect()
         send_timeout_,      // Send timeout
         receive_timeout_))  // Receive timeout
     {
-        Logger::warn("HttpNetworkClient::connect() failed to set timeouts: %d\n", GetLastError());
+        Logger::warning("HttpNetworkClient::connect() failed to set timeouts: %d\n", GetLastError());
     }
 
     Logger::debug2("HttpNetworkClient::connect() connecting to %ls:%d\n", host_, port_);
@@ -220,7 +220,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
 
     // Set timeouts on the request handle
     if (!applyTimeouts(hRequest_)) {
-        Logger::warn("HttpNetworkClient::post() Failed to set request timeouts\n");
+        Logger::warning("HttpNetworkClient::post() Failed to set request timeouts\n");
     }
 
     // Build headers using fixed buffer
@@ -415,7 +415,7 @@ bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length,
 
     // Set timeouts on the request handle
     if (!applyTimeouts(hRequest_)) {
-        Logger::warn("HttpNetworkClient::getLogzillaVersion() failed to set request timeouts\n");
+        Logger::warning("HttpNetworkClient::getLogzillaVersion() failed to set request timeouts\n");
     }
 
     // Send request without API key header since version endpoint doesn't require auth

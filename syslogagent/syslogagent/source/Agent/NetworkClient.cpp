@@ -289,7 +289,7 @@ bool NetworkClient::initialize(const Configuration* config, const wchar_t* api_k
     if (config_->getUseHTTP2()) {
         DWORD dwOption = WINHTTP_PROTOCOL_FLAG_HTTP2;
         if (!WinHttpSetOption(hSession_, WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, &dwOption, sizeof(dwOption))) {
-            Logger::warn("Failed to enable HTTP/2, falling back to HTTP/1.1: %u\n", GetLastError());
+            Logger::warning("Failed to enable HTTP/2, falling back to HTTP/1.1: %u\n", GetLastError());
         }
     }
 
@@ -342,7 +342,7 @@ NetworkClient::RESULT_TYPE NetworkClient::post(const char* buf, uint32_t length)
     }
 
     if (!negotiateCompression()) {
-        Logger::warn("Failed to negotiate compression\n");
+        Logger::warning("Failed to negotiate compression\n");
     }
 
     std::wstring headers = L"Content-Type: application/json\r\n";

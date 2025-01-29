@@ -14,7 +14,7 @@ public:
 private:
     // Store string literals as member variables to return char*
     static constexpr const char* HEADER = "";
-    static constexpr const char* SEPARATOR = "";
+    static constexpr const char* SEPARATOR = "\n";
     static constexpr const char* TRAILER = "";
     
     char header_[sizeof(HEADER)];      // Includes null terminator

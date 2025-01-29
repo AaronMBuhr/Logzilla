@@ -58,7 +58,7 @@ public:
 	template<typename... _args> static bool info(const char* format, _args... args) {
 		return log(INFO, format, args...);
 	}
-	template<typename... _args> static bool warn(const char* format, _args... args) {
+	template<typename... _args> static bool warning(const char* format, _args... args) {
 		return log(WARN, format, args...);
 	}
 	template<typename... _args> static bool recoverable_error(const char* format, _args... args) {
