@@ -1,5 +1,5 @@
-﻿<!-- SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
+<!-- SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright 2021 LogZilla Corp.
 -->
 <Window x:Class="SyslogAgent.Config.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -299,6 +299,7 @@ Copyright © 2021 LogZilla Corp.
                                 <ComboBoxItem>VERBOSE</ComboBoxItem>
                                 <ComboBoxItem>DEBUG</ComboBoxItem>
                                 <ComboBoxItem>DEBUG2</ComboBoxItem>
+                                <ComboBoxItem>DEBUG3</ComboBoxItem>
                             </ComboBox>
                             <TextBox Grid.Column="1" Grid.Row="1" Margin="2,0,0,0" Width="200" Name="debugLogFilename" ToolTip="Enter the path and name for the debug log file"></TextBox>
                         </Grid>

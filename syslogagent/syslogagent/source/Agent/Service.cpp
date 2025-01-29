@@ -8,6 +8,13 @@ Copyright 2021 Logzilla Corp.
 #include "Util.h"
 
 #include "stdafx.h"
+#include "Service.h"
+#include "Globals.h"
+#include "Logger.h"
+#include "HttpNetworkClient.h"
+#include "JsonNetworkClient.h"
+#include "SyslogAgentSharedConstants.h"
+#include "Util.h"
 #include <conio.h>
 #include <fileapi.h>
 #include <fstream>
@@ -19,8 +26,6 @@ Copyright 2021 Logzilla Corp.
 #include <windows.h>
 #include <atomic>
 #include "INetworkClient.h"
-#include "HttpNetworkClient.h"
-#include "JsonNetworkClient.h"
 #include "Logger.h"
 #include "Configuration.h"
 #include "EventHandlerMessageQueuer.h"
@@ -41,46 +46,39 @@ using std::atomic;
 
 namespace Syslog_agent {
 
-// Static member initialization
+// Define static members
+Configuration Service::config_;
+shared_ptr<MessageQueue> Service::primary_message_queue_;
+shared_ptr<MessageQueue> Service::secondary_message_queue_;
+shared_ptr<INetworkClient> Service::primary_network_client_;
+shared_ptr<INetworkClient> Service::secondary_network_client_;
+shared_ptr<MessageBatcher> Service::primary_batcher_;
+shared_ptr<MessageBatcher> Service::secondary_batcher_;
 std::atomic<bool> Service::fatal_shutdown_in_progress = false;
 unique_ptr<thread> Service::send_thread_ = nullptr;
-Configuration Service::config_;
-shared_ptr<MessageQueue> Service::primary_message_queue_ = nullptr;
-shared_ptr<MessageQueue> Service::secondary_message_queue_ = nullptr;
-shared_ptr<INetworkClient> Service::primary_network_client_ = nullptr;
-shared_ptr<INetworkClient> Service::secondary_network_client_ = nullptr;
 volatile bool Service::shutdown_requested_ = false;
 volatile bool Service::service_shutdown_requested_ = false;
-WindowsEvent Service::shutdown_event_{ L"LogZilla_SyslogAgent_Service_Shutdown" };
-shared_ptr<FileWatcher> Service::filewatcher_ = nullptr;
+WindowsEvent Service::shutdown_event_(L"LogZilla_SyslogAgent_Service_Shutdown");
+shared_ptr<FileWatcher> Service::filewatcher_;
 vector<EventLogSubscription> Service::subscriptions_;
+static SERVICE_STATUS_HANDLE service_status_handle_ = nullptr;
 
 namespace {
     // Helper function to safely clean up network clients
     void cleanupNetworkClient(shared_ptr<INetworkClient>& client) {
         if (client) {
-            try {
-                client->close();
-                client.reset();
-            }
-            catch (const ::std::exception& e) {
-                Logger::debug2("Exception during network client cleanup: %s\n", e.what());
-            }
+            client->close();
+            client.reset();
         }
     }
 
     // Helper function to safely clean up message queues
     void cleanupMessageQueue(shared_ptr<MessageQueue>& queue) {
         if (queue) {
-            try {
-                while (!queue->isEmpty()) {
-                    queue->removeFront();
-                }
-                queue.reset();
+            while (!queue->isEmpty()) {
+                queue->removeFront();
             }
-            catch (const ::std::exception& e) {
-                Logger::debug2("Exception during message queue cleanup: %s\n", e.what());
-            }
+            queue.reset();
         }
     }
 } // end anonymous namespace
@@ -90,26 +88,26 @@ void Service::loadConfiguration(bool running_from_console, bool override_log_lev
 }
 
 void sendMessagesThread() {
-    Logger::debug2("sendMessagesThread()> starting\n");
-    try {
-        if (!Service::primary_message_queue_ || !Service::primary_network_client_) {
-            throw ::std::runtime_error("Required primary components not initialized");
-        }
+    Logger::debug2("sendMessagesThread() starting\n");
+    auto sender = make_unique<SyslogSender>(
+        Service::config_,
+        Service::primary_message_queue_,
+        Service::secondary_message_queue_,
+        Service::primary_network_client_,
+        Service::secondary_network_client_,
+        Service::primary_batcher_,
+        Service::secondary_batcher_
+    );
 
-        SyslogSender sender(
-            Service::config_,
-            Service::primary_message_queue_,
-            Service::secondary_message_queue_,
-            Service::primary_network_client_,
-            Service::secondary_network_client_);
-        Logger::debug2("sendMessagesThread()> sender running\n");
-        sender.run();
+    try {
+        sender->run();
     }
-    catch (const ::std::exception& exception) {
-        Logger::fatal("Fatal error in sender thread: %s\n", exception.what());
-        Service::fatalErrorHandler("Sender thread encountered fatal error");
+    catch (const std::exception& e) {
+        Logger::critical("Exception in sendMessagesThread: %s\n", e.what());
+        Service::fatalErrorHandler("Fatal error in send thread");
     }
-    Logger::debug2("sendMessagesThread()> exiting\n");
+
+    Logger::debug2("sendMessagesThread() ending\n");
 }
 
 void Service::run(bool running_as_console) {
@@ -226,15 +224,31 @@ bool Service::initializeNetworkComponents() {
     // Now create the actual client based on the format
     int format = config_.getPrimaryLogformat();
     if (format == SharedConstants::LOGFORMAT_JSONPORT) {
+        // Parse the URL to get hostname
+        Util::UrlComponents urlComponents;
+        if (!Util::ParseUrl(config_.getPrimaryHost().c_str(), urlComponents)) {
+            Logger::fatal("Failed to parse primary host URL\n");
+            return false;
+        }
+
+        port = config_.getPrimaryPort();
+        if (port < 1) {
+            port = urlComponents.port;
+            if (!urlComponents.hasExplicitPort || port < 1) {
+                port = SharedConstants::LZ_JSON_PORT;
+            }
+        }
         Logger::debug2("Using JSON client for port %d\n", port);
-        primary_network_client_ = make_shared<JsonNetworkClient>(
-            config_.getPrimaryHost(),
-            config_.getPrimaryPort()
+        
+        primary_network_client_ = std::static_pointer_cast<INetworkClient>(
+            make_shared<JsonNetworkClient>(urlComponents.hostName, port)
         );
+        primary_batcher_ = make_shared<JSONMessageBatcher>();
         isJsonPort = true;
     } else {
         Logger::debug2("Using HTTP client for port %d\n", port);
         primary_network_client_ = make_shared<HttpNetworkClient>();
+        primary_batcher_ = make_shared<HTTPMessageBatcher>();
     }
         
     Logger::debug2("Service::run()> initializing primary_network_client\n");
@@ -313,18 +327,37 @@ bool Service::initializeSecondaryComponents() {
     // Now create the actual client based on the format
     int format = config_.getSecondaryLogformat();
     if (format == SharedConstants::LOGFORMAT_JSONPORT) {
-        Logger::debug2("Using JSON client for secondary port %d\n", port);
-        secondary_network_client_ = make_shared<JsonNetworkClient>(
-            config_.getSecondaryHost(),
-            config_.getSecondaryPort()
+        Logger::debug2("Using JSON client for secondary port %d\n", SharedConstants::LZ_JSON_PORT);
+        
+        // Parse the URL to get hostname
+        Util::UrlComponents urlComponents;
+        if (!Util::ParseUrl(config_.getSecondaryHost().c_str(), urlComponents)) {
+            Logger::fatal("Failed to parse secondary host URL\n");
+            return false;
+        }
+
+        port = config_.getSecondaryPort();
+        if (port < 1) {
+            port = urlComponents.port;
+            if (!urlComponents.hasExplicitPort || port < 1) {
+                port = SharedConstants::LZ_JSON_PORT;
+            }
+        }
+
+        secondary_network_client_ = std::static_pointer_cast<INetworkClient>(
+            make_shared<JsonNetworkClient>(urlComponents.hostName, port)
         );
+        secondary_batcher_ = make_shared<JSONMessageBatcher>();
         isJsonPort = true;
     } else {
         Logger::debug2("Using HTTP client for secondary port %d\n", port);
         secondary_network_client_ = make_shared<HttpNetworkClient>();
+        secondary_batcher_ = make_shared<HTTPMessageBatcher>();
     }
-
+        
     Logger::debug2("Service::run()> initializing secondary_network_client\n");
+
+    // Create URL with /incoming path for sending events
     wstring url = config_.getSecondaryHost() + SharedConstants::HTTP_API_PATH;
     if (!secondary_network_client_->initialize(&config_, 
         config_.getSecondaryApiKey().c_str(),
@@ -532,54 +565,60 @@ void Service::handleQueueStatusAndConfig() {
 }
 
 void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
-    // Save bookmarks before shutdown
-    for (auto& sub : subscriptions_) {
-        try {
-            sub.cancelSubscription();
-            auto channel = sub.getChannel();
-            auto bookmark = sub.getBookmark();
-            Registry::writeBookmark(channel.c_str(), bookmark.c_str());
-        }
-        catch (const ::std::exception& e) {
-            Logger::debug2("Exception during subscription cleanup: %s\n", e.what());
-        }
-    }
+    Logger::debug2("Service::cleanupAndShutdown()> starting\n");
 
-    Logger::debug("service run joining sender\n");
-    SyslogSender::stop();
-    
+    // Set shutdown flags
+    shutdown_requested_ = true;
+    service_shutdown_requested_ = true;
+
+    // Signal shutdown event
+    shutdown_event_.signal();
+
+    // Wait for send thread to finish
     if (send_thread_ && send_thread_->joinable()) {
-        try {
-            send_thread_->join();
-        }
-        catch (const ::std::exception& e) {
-            Logger::debug2("Exception during thread join: %s\n", e.what());
-        }
+        Logger::debug2("Service::cleanupAndShutdown()> waiting for send thread to finish\n");
+        send_thread_->join();
+        send_thread_.reset();
     }
 
-    // Clean up network clients and message queues
+    // Clean up network clients first to ensure no more sends
     cleanupNetworkClient(primary_network_client_);
     cleanupNetworkClient(secondary_network_client_);
+
+    // Clean up message queues
     cleanupMessageQueue(primary_message_queue_);
     cleanupMessageQueue(secondary_message_queue_);
 
-    // Handle restart scenario
-    if (!shutdown_requested_ && (!service_shutdown_requested_) && restart_needed) {
+    // Clean up batchers
+    primary_batcher_.reset();
+    secondary_batcher_.reset();
+
+    // Reset shutdown flags
+    shutdown_requested_ = false;
+    service_shutdown_requested_ = false;
+
+    Logger::debug2("Service::cleanupAndShutdown()> cleanup complete\n");
+
+    if (restart_needed) {
+        Logger::info("Service::cleanupAndShutdown()> restarting service\n");
         if (running_as_console) {
-            Logger::debug("restart needed but running as console, exiting\n");
+            Logger::info("Service::cleanupAndShutdown()> running as console, not restarting\n");
+        } else {
+            // Restart service
+            if (service_status_handle_) {
+                SERVICE_STATUS status = {};
+                status.dwCurrentState = SERVICE_STOPPED;
+                status.dwControlsAccepted = 0;
+                status.dwWin32ExitCode = 0;
+                status.dwServiceSpecificExitCode = 0;
+                status.dwCheckPoint = 0;
+                status.dwWaitHint = 0;
+                SetServiceStatus(service_status_handle_, &status);
+            }
         }
-        else {
-            Logger::debug("attempting to restart\n");
-            Sleep(5000);
-            exit(1);
-        }
-    }
-    else {
-        Logger::debug("LZ Syslog Agent exiting\n");
     }
 
-    Sleep(2000); // to allow any overlapping callbacks to finish
-    Logger::debug("service run exiting\n");
+    Logger::debug2("Service::cleanupAndShutdown()> exiting\n");
 }
 
 void Service::shutdown() {

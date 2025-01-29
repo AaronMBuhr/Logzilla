@@ -62,7 +62,6 @@ namespace Syslog_agent {
         void drainConnection();
         bool checkServerCert();
         bool followRedirect(wchar_t* redirect_buffer, size_t buffer_size);
-        bool readResponse(char* response_buffer, size_t max_length, size_t& bytes_written);
         void cleanup_request();
 
         bool use_ssl_;

@@ -38,7 +38,6 @@ public:
 	static bool log_no_datetime(const LogLevel log_level, const char* format, ...);
 	static void setLogEventsToFile() { singleton()->log_events_to_file_ = true; }
 	static bool getLogEventsToFile() { return singleton()->log_events_to_file_; }
-	static void logEventToFile(string event_message); // returns false if there was an error logging
 	static void getDateTimeStr(char* buf, int bufsize);
 	static bool isUnittestRunning();
 	static string getUnitTestLog();

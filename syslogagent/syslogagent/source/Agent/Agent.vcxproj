@@ -139,14 +139,17 @@
     <ClInclude Include="external\pugixml\src\pugiconfig.hpp" />
     <ClInclude Include="external\pugixml\src\pugixml.hpp" />
     <ClInclude Include="Globals.h" />
+    <ClInclude Include="HTTPMessageBatcher.h" />
     <ClInclude Include="IEventHandler.h" />
     <ClInclude Include="INetworkClient.h" />
+    <ClInclude Include="JSONMessageBatcher.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="ArrayQueue.h" />
     <ClInclude Include="Bitmap.h" />
     <ClInclude Include="BitmappedObjectPool.h" />
     <ClInclude Include="FileWatcher.h" />
     <ClInclude Include="message.h" />
+    <ClInclude Include="MessageBatcher.h" />
     <ClInclude Include="MessageQueue.h" />
     <ClInclude Include="OStreamBuf.h" />
     <ClInclude Include="RecordNumber.h" />
@@ -156,6 +159,7 @@
     <ClInclude Include="LogConfiguration.h" />
     <ClInclude Include="Registry.h" />
     <ClInclude Include="Service.h" />
+    <ClInclude Include="StatefulLogger.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="SyslogAgentSharedConstants.h" />
     <ClInclude Include="SyslogSender.h" />
@@ -180,6 +184,7 @@
     <ClCompile Include="Bitmap.cpp" />
     <ClCompile Include="Configuration.cpp" />
     <ClCompile Include="FileWatcher.cpp" />
+    <ClCompile Include="MessageBatcher.cpp" />
     <ClCompile Include="MessageQueue.cpp" />
     <ClCompile Include="RecordNumber.cpp" />
     <ClCompile Include="Result.cpp" />
@@ -187,6 +192,7 @@
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="Registry.cpp" />
     <ClCompile Include="Service.cpp" />
+    <ClCompile Include="StatefulLogger.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='UnitTesting|x64'">Create</PrecompiledHeader>

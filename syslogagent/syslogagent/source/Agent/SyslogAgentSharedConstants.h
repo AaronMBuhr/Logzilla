@@ -25,6 +25,7 @@ namespace Syslog_agent {
         static constexpr wchar_t const* LOGZILLA_VERSION_PATH   = L"/version";
         static constexpr wchar_t const* CERT_FILE_PRIMARY       = L"primary.pfx";
         static constexpr wchar_t const* CERT_FILE_SECONDARY     = L"secondary.pfx";
+        static constexpr unsigned int   LZ_JSON_PORT            = 515;
 
         // Version strings
         static constexpr wchar_t const* CURRENT_VERSION         = SYSLOGAGENT_CURRENT_VERSION;

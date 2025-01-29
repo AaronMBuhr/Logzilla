@@ -213,12 +213,17 @@ string Configuration::getHostName() const {
     return string();
 }
 
-void Configuration::setLogformatForVersion(int& logformat, const string& version) {
+int Configuration::setLogformatForVersion(int& logformat, const string& version) {
+    // DEBUGGING
+	return SharedConstants::LOGFORMAT_JSONPORT;
+
     if (Util::compareSoftwareVersions(version, SharedConstants::LOGFORMAT_LZ_VERSION_HTTP) < 0) {
         logformat = SharedConstants::LOGFORMAT_JSONPORT;
+        return logformat;
     }
     else {
         logformat = SharedConstants::LOGFORMAT_HTTPPORT;
+        return logformat;
     }
 }
 
@@ -253,6 +258,7 @@ int Configuration::getSecondaryLogformat() const {
 int Configuration::getPrimaryPort() const {
     shared_lock<shared_mutex> lock(mutex_);
     
+#if THIS_CODE_IS_OBSOLETE
     if (primary_port_ > 0) {
         return primary_port_;
     }
@@ -264,6 +270,8 @@ int Configuration::getPrimaryPort() const {
     }
     
     return primary_use_tls_ ? 443 : 80;  // HTTP ports
+#endif
+    return primary_port_;
 }
 
 int Configuration::getSecondaryPort() const {

@@ -64,6 +64,11 @@ HttpNetworkClient::HttpNetworkClient()
     , port_(0)
     , is_connected_(false)
 {
+    // Initialize string buffers
+    url_[0] = L'\0';
+    host_[0] = L'\0';
+    path_[0] = L'\0';
+    api_key_[0] = L'\0';
 }
 
 HttpNetworkClient::~HttpNetworkClient()
@@ -82,18 +87,21 @@ bool HttpNetworkClient::initialize(const Configuration* config, const wchar_t* a
     }
 
     // Use fixed-size buffers for URL and API key
-    wchar_t url_buffer[MAX_URL_LENGTH];
-    wchar_t api_key_buffer[MAX_API_KEY_LENGTH];
+    wchar_t url_buffer[MAX_URL_LENGTH] = {};  // Zero-initialize
+    wchar_t api_key_buffer[MAX_API_KEY_LENGTH] = {};  // Zero-initialize
     
     wcsncpy_s(url_buffer, url, MAX_URL_LENGTH - 1);
+    url_buffer[MAX_URL_LENGTH - 1] = L'\0';  // Ensure null termination
+    
     wcsncpy_s(api_key_buffer, api_key, MAX_API_KEY_LENGTH - 1);
+    api_key_buffer[MAX_API_KEY_LENGTH - 1] = L'\0';  // Ensure null termination
     
     use_ssl_ = use_ssl;
     port_ = port;
 
     // Parse URL into host and path using fixed buffers
-    wchar_t host_buffer[MAX_URL_LENGTH];
-    wchar_t path_buffer[MAX_PATH_LENGTH];
+    wchar_t host_buffer[MAX_URL_LENGTH] = {};  // Zero-initialize
+    wchar_t path_buffer[MAX_PATH_LENGTH] = {};  // Zero-initialize
     
     URL_COMPONENTS urlComp = { 0 };
     urlComp.dwStructSize = sizeof(urlComp);
@@ -107,10 +115,25 @@ bool HttpNetworkClient::initialize(const Configuration* config, const wchar_t* a
         return false;
     }
 
-    // Store the parsed components
-    wcsncpy_s(host_, host_buffer, _countof(host_));
-    wcsncpy_s(path_, path_buffer, _countof(path_));
-    wcsncpy_s(api_key_, api_key_buffer, _countof(api_key_));
+    if (port_ < 1) {
+        port_ = urlComp.nPort;
+        if (port_ == 0) {  // If no port in URL, use default based on scheme
+            port_ = use_ssl_ ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT;
+        }
+    }
+
+    // Store the parsed components with explicit null termination
+    wcsncpy_s(url_, url_buffer, _countof(url_) - 1);
+    url_[_countof(url_) - 1] = L'\0';
+    
+    wcsncpy_s(host_, host_buffer, _countof(host_) - 1);
+    host_[_countof(host_) - 1] = L'\0';
+    
+    wcsncpy_s(path_, path_buffer, _countof(path_) - 1);
+    path_[_countof(path_) - 1] = L'\0';
+    
+    wcsncpy_s(api_key_, api_key_buffer, _countof(api_key_) - 1);
+    api_key_[_countof(api_key_) - 1] = L'\0';
 
     return true;
 }
@@ -232,7 +255,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
         return error;
     }
 
-    Logger::debug2("HttpNetworkClient::post() Sending request\n");
+    Logger::debug2("HttpNetworkClient::post() Sending request (%d bytes)...\n", length);
     if (!WinHttpSendRequest(hRequest_,
         WINHTTP_NO_ADDITIONAL_HEADERS,
         0,
@@ -523,12 +546,22 @@ bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t ma
         return false;
     }
 
-    wchar_t headers[MAX_HEADERS_LENGTH];
-    _snwprintf_s(headers, MAX_HEADERS_LENGTH, _TRUNCATE, L"X-API-KEY: %s\r\n", api_key_);
+    // Initialize headers buffer and ensure null termination
+    wchar_t headers[MAX_HEADERS_LENGTH] = {};
+    
+    // Format headers safely with size limit and ensure null termination
+    int header_length = _snwprintf_s(headers, _countof(headers) - 1, _TRUNCATE, L"X-API-KEY: %s\r\n", api_key_);
+    if (header_length < 0 || header_length >= _countof(headers)) {
+        Logger::recoverable_error("HttpNetworkClient::get() Header formatting failed or truncated\n");
+        WinHttpCloseHandle(hRequest_);
+        hRequest_ = NULL;
+        return false;
+    }
+    headers[_countof(headers) - 1] = L'\0';  // Ensure null termination
     
     if (!WinHttpSendRequest(hRequest_,
         headers,
-        -1,
+        static_cast<DWORD>(wcslen(headers)),  // Use actual length instead of -1
         WINHTTP_NO_REQUEST_DATA,
         0,
         0,

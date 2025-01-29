@@ -14,6 +14,7 @@ Copyright 2021 Logzilla Corp.
 #include "Configuration.h"
 #include "INetworkClient.h"
 #include "MessageQueue.h"
+#include "MessageBatcher.h"
 #include "WindowsTimer.h"
 
 using namespace std;
@@ -31,7 +32,9 @@ public:
         shared_ptr<MessageQueue> primary_queue,
         shared_ptr<MessageQueue> secondary_queue,
         shared_ptr<INetworkClient> primary_network_client,
-        shared_ptr<INetworkClient> secondary_network_client);
+        shared_ptr<INetworkClient> secondary_network_client,
+        shared_ptr<MessageBatcher> primary_batcher,
+        shared_ptr<MessageBatcher> secondary_batcher);
 
     ~SyslogSender() = default;
 
@@ -41,23 +44,20 @@ public:
 
     void run() const;
 
-    static void stop() {
-        stop_requested_ = true;
-    }
-
-    static bool isStopRequested() {
-        return stop_requested_;
-    }
+    static void requestStop() { stop_requested_ = true; }
+    static bool isStopRequested() { return stop_requested_; }
 
 protected:
-    int sendMessageBatch(shared_ptr<MessageQueue> msg_queue,
+    int sendMessageBatch(
+        shared_ptr<MessageQueue> msg_queue,
         shared_ptr<INetworkClient> network_client,
-        char* buf,
+        uint32_t batch_count,
+        char* batch_buf,
+        uint32_t& batch_buf_length,
         int64_t& oldest_message_time) const;
 
 private:
-    static volatile bool stop_requested_;
-    static WindowsTimer enqueue_timer_;
+    static atomic<bool> stop_requested_;
 
     static const char event_header_[];
     static const char message_separator_[];
@@ -68,6 +68,8 @@ private:
     shared_ptr<MessageQueue> secondary_queue_;
     shared_ptr<INetworkClient> primary_network_client_;
     shared_ptr<INetworkClient> secondary_network_client_;
+    shared_ptr<MessageBatcher> primary_batcher_;
+    shared_ptr<MessageBatcher> secondary_batcher_;
     unique_ptr<char[]> message_buffer_;
     mutable int64_t primary_oldest_message_time_;
     mutable int64_t secondary_oldest_message_time_;

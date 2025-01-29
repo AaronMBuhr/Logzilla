@@ -222,7 +222,7 @@ namespace Syslog_agent {
         static constexpr int MAX_COMPUTERNAME_LENGH = 200;
         void loadFilterIds(wstring value);
         void getTimeZoneOffset();
-        void setLogformatForVersion(int& logformat, const string& version);
+        int setLogformatForVersion(int& logformat, const string& version);
 
         // Configuration data
         wstring api_path_ = SharedConstants::HTTP_API_PATH;

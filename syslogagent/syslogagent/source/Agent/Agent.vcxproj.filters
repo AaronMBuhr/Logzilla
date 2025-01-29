@@ -117,6 +117,18 @@
     <ClInclude Include="INetworkClient.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="StatefulLogger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MessageBatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="JSONMessageBatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HTTPMessageBatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -192,6 +204,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="HttpNetworkClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="StatefulLogger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MessageBatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

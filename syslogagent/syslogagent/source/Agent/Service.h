@@ -15,6 +15,9 @@ Copyright 2021 Logzilla Corp.
 #include "LogConfiguration.h"
 #include "MessageQueue.h"
 #include "INetworkClient.h"
+#include "MessageBatcher.h"
+#include "HTTPMessageBatcher.h"
+#include "JSONMessageBatcher.h"
 #include "EventLogSubscription.h"
 #include "FileWatcher.h"
 
@@ -40,6 +43,8 @@ public:
     static shared_ptr<MessageQueue> secondary_message_queue_;
     static shared_ptr<INetworkClient> primary_network_client_;
     static shared_ptr<INetworkClient> secondary_network_client_;
+    static shared_ptr<MessageBatcher> primary_batcher_;
+    static shared_ptr<MessageBatcher> secondary_batcher_;
 
     // Public interface
     static void run(bool running_as_console);

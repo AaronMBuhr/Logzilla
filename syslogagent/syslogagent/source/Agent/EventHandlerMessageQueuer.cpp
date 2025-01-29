@@ -15,6 +15,7 @@ Copyright 2021 Logzilla Corp.
 #include "Util.h"
 #include "OStreamBuf.h"
 #include "SyslogSender.h"
+#include "StatefulLogger.h"
 
 using namespace std;
 using namespace Syslog_agent;
@@ -203,7 +204,7 @@ EventHandlerMessageQueuer::EventHandlerMessageQueuer(
 Result EventHandlerMessageQueuer::handleEvent(
     const wchar_t* subscription_name, EventLogEvent& event)
 {
-    Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Processing event from subscription %S\n", 
+    Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Processing event from subscription %S\n", 
         subscription_name);
     
     event.renderEvent();
@@ -227,6 +228,7 @@ Result EventHandlerMessageQueuer::handleEvent(
             
             Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Generated message: %s\n", 
                 json_buffer);
+			StatefulLogger::logEvent();
             
             while (primary_message_queue_->isFull()) {
                 Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Primary queue full, removing front message\n");
@@ -235,7 +237,7 @@ Result EventHandlerMessageQueuer::handleEvent(
             
             primary_message_queue_->enqueue(json_buffer, 
                 static_cast<int>(strlen(json_buffer)));
-            Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Message enqueued to primary queue\n");
+            Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Message enqueued to primary queue\n");
 
             if (secondary_message_queue_) {
                 bool have_secondary_message = true;
@@ -257,7 +259,7 @@ Result EventHandlerMessageQueuer::handleEvent(
                     
                     secondary_message_queue_->enqueue(json_buffer, 
                         static_cast<int>(strlen(json_buffer)));
-                    Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Message enqueued to secondary queue\n");
+                    Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Message enqueued to secondary queue\n");
                 }
                 else {
                     Logger::warn("EventHandlerMessageQueuer::handleEvent()> Secondary message generation failed for event from %S\n", 
@@ -277,7 +279,7 @@ Result EventHandlerMessageQueuer::handleEvent(
     }
 
     Globals::instance()->releaseMessageBuffer(json_buffer);
-    Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Successfully processed event from %S\n", 
+    Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Successfully processed event from %S\n", 
         subscription_name);
     return Result(static_cast<DWORD>(ERROR_SUCCESS));
 }
@@ -301,11 +303,35 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
         return true;
     };
 
+
+
     // Start JSON object
     json_output << "{";
 
     // Add host and program to main JSON structure
     string hostname = configuration_.getHostName();
+
+ //   // DEBUGGING
+ //   json_output << "\"_source_type\": \"WindowsAgent\","
+	//	<< "\"_source_tag\": \"windows_agent\","
+ //       << "\"_log_type\": \"eventlog\",";
+
+ //   json_output
+ //       << "\"host\": \"TESTHOST04\","
+ //       << "\"program\": \"testprogram04\","
+ //       << "\"event_id\": \"11111\","
+ //       << "\"event_log\": \"testlog04\","
+ //       //<< "\"severity\": \"1" << (data.severity + '0') << "\","
+ //       //<< "\"facility\": \"1" << configuration_.getFacility() << "\","
+ //       << "\"message\": \"EventID=444\"";
+
+ //   // json_output << ",\"extra_fields\": { \"host\": \"host01\", \"program\": \"program01\" , \"_source_type\": \"WindowsAgent\", \"_source_tag\": \"windows_agent\" } }" << (char)10;
+ //   // json_output << ",\"extra_fields\": { \"host\": \"host01\", \"program\": \"program01\" } }" << (char)10;
+	//json_output << "}" << (char)10;
+
+
+ //   goto skip;
+
     if (!hostname.empty()) {
         if (!checkBufferSpace("hostname", hostname.length() + 10)) {
             return false;
@@ -319,125 +345,146 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
     }
     json_output << "\"program\":\"" << data.provider << "\"";
 
-    // Add message
-    if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
-        size_t msg_len = strlen(data.message);
-        char* msg_buf = nullptr;
+    json_output 
+        << ", \"severity\":\"" << static_cast<unsigned int>(data.severity) << "\""
+        << ", \"facility\":\"" << configuration_.getFacility() << "\""
+        << ", \"_source_type\": \"WindowsAgent\""
+        << ", \"_source_tag\":\"windows_agent\""
+        << ", \"log_type\":\"eventlog\""
+        << ", \"event_id\":\"" << data.event_id << "\""
+        << ", \"event_log\":\"" << log_name_utf8_ << "\"";
+    //json_output
+    //    << ", \"_source_type\": \"WindowsAgent\""
+    //    << ", \"_source_tag\":\"windows_agent\""
+    //    << ", \"log_type\":\"eventlog\""
+    //    << ", \"event_id\":\"" << data.event_id << "\""
+    //    << ", \"event_log\":\"" << log_name_utf8_ << "\"";
+
+
+
+
+
+
+    size_t msg_len = strlen(data.message);
+    char* msg_buf = nullptr;
         
-        // Calculate space needed for remaining fields after message
-        size_t remaining_size = 200;  // Basic JSON structure and formatting
-        remaining_size += strlen(data.event_id);
-        remaining_size += strlen(log_name_utf8_);
+    // Calculate space needed for remaining fields after message
+    size_t remaining_size = 200;  // Basic JSON structure and formatting
+    remaining_size += strlen(data.event_id);
+    remaining_size += strlen(log_name_utf8_);
         
-        // Account for timestamp if present
-        if (data.timestamp[0] != '\0') {
-            remaining_size += strlen(data.timestamp) + strlen(data.microsec) + 30;
-        }
+    // Account for timestamp if present
+    if (data.timestamp[0] != '\0') {
+        remaining_size += strlen(data.timestamp) + strlen(data.microsec) + 30;
+    }
         
-        // Account for suffix if present
-        if (!configuration_.getSuffix().empty()) {
-            remaining_size += strlen(suffix_utf8_) + 10;
-        }
+    // Account for suffix if present
+    if (!configuration_.getSuffix().empty()) {
+        remaining_size += strlen(suffix_utf8_) + 10;
+    }
         
-        // Account for event data fields if not in MINIMUM mode
-        if (level != FormatLevel::MINIMUM && data.event_data_count > 0) {
-            for (size_t i = 0; i < data.event_data_count; i++) {
-                if (data.event_data[i].used) {
-                    remaining_size += strlen(data.event_data[i].key) + strlen(data.event_data[i].value) + ESTIMATED_FIELD_OVERHEAD;
-                }
+    // Account for event data fields if not in MINIMUM mode
+    if (level != FormatLevel::MINIMUM && data.event_data_count > 0) {
+        for (size_t i = 0; i < data.event_data_count; i++) {
+            if (data.event_data[i].used) {
+                remaining_size += strlen(data.event_data[i].key) + strlen(data.event_data[i].value) + ESTIMATED_FIELD_OVERHEAD;
             }
         }
+    }
         
-        // Add 20% safety margin for JSON escaping and formatting
-        remaining_size = static_cast<size_t>(remaining_size * 1.2);
+    // Add 20% safety margin for JSON escaping and formatting
+    remaining_size = static_cast<size_t>(remaining_size * 1.2);
         
-        // Get current buffer position
-        auto current_pos = static_cast<size_t>(ostream_buffer.pubseekoff(0, ios_base::cur));
+    // Get current buffer position
+    auto current_pos = static_cast<size_t>(ostream_buffer.pubseekoff(0, ios_base::cur));
         
-        // Calculate maximum safe message length
-        size_t max_safe_msg_len = 0;
-        if (current_pos + remaining_size < buflen) {
-            max_safe_msg_len = buflen - (current_pos + remaining_size);
+    // Calculate maximum safe message length
+    size_t max_safe_msg_len = 0;
+    if (current_pos + remaining_size < buflen) {
+        max_safe_msg_len = buflen - (current_pos + remaining_size);
             
-            // For TRUNCATED_MSG level, add truncation notice
-            if (level == FormatLevel::TRUNCATED_MSG && msg_len > max_safe_msg_len) {
-                char truncate_prefix[100];
-                snprintf(truncate_prefix, sizeof(truncate_prefix), 
-                    "(message truncated: %zu bytes requested, %zu bytes available) ", 
-                    msg_len, max_safe_msg_len);
-                size_t prefix_len = strlen(truncate_prefix);
+        // For TRUNCATED_MSG level, add truncation notice
+        if (level == FormatLevel::TRUNCATED_MSG && msg_len > max_safe_msg_len) {
+            char truncate_prefix[100];
+            snprintf(truncate_prefix, sizeof(truncate_prefix), 
+                "(message truncated: %zu bytes requested, %zu bytes available) ", 
+                msg_len, max_safe_msg_len);
+            size_t prefix_len = strlen(truncate_prefix);
                 
-                // Calculate what percentage of message we can keep
-                double retention_percent = (max_safe_msg_len * 100.0) / msg_len;
+            // Calculate what percentage of message we can keep
+            double retention_percent = (max_safe_msg_len * 100.0) / msg_len;
                 
-                Logger::verbose("Message truncation: %zu bytes requested, %zu bytes available (%.1f%% retained) "
-                    "(buffer position: %zu/%zu, estimated remaining fields: %zu bytes)", 
-                    msg_len, max_safe_msg_len, retention_percent, current_pos, buflen, remaining_size);
+            Logger::verbose("Message truncation: %zu bytes requested, %zu bytes available (%.1f%% retained) "
+                "(buffer position: %zu/%zu, estimated remaining fields: %zu bytes)", 
+                msg_len, max_safe_msg_len, retention_percent, current_pos, buflen, remaining_size);
                 
-                // Ensure we have space for prefix + at least some message content
-                if (max_safe_msg_len > prefix_len + 50) {  // At least 50 chars of message
-                    max_safe_msg_len -= prefix_len;  // Reserve space for prefix
-                    msg_buf = Globals::instance()->getMessageBuffer("jsonEscapeMessage");
-                    
-                    // Copy prefix with size information
-                    strcpy_s(msg_buf, Globals::MESSAGE_BUFFER_SIZE, truncate_prefix);
-                    
-                    // Copy truncated portion of message
-                    size_t msg_content_len = min(msg_len, max_safe_msg_len - 1);
-                    strncpy_s(msg_buf + prefix_len, Globals::MESSAGE_BUFFER_SIZE - prefix_len, data.message, msg_content_len);
-                    msg_buf[prefix_len + msg_content_len] = '\0';
-                    
-                    Logger::debug2("Message truncated from %zu to %zu bytes (including %zu byte prefix)", 
-                        msg_len, prefix_len + msg_content_len, prefix_len);
-                } else {
-                    // Not enough space for prefix + message, just use original truncation
-                    msg_buf = Globals::instance()->getMessageBuffer("jsonEscapeMessage");
-                    strncpy_s(msg_buf, Globals::MESSAGE_BUFFER_SIZE, data.message, max_safe_msg_len - 1);
-                    msg_buf[max_safe_msg_len - 1] = '\0';
-                    Logger::warn("Severe truncation: insufficient space for prefix. Message truncated from %zu to %zu bytes (%.1f%% retained)", 
-                        msg_len, max_safe_msg_len, retention_percent);
-                }
-            } else {
-                // No truncation needed or not in TRUNCATED_MSG mode
+            // Ensure we have space for prefix + at least some message content
+            if (max_safe_msg_len > prefix_len + 50) {  // At least 50 chars of message
+                max_safe_msg_len -= prefix_len;  // Reserve space for prefix
                 msg_buf = Globals::instance()->getMessageBuffer("jsonEscapeMessage");
-                Util::jsonEscapeString(data.message, msg_buf, Globals::MESSAGE_BUFFER_SIZE);
+                    
+                // Copy prefix with size information
+                strcpy_s(msg_buf, Globals::MESSAGE_BUFFER_SIZE, truncate_prefix);
+                    
+                // Copy truncated portion of message
+                size_t msg_content_len = min(msg_len, max_safe_msg_len - 1);
+                strncpy_s(msg_buf + prefix_len, Globals::MESSAGE_BUFFER_SIZE - prefix_len, data.message, msg_content_len);
+                msg_buf[prefix_len + msg_content_len] = '\0';
+                    
+                Logger::debug2("Message truncated from %zu to %zu bytes (including %zu byte prefix)", 
+                    msg_len, prefix_len + msg_content_len, prefix_len);
+            } else {
+                // Not enough space for prefix + message, just use original truncation
+                msg_buf = Globals::instance()->getMessageBuffer("jsonEscapeMessage");
+                strncpy_s(msg_buf, Globals::MESSAGE_BUFFER_SIZE, data.message, max_safe_msg_len - 1);
+                msg_buf[max_safe_msg_len - 1] = '\0';
+                Logger::warn("Severe truncation: insufficient space for prefix. Message truncated from %zu to %zu bytes (%.1f%% retained)", 
+                    msg_len, max_safe_msg_len, retention_percent);
             }
         } else {
-            // Buffer already too full, use minimal message
+            // No truncation needed or not in TRUNCATED_MSG mode
             msg_buf = Globals::instance()->getMessageBuffer("jsonEscapeMessage");
-            strcpy_s(msg_buf, Globals::MESSAGE_BUFFER_SIZE, "(message omitted due to buffer constraints)");
-            Logger::warn("Buffer constraints prevent including message content: "
-                "buffer position %zu/%zu with %zu bytes needed for remaining fields", 
-                current_pos, buflen, remaining_size);
+            Util::jsonEscapeString(data.message, msg_buf, Globals::MESSAGE_BUFFER_SIZE);
         }
-        
-        if (!checkBufferSpace("message", strlen(msg_buf) + 50)) {  // Extra space for escaping
-            Globals::instance()->releaseMessageBuffer(msg_buf);
-            return false;
-        }
-        
-        json_output << ", \"message\":\"" << msg_buf << "\"";
-        Globals::instance()->releaseMessageBuffer(msg_buf);
-    } else if (logformat == SharedConstants::LOGFORMAT_JSONPORT) {
-        if (!checkBufferSpace("message", 30)) {
-            return false;
-        }
-        json_output << ", \"message\":\"JSON log event\"";
+    } else {
+        // Buffer already too full, use minimal message
+        msg_buf = Globals::instance()->getMessageBuffer("jsonEscapeMessage");
+        strcpy_s(msg_buf, Globals::MESSAGE_BUFFER_SIZE, "(message omitted due to buffer constraints)");
+        Logger::warn("Buffer constraints prevent including message content: "
+            "buffer position %zu/%zu with %zu bytes needed for remaining fields", 
+            current_pos, buflen, remaining_size);
     }
+        
+    if (!checkBufferSpace("message", strlen(msg_buf) + 50)) {  // Extra space for escaping
+        Globals::instance()->releaseMessageBuffer(msg_buf);
+        return false;
+    }
+        
+    json_output << ", \"message\":\"" << msg_buf << "\"";
+    Globals::instance()->releaseMessageBuffer(msg_buf);
 
     // Everything else goes in extra_fields
     if (!checkBufferSpace("extra_fields_start", 100)) {
         return false;
     }
-    json_output << ", \"extra_fields\":{ "
-        << "\"severity\":\"" << (data.severity + '0') << "\""
-        << ", \"facility\":\"" << configuration_.getFacility() << "\""
-        << ", \"_source_tag\":\"windows_agent\""
-        << ", \"log_type\":\"eventlog\""
-        << ", \"event_id\":\"" << data.event_id << "\""
-        << ", \"event_log\":\"" << log_name_utf8_ << "\""
-        << ", \"host\":\"" << hostname << "\""
-        << ", \"program\":\"" << data.provider << "\"";
+    // json_output << ", \"_source_tag\":\"windows_agent\"";
+    if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
+        json_output << ", \"extra_fields\":{ ";
+    }
+    //json_output << ", \"extra_fields\":{ "
+    //    << "\"severity\":\"" << (data.severity + '0') << "\""
+    //    << ", \"facility\":\"" << configuration_.getFacility() << "\""
+    //    << ", \"_source_tag\":\"windows_agent\""
+    //    << ", \"log_type\":\"eventlog\""
+    //    << ", \"event_id\":\"" << data.event_id << "\""
+    //    << ", \"event_log\":\"" << log_name_utf8_ << "\""
+    //    << ", \"host\":\"" << hostname << "\""
+    //    << ", \"program\":\"" << data.provider << "\"";
+
+
+	StatefulLogger::setEventId(data.event_id);
+	StatefulLogger::setEventLog(log_name_utf8_);
+	StatefulLogger::setEventDatetime(data.timestamp);
 
     // Add event data fields to extra_fields
     if (level != FormatLevel::MINIMUM && data.event_data_count > 0) {
@@ -464,30 +511,31 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
         }
     }
 
-    if (logformat == SharedConstants::LOGFORMAT_HTTPPORT && data.timestamp[0] != '\0') {
-        if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
-            return false;
-        }
-        json_output << ", \"first_occurrence\":\"" << data.timestamp << "." << data.microsec << "\"";
-    }
+    // DEBUGGING
+    //if (logformat == SharedConstants::LOGFORMAT_HTTPPORT && data.timestamp[0] != '\0') {
+    //    if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
+    //        return false;
+    //    }
+    //    json_output << ", \"first_occurrence\":\"" << data.timestamp << "." << data.microsec << "\"";
+    //}
 
     // For JSON port format, duplicate fields inside extra_fields
     if (logformat == SharedConstants::LOGFORMAT_JSONPORT) {
         if (!checkBufferSpace("json_extra_fields", 200)) {
             return false;
         }
-        json_output << ", \"program\":\"" << data.provider << "\"";
-        json_output << ", \"facility\":\"" << configuration_.getFacility() << "\"";
-        json_output << ", \"severity\":\"" << (data.severity + '0') << "\"";
-        //json_output << ", \"_source_type\":\"WindowsAgent\"";
+        //json_output << ", \"program\":\"" << data.provider << "\"";
+        //json_output << ", \"facility\":\"" << configuration_.getFacility() << "\"";
+        //json_output << ", \"severity\":\"" << (data.severity + '0') << "\"";
+        ////json_output << ", \"_source_type\":\"WindowsAgent\"";
 
-        if (data.timestamp[0] != '\0') {
-            json_output << ", \"ts\":\"" << data.timestamp << "." << data.microsec << "\"";
-        }
-        if (!hostname.empty()) {
-            json_output << ", \"host\":\"" << hostname << "\"";
-        }
-        json_output << ", \"message\":\"" << data.message << "\"";
+        //if (data.timestamp[0] != '\0') {
+        //    json_output << ", \"ts\":\"" << data.timestamp << "." << data.microsec << "\"";
+        //}
+        //if (!hostname.empty()) {
+        //    json_output << ", \"host\":\"" << hostname << "\"";
+        //}
+        // json_output << ", \"message\":\"" << data.message << "\"";
     }
 
     // For HTTP format, suffix fields go inside extra_fields
@@ -498,8 +546,10 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
         json_output << ", " << suffix_utf8_;
     }
 
-    // Close extra_fields object
-    json_output << " }";
+    if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
+        // Close extra_fields object
+        json_output << " }";
+    }
 
     // For JSON port format, suffix fields go at root level
     if (logformat == SharedConstants::LOGFORMAT_JSONPORT && !configuration_.getSuffix().empty()) {
@@ -511,6 +561,8 @@ bool EventHandlerMessageQueuer::tryGenerateJson(
 
     // Close the main object
     json_output << " }";
+
+    skip:
 
     json_output << (char)10 << (char)0;  // Add newline and null terminator
         

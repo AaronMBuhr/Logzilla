@@ -166,7 +166,7 @@ namespace Syslog_agent {
 
         case EvtSubscribeActionDeliver:
         {
-            Logger::debug3("handleSubscriptionEvent()> Got event for %s with bookmark %p\n", 
+            Logger::debug2("handleSubscriptionEvent()> Got event for %s with bookmark %p\n", 
                 channel_buf, subscription->bookmark_);
 
             if (subscription->bookmark_ == NULL) {
@@ -179,7 +179,7 @@ namespace Syslog_agent {
             // Wrap the hEvent in an EventLogEvent object
             EventLogEvent processed_event(hEvent);
             try {
-                Logger::debug3("handleSubscriptionEvent()> Processing event for %s\n", channel_buf);
+                Logger::debug2("handleSubscriptionEvent()> Processing event for %s\n", channel_buf);
                 subscription->event_handler_->handleEvent(subscription->subscription_name_.c_str(), processed_event);
                 Logger::debug3("handleSubscriptionEvent()> Successfully processed event for %s\n", channel_buf);
 

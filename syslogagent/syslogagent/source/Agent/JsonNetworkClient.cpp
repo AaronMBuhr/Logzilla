@@ -6,9 +6,12 @@
 #include <WinSock2.h>
 #include <Windows.h>
 #include <ws2tcpip.h>
+#include <WinError.h>
 
 #include <sstream>
+#include <vector>
 
+using namespace std;
 using namespace Syslog_agent;
 
 namespace {
@@ -31,9 +34,9 @@ namespace {
     }
 }
 
-JsonNetworkClient::JsonNetworkClient(const std::wstring& remote_host_address, unsigned int remote_port)
-    : remote_host_address_(remote_host_address)
-    , remote_port_(remote_port)
+JsonNetworkClient::JsonNetworkClient(const std::wstring& hostname, unsigned int port)
+    : remote_host_address_(hostname)
+    , remote_port_(port)
     , is_connected_(false)
     , socket_(INVALID_SOCKET)
     , connect_timeout_(DEFAULT_CONNECT_TIMEOUT)
@@ -45,15 +48,6 @@ JsonNetworkClient::JsonNetworkClient(const std::wstring& remote_host_address, un
 JsonNetworkClient::~JsonNetworkClient()
 {
     close();
-}
-
-bool JsonNetworkClient::initialize(const Configuration* config, const wchar_t* api_key,
-    const wchar_t* url, bool use_ssl, unsigned int port)
-{
-    if (port != 0) {
-        remote_port_ = port;
-    }
-    return true;
 }
 
 bool JsonNetworkClient::connect()
@@ -86,12 +80,6 @@ bool JsonNetworkClient::connect()
         Logger::warn("JsonNetworkClient::connect() failed to set send timeout: %d\n", WSAGetLastError());
     }
 
-    struct addrinfo hints = { 0 };
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_protocol = IPPROTO_TCP;
-
-    struct addrinfo* result_addr = nullptr;
     char host_utf8[256];
     if (!ws2s(remote_host_address_.c_str(), host_utf8, sizeof(host_utf8))) {
         Logger::recoverable_error("JsonNetworkClient::connect() failed to convert host address\n");
@@ -99,22 +87,53 @@ bool JsonNetworkClient::connect()
         WSACleanup();
         return false;
     }
+
+    // Try direct IP connection first
+    struct sockaddr_in addr = { 0 };
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(remote_port_);
     
-    char port_str[32];
-    snprintf(port_str, sizeof(port_str), "%u", remote_port_);
+    INT ip_result = InetPtonA(AF_INET, host_utf8, &addr.sin_addr);
+    if (ip_result == 1) {
+        Logger::info("JsonNetworkClient::connect() attempting direct IP connection to: %s\n", host_utf8);
+        int connect_result = ::connect(socket_, (struct sockaddr*)&addr, sizeof(addr));
+        if (connect_result != SOCKET_ERROR) {
+            is_connected_ = true;
+            return true;
+        }
+        Logger::warn("JsonNetworkClient::connect() direct connection failed: %d\n", WSAGetLastError());
+    }
+
+    // If direct connection failed or hostname was not an IP, fall back to DNS
+    struct addrinfo hints = { 0 };
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
     
-    result = ::getaddrinfo(host_utf8, port_str, &hints, &result_addr);
-    if (result != 0) {
-        Logger::recoverable_error("JsonNetworkClient::connect() getaddrinfo failed: %d\n", result);
+    Logger::info("JsonNetworkClient::connect() falling back to DNS resolution for host: %s\n", host_utf8);
+    struct addrinfo* result_addr;
+    int dns_result = ::getaddrinfo(host_utf8, std::to_string(remote_port_).c_str(), &hints, &result_addr);
+    if (dns_result != 0) {
+        Logger::recoverable_error("JsonNetworkClient::connect() all connection attempts failed for host: %s\n", host_utf8);
         closesocket(socket_);
         WSACleanup();
         return false;
     }
 
-    result = ::connect(socket_, result_addr->ai_addr, (int)result_addr->ai_addrlen);
+    bool connected = false;
+    struct addrinfo* ptr = result_addr;
+    while (ptr != nullptr && !connected) {
+        int connect_result = ::connect(socket_, ptr->ai_addr, (int)ptr->ai_addrlen);
+        if (connect_result != SOCKET_ERROR) {
+            connected = true;
+            break;
+        }
+        ptr = ptr->ai_next;
+    }
+    
     ::freeaddrinfo(result_addr);
 
-    if (result == SOCKET_ERROR) {
+    if (!connected) {
         Logger::recoverable_error("JsonNetworkClient::connect() connect failed: %d\n", WSAGetLastError());
         closesocket(socket_);
         WSACleanup();
@@ -125,19 +144,24 @@ bool JsonNetworkClient::connect()
     return true;
 }
 
-JsonNetworkClient::RESULT_TYPE JsonNetworkClient::post(const char* buf, uint32_t length)
+DWORD JsonNetworkClient::post(const char* buf, uint32_t length)
 {
     if (!is_connected_) {
-        return ERROR_NOT_CONNECTED;
+        Logger::recoverable_error("JsonNetworkClient::post() not connected\n");
+        return ERROR_NETWORK_UNREACHABLE;
+    }
+
+    if (socket_ == INVALID_SOCKET) {
+        return ERROR_NETWORK_UNREACHABLE;
     }
 
     int bytes_sent = ::send(socket_, buf, length, 0);
     if (bytes_sent == SOCKET_ERROR) {
         Logger::recoverable_error("JsonNetworkClient::post() send failed: %d\n", WSAGetLastError());
-        return WSAGetLastError();
+        return ERROR_NETWORK_UNREACHABLE;
     }
 
-    return RESULT_SUCCESS;
+    return ERROR_SUCCESS;
 }
 
 void JsonNetworkClient::close()
@@ -145,28 +169,23 @@ void JsonNetworkClient::close()
     if (socket_ != INVALID_SOCKET) {
         closesocket(socket_);
         socket_ = INVALID_SOCKET;
-        WSACleanup();
     }
+    WSACleanup();
     is_connected_ = false;
 }
 
 bool JsonNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length, size_t& bytes_written)
 {
-    // Not implemented for JSON protocol
+    // Not implemented for JSON client
+    bytes_written = 0;
     return false;
 }
 
-std::wstring JsonNetworkClient::connectionName() const
+std::string JsonNetworkClient::connectionNameUtf8()
 {
-    return remote_host_address_;
-}
-
-std::string JsonNetworkClient::connectionNameUtf8() const
-{
-    char host_utf8[256];
-    if (!ws2s(remote_host_address_.c_str(), host_utf8, sizeof(host_utf8))) {
-        Logger::recoverable_error("JsonNetworkClient::connectionNameUtf8() failed to convert host address\n");
-        return "";
+    char buffer[256];
+    if (ws2s(remote_host_address_.c_str(), buffer, sizeof(buffer))) {
+        return std::string(buffer);
     }
-    return host_utf8;
+    return "";
 }

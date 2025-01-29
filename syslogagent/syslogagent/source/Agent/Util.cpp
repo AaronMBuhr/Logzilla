@@ -23,6 +23,8 @@ Copyright 2021 Logzilla Corp.
 #include <TlHelp32.h>
 #include "Util.h"
 #include "Globals.h"
+#include "Logger.h"
+#include <winhttp.h>
 
 namespace Syslog_agent {
 
@@ -40,29 +42,28 @@ void Util::toPrintableAscii(char* destination, int destination_count,
     destination[i] = 0;
 }
 
-size_t Util::wstr2str(char* dest, size_t dest_size, const wchar_t* src) {
-    if (!src || !dest || dest_size == 0) return 0;
-    
-    // Get required size and verify buffer
-    int size_needed = WideCharToMultiByte(CP_UTF8, 0, src, -1, NULL, 0, NULL, NULL);
-    if (size_needed <= 0 || static_cast<size_t>(size_needed) > dest_size) {
-        dest[0] = '\0';
-        return 0;
+size_t Util::wstr2str(char* dest, size_t dest_size, const wchar_t* src)
+{
+    if (!dest || !src || dest_size == 0) return 0;
+
+    size_t converted = 0;
+    if (WideCharToMultiByte(CP_UTF8, 0, src, -1, dest, static_cast<int>(dest_size), NULL, NULL)) {
+        converted = strlen(dest);
     }
-    
-    // Do the actual conversion
-    int result = WideCharToMultiByte(CP_UTF8, 0, src, -1, dest, static_cast<int>(dest_size), NULL, NULL);
-    return result > 0 ? static_cast<size_t>(result - 1) : 0;  // -1 to not count null terminator
+    dest[dest_size - 1] = '\0';  // Ensure null termination
+    return converted;
 }
 
 size_t Util::wstr2str_truncate(char* dest, size_t dest_size, const wchar_t* src)
 {
-    size_t i;
-    for (i = 0; i < dest_size - 1 && src[i] != 0; i++) {
-        dest[i] = static_cast<char>(src[i]);
+    if (!dest || !src || dest_size == 0) return 0;
+
+    size_t converted = wstr2str(dest, dest_size, src);
+    if (converted >= dest_size - 1) {
+        dest[dest_size - 1] = '\0';
+        return dest_size - 1;
     }
-    dest[i] = 0;
-    return i;
+    return converted;
 }
 
 size_t Util::toLowercase(wchar_t* str) {
@@ -385,6 +386,13 @@ int64_t Util::getUnixTimeMilliseconds() {
     return unixTimeMilliseconds;
 }
 
+void Util::epochToDateTime(const char* epochStr, char* output) {
+    std::time_t epoch = std::atoll(epochStr);
+    std::tm timeinfo;
+    localtime_s(&timeinfo, &epoch);
+    std::strftime(output, 20, "%Y-%m-%d %H:%M:%S", &timeinfo);
+}
+
 int Util::compareSoftwareVersions(const std::string& version_a, 
     const std::string& version_b) {
     std::vector<int> parts_a = splitVersion(version_a);
@@ -451,6 +459,44 @@ std::vector<int> Util::splitVersion(const std::string& version) {
     }
 
     return parts;
+}
+
+bool Util::ParseUrl(const wchar_t* url, UrlComponents& components) {
+    if (!url || wcslen(url) == 0) {
+        Logger::recoverable_error("ParseUrl() empty URL\n");
+        return false;
+    }
+
+    const size_t urlLen = wcslen(url);
+    if (urlLen > static_cast<size_t>(MAXDWORD)) {
+        Logger::recoverable_error("ParseUrl() URL too long\n");
+        return false;
+    }
+
+    std::vector<wchar_t> hostName(urlLen + 1);
+    std::vector<wchar_t> urlPath(urlLen + 1);
+    std::vector<wchar_t> scheme(urlLen + 1);
+    
+    URL_COMPONENTS urlComp = { 0 };
+    urlComp.dwStructSize = sizeof(urlComp);
+    urlComp.lpszHostName = hostName.data();
+    urlComp.dwHostNameLength = static_cast<DWORD>(urlLen + 1);
+    urlComp.lpszUrlPath = urlPath.data();
+    urlComp.dwUrlPathLength = static_cast<DWORD>(urlLen + 1);
+    urlComp.lpszScheme = scheme.data();
+    urlComp.dwSchemeLength = static_cast<DWORD>(urlLen + 1);
+    
+    if (!WinHttpCrackUrl(url, 0, 0, &urlComp)) {
+        Logger::recoverable_error("ParseUrl() failed to parse URL: %d\n", GetLastError());
+        return false;
+    }
+
+    components.hostName = hostName.data();
+    components.isSecure = (_wcsicmp(scheme.data(), L"https") == 0);
+    components.port = urlComp.nPort;
+    components.path = urlPath.data();
+
+    return true;
 }
 
 } // end namespace Syslog_agent
