@@ -17,9 +17,9 @@ private:
     static constexpr const char* SEPARATOR = ", ";
     static constexpr const char* TRAILER = " ] }";
     
-    char header_[sizeof(HEADER)];      // Includes null terminator
-    char separator_[sizeof(SEPARATOR)]; // Includes null terminator
-    char trailer_[sizeof(TRAILER)];    // Includes null terminator
+    char header_[16];      // Size of "{ \"events\": [ " + null terminator
+    char separator_[3];     // Size of ", " + null terminator
+    char trailer_[5];      // Size of " ] }" + null terminator
 
 public:
     HTTPMessageBatcher() : MessageBatcher() {

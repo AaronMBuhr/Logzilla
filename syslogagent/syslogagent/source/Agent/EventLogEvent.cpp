@@ -49,11 +49,12 @@ namespace Syslog_agent {
         if (buffer_size_needed < (Globals::MESSAGE_BUFFER_SIZE / sizeof(wchar_t))) {
             xml_buffer_w[buffer_size_needed] = 0;
             int utf8_size = WideCharToMultiByte(CP_UTF8, 0, xml_buffer_w, 
-                static_cast<int>(buffer_size_needed), nullptr, 0, nullptr, nullptr) + 1;
-            if (utf8_size >= Globals::MESSAGE_BUFFER_SIZE)
+                static_cast<int>(buffer_size_needed), nullptr, 0, nullptr, nullptr);
+            if (utf8_size >= Globals::MESSAGE_BUFFER_SIZE - 1)
                 utf8_size = Globals::MESSAGE_BUFFER_SIZE - 1;
             WideCharToMultiByte(CP_UTF8, 0, xml_buffer_w, static_cast<int>(buffer_size_needed), 
                 xml_buffer_, utf8_size, nullptr, nullptr);
+            xml_buffer_[utf8_size] = '\0';  // Ensure null termination
         }
         else {
             xml_buffer_[0] = 0;
@@ -92,18 +93,21 @@ namespace Syslog_agent {
         BOOL succeeded = EvtFormatMessage(metadata_handle, windows_event_handle_, 0, 0, nullptr, 
             EvtFormatMessageEvent, Globals::MESSAGE_BUFFER_SIZE / sizeof(wchar_t) - 1, text_buffer_w, 
             &buffer_size_needed);
-        text_buffer_w[buffer_size_needed] = 0;
         if (!succeeded) {
             auto err = GetLastError();
             Logger::recoverable_error("EventLogEvent::renderText()> error %d\n", err);
+            text_buffer_w[0] = L'\0';
+            buffer_size_needed = 0;
         }
-        int utf8_size = WideCharToMultiByte(CP_UTF8, 0, text_buffer_w, buffer_size_needed, nullptr, 0, 
-            nullptr, nullptr) + 1;
-        if (utf8_size >= Globals::MESSAGE_BUFFER_SIZE)
+        text_buffer_w[buffer_size_needed] = L'\0';
+        
+        int utf8_size = WideCharToMultiByte(CP_UTF8, 0, text_buffer_w, 
+            static_cast<int>(buffer_size_needed), nullptr, 0, nullptr, nullptr);
+        if (utf8_size >= Globals::MESSAGE_BUFFER_SIZE - 1)
             utf8_size = Globals::MESSAGE_BUFFER_SIZE - 1;
-        int len = WideCharToMultiByte(CP_UTF8, 0, text_buffer_w, buffer_size_needed, text_buffer_, 
-            utf8_size, nullptr, nullptr);
-        text_buffer_[len] = 0;
+        WideCharToMultiByte(CP_UTF8, 0, text_buffer_w, static_cast<int>(buffer_size_needed),
+            text_buffer_, utf8_size, nullptr, nullptr);
+        text_buffer_[utf8_size] = '\0';  // Ensure null termination
         EvtClose(metadata_handle);
         Globals::instance()->releaseMessageBuffer(reinterpret_cast<char*>(text_buffer_w));
     }

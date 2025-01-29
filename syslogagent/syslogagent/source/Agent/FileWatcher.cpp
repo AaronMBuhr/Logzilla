@@ -169,7 +169,7 @@ void FileWatcher::processLine(const char* line_cstr) {
 				<< "\"message\": \"" << line_cstr << "\", "
 				<< "\"extra_fields\": { "
 				<< "\"_source_tag\": \"windows_agent\", "
-				<< "\"log_type\": \"file\", "
+				<< "\"_log_type\": \"file\", "
 				<< "\"file\": \"" << filename_multibyte_escaped_ << "\" }"
 				<< " }" << '\n' << '\0';
 		}

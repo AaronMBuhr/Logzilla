@@ -159,6 +159,7 @@ namespace Syslog_agent {
         // Add root level fields
         string hostname = configuration_.getHostName();
 
+        // http ingestion will accept these at root
         if (!hostname.empty()) {
             if (!checkBufferSpace("hostname", hostname.length() + 10)) {
                 return false;
@@ -172,17 +173,15 @@ namespace Syslog_agent {
         }
         json_output << "\"program\":\"" << data.provider << "\"";
 
-        // Add severity and facility at root level for HTTP
-        json_output << ", \"severity\":\"" << static_cast<unsigned int>(data.severity) << "\""
-            << ", \"facility\":\"" << configuration_.getFacility() << "\"";
 
-
-        if (logformat == SharedConstants::LOGFORMAT_HTTPPORT && data.timestamp[0] != '\0') {
-            if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
-                return false;
-            }
-            json_output << ", \"first_occurrence\":\"" << data.timestamp << "." << data.microsec << "\"";
-        }
+        // don't know if http format will accept this directly, json won't, but current
+        // rule takes ts from extra_fields anyway
+        //if (logformat == SharedConstants::LOGFORMAT_HTTPPORT && data.timestamp[0] != '\0') {
+        //    if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
+        //        return false;
+        //    }
+        //    json_output << ", \"first_occurrence\": " << data.timestamp << "." << data.microsec;
+        //}
 
         json_output << ", ";
         // Start extra_fields for HTTP format
@@ -191,14 +190,32 @@ namespace Syslog_agent {
         }
         json_output << "\"_source_type\": \"WindowsAgent\""
             << ", \"_source_tag\":\"windows_agent\""
-            << ", \"log_type\":\"eventlog\""
+            << ", \"_log_type\":\"eventlog\""
             << ", \"event_id\":\"" << data.event_id << "\""
             << ", \"event_log\":\"" << log_name_utf8_ << "\"";
-        if (data.timestamp[0] != '\0') {
-            if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
+        json_output << ", \"severity\":\"" << static_cast<unsigned int>(data.severity) << "\""
+            << ", \"facility\":\"" << configuration_.getFacility() << "\"";
+        //if (data.timestamp[0] != '\0') {
+        //    if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
+        //        return false;
+        //    }
+        //    json_output << ", \"ts\": \"" << data.timestamp << "." << data.microsec << "\"";
+        //}
+
+        if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
+            // rule wants these two inside extra_fields
+            if (!hostname.empty()) {
+                if (!checkBufferSpace("hostname", hostname.length() + 10)) {
+                    return false;
+                }
+                json_output << ", \"host\":\"" << hostname << "\",";
+            }
+
+            // Add program and timestamp for HTTP format
+            if (!checkBufferSpace("program", strlen(data.provider) + 20)) {
                 return false;
             }
-            json_output << ", \"ts\":" << data.timestamp << "." << data.microsec;
+            json_output << "\"program\":\"" << data.provider << "\"";
         }
 
 
@@ -235,9 +252,6 @@ namespace Syslog_agent {
             string suffix_utf8(suffix.begin(), suffix.end());
             json_output << ", " << suffix_utf8;  // Already in "key":"value" format
         }
-		if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
-			json_output << "}"; // extra fields
-		}
 
         // Add message field
         size_t msg_len = strlen(data.message);
@@ -284,10 +298,17 @@ namespace Syslog_agent {
         }
 
         json_output << ", \"message\":\"" << msg_buf << "\"";
+
+        if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
+
+        // now put message outside extra_fields as well...
+        // i know, this sucks, it's just the way the lz appstore app is written
+        json_output << "}, \"message\":\"" << msg_buf << "\""; 
         Globals::instance()->releaseMessageBuffer(msg_buf);
+        }
 
         // Close the JSON object
-        json_output << "}";
+        json_output << "}" << std::ends;
 
         return true;
     }
