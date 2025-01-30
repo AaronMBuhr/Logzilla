@@ -11,6 +11,28 @@ Copyright c 2021 Logzilla Corp.
 using namespace std;
 
 
+/* LOG LEVELS
+	INFO	Basic operational info
+	VERB	Verbose operational info
+	WARN	Non-urgent things to be aware of to prevent future problems
+	RCVR	Something that is never supposed to happen has happened
+			but the program will recover and continue to operate 
+			(near at least) normally
+	CRIT	An error has occurred that is urgent and is going to
+			require human intervention to resolve -- program
+			operation will be severely compromised or prevented
+	FATL	An error has occurred that prevents the program
+			from continuing, and it will shut down
+	DEBG	Debugging messages
+	DBG2	More detailed debugging messages
+	DBG3	Most detailed debugging messages, not to be used by
+			customer, only for troubleshooting and debugging
+	NONE	(Log Setting) Log nothing
+	ALWY	(Log Level) Log at all settings
+	FORC	(Log level) Log at all settings even NONE
+	*/
+
+
 #define LOG_CURRENT_LOCATION(p) Logger::debug( "Debug marker (%s) - ::%s() in file: %s(%d)\n", p, __func__ , __FILE__, __LINE__ )
 class Logger
 {
@@ -22,7 +44,7 @@ public:
 	enum LogLevel { DEBUG3, DEBUG2, DEBUG, VERBOSE, INFO, WARN, RECOVERABLE_ERROR, 
 		CRITICAL, FATAL, NOLOG, ALWAYS, FORCE };
 	static constexpr char const* LOGLEVEL_ABBREVS[12] = { "DBG3", "DBG2", "DEBG", 
-		"VERB", "INFO", "WARN", "RERR", "CRIT", "FATL", "NONE", "ALWY", "FORC" };
+		"VERB", "INFO", "WARN", "RCVR", "CRIT", "FATL", "NONE", "ALWY", "FORC" };
 	static vector<string> LOGLEVEL_ABBREVS_WITHBRACKET;
 	enum LogDestination { DEST_CONSOLE, DEST_FILE, DEST_CONSOLE_AND_FILE };
 
