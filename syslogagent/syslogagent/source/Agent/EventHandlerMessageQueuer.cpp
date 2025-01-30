@@ -68,7 +68,14 @@ namespace Syslog_agent {
         if (config.getSeverity() == SharedConstants::Severities::DYNAMIC) {
             auto level = event.getXmlDoc().child("Event").child("System")
                 .child("Level").child_value();
-            severity = level[0] ? unixSeverityFromWindowsSeverity(level[0])
+            // Convert wide character to narrow using proper conversion
+            char level_char = '\0';
+            if (level && level[0]) {
+                char temp[2] = {0};
+                WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(level), 1, temp, sizeof(temp), nullptr, nullptr);
+                level_char = temp[0];
+            }
+            severity = level_char ? unixSeverityFromWindowsSeverity(level_char)
                 : SharedConstants::Severities::NOTICE;
         }
         else {

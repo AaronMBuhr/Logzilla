@@ -214,8 +214,6 @@ string Configuration::getHostName() const {
 }
 
 int Configuration::setLogformatForVersion(int& logformat, const string& version) {
- //   // DEBUGGING
-	// return SharedConstants::LOGFORMAT_JSONPORT;
 
     if (Util::compareSoftwareVersions(version, SharedConstants::LOGFORMAT_LZ_VERSION_HTTP) < 0) {
         logformat = SharedConstants::LOGFORMAT_JSONPORT;
