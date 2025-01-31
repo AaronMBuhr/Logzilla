@@ -493,44 +493,32 @@ void Service::initializeEventLogSubscriptions(const vector<LogConfiguration>& lo
     }
 }
 
-void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_needed) {
-    while (!shutdown_requested_) {
-        Logger::debug2("service run first !shutdown_requested\n");
-        auto this_run_time = time(nullptr);
+void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_needed)
+{
+    Logger::debug2("Service::mainLoop()> Starting main loop\n");
 
-        // Process file watcher if configured
-        if (filewatcher_ != nullptr) {
-            Result tail_result = filewatcher_->process();
-            if (!tail_result.isSuccess() && tail_result.statusCode() != FileWatcher::NoNewData) {
-                Logger::debug("FileWatcher result: %s\n", tail_result.what());
-            }
-        }
-
-        first_loop = false;
-        Logger::debug("waiting for key hit/shutdown requested...\n");
-
-        // Main service loop with periodic checks
-        bool loop_interrupted = false;
-        for (auto i = 0; i < config_.getEventLogPollIntervalValue(); i++) {
-            if (checkForShutdown(running_as_console, restart_needed)) {
-                loop_interrupted = true;
-                break;
+    int loop_count = 0;
+    while (!checkForShutdown(running_as_console, restart_needed)) {
+        try {
+            if (first_loop) {
+                first_loop = false;
+                Logger::info("Service::mainLoop()> Service is running\n");
             }
 
-            // Handle queue status and configuration saves
             handleQueueStatusAndConfig();
-
-            // Wait for next check interval
-            if (!shutdown_requested_) {
-                shutdown_event_.wait(1000);
+            Sleep(100);  // Small sleep to prevent tight loop
+            if (++loop_count % 10 == 0) {
+                for (auto& subscription : subscriptions_)
+                    subscription.saveBookmark();
+            }
+            if (loop_count >= 100) {
+                Logger::debug("Service::mainLoop()> heartbeat: 100 loops\n");
+                loop_count = 0;
             }
         }
-
-        if (loop_interrupted) {
-            break;
+        catch (const std::exception& e) {
+            Logger::recoverable_error("Service::mainLoop()> Exception: %s\n", e.what());
         }
-
-        Logger::debug2("no key hit & no shutdown requested...\n");
     }
 }
 
@@ -560,7 +548,7 @@ void Service::handleQueueStatusAndConfig() {
 
     if (config_.getUseLogAgent() && primary_message_queue_->isEmpty() 
         && (secondary_message_queue_ == nullptr || secondary_message_queue_->isEmpty())) {
-        Logger::debug2("Saving config to registry\n");
+        Logger::debug3("Saving config to registry\n");
         config_.saveToRegistry();
     }
 }

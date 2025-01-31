@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -238,22 +238,29 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
 }
 
 
-void Registry::writeBookmark(const wchar_t* channel, const wchar_t* bookmark) {
+void Registry::writeBookmark(const wchar_t* channel, const wchar_t* bookmark_buffer, DWORD buffer_size) {
     HKEY channel_key;
     DWORD status = ERROR_SUCCESS;
     wchar_t full_channel_path[4096];
     swprintf_s(full_channel_path, 4096, L"%s\\%s", 
         SharedConstants::RegistryKey::CHANNELS_KEY, channel);
-    status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, full_channel_path, 0, 
-        KEY_READ | KEY_SET_VALUE, &channel_key);
+    
+    // Create or open the channel key
+    DWORD disposition;
+    status = RegCreateKeyExW(HKEY_LOCAL_MACHINE, full_channel_path, 0, NULL,
+        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &channel_key, &disposition);
     if (status != ERROR_SUCCESS) {
-        throw Result(status, "Registry::writeBookmark()", "could not open channel");
+        throw Result(status, "Registry::writeBookmark()", "could not create/open channel key");
     }
-    status = RegSetValueEx(channel_key, SharedConstants::RegistryKey::CHANNEL_BOOKMARK, 
-        0, REG_SZ, (LPBYTE)bookmark, static_cast<DWORD>(wcslen(bookmark)) * sizeof(wchar_t));
+
+    // Write the bookmark data
+    status = RegSetValueExW(channel_key, SharedConstants::RegistryKey::CHANNEL_BOOKMARK, 
+        0, REG_SZ, reinterpret_cast<const BYTE*>(bookmark_buffer), buffer_size);
     if (status != ERROR_SUCCESS) {
+        RegCloseKey(channel_key);
         throw Result(status, "Registry::writeBookmark()", "could not write bookmark");
     }
+
     RegCloseKey(channel_key);
 }
 

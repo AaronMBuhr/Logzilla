@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 
@@ -14,7 +14,7 @@ void LogConfiguration::loadFromRegistry(Registry& parent) {
 }
 
 void LogConfiguration::saveToRegistry(Registry& parent) const {
-    Registry::writeBookmark(channel_.c_str(), bookmark_.c_str());
+    return;
+    const wchar_t* bookmark_str = bookmark_.c_str();
+    Registry::writeBookmark(channel_.c_str(), bookmark_str, static_cast<DWORD>(wcslen(bookmark_str) * sizeof(wchar_t)));
 }
-
-

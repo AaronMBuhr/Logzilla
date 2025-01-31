@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 #pragma once
@@ -27,7 +27,7 @@ namespace Syslog_agent {
         void writeTime(const wchar_t* name, time_t value) const;
         std::vector<std::wstring> readChannels() const;
         static std::wstring readBookmark(const wchar_t* channel);
-        static void writeBookmark(const wchar_t* channel, const wchar_t* bookmark);
+        static void writeBookmark(const wchar_t* channel, const wchar_t* bookmark_buffer, DWORD buffer_size);
         static void loadSetupFile();
     private:
         std::wstring readSubkey(HKEY registry_key, DWORD index) const;

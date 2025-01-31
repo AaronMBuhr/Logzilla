@@ -47,12 +47,9 @@ public:
     // Wait for messages to be available or until timeout_ms milliseconds have elapsed
     // Returns true if messages are available, false if timed out
     bool waitForMessages(uint32_t timeout_ms) {
-        bool hasMessages = items_sem_.try_acquire_for(std::chrono::milliseconds(timeout_ms));
-        if (hasMessages) {
-            // Re-release since we're just peeking
-            items_sem_.release();
-        }
-        return hasMessages;
+        std::unique_lock<std::recursive_mutex> lock(queue_mutex_);
+        return items_cv_.wait_for(lock, std::chrono::milliseconds(timeout_ms),
+            [this]() { return !send_buffers_queue_->isEmpty(); });
     }
 
     template <typename Func>
@@ -79,9 +76,8 @@ private:
     std::atomic<uint32_t> in_use_counter_;
     
     mutable std::recursive_mutex queue_mutex_;
+    std::condition_variable_any items_cv_;  // Use condition_variable_any for recursive_mutex
     std::unique_ptr<ArrayQueue<Message>> send_buffers_queue_;
     std::unique_ptr<BitmappedObjectPool<MessageBuffer>> send_buffers_;
-    
-    // Counting semaphore to track number of items in queue
-    std::counting_semaphore<INT_MAX> items_sem_{0};
+    std::counting_semaphore<> items_sem_{ 0 };
 };

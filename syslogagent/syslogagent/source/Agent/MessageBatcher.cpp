@@ -60,9 +60,9 @@ int MessageBatcher::BatchEventsInternal(shared_ptr<MessageQueue> msg_queue, char
         }
 
         int batch_count = 0;
-        for (int i = 0; i < max_batch; ++i) {
+        for (size_t i = 0; i < max_batch; ++i) {
             // Peek at the next message
-            int msg_size = msg_queue->peek(single_message_buffer, GetMaxMessageSize_(), i);
+            int msg_size = msg_queue->peek(single_message_buffer, GetMaxMessageSize_(), static_cast<int>(i));
             Globals::instance()->peek_count_++;
 
             if (msg_size <= 0) break;

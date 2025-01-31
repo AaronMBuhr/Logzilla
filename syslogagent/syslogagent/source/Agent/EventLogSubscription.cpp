@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "EventLogSubscription.h"
 #include "Logger.h"
+#include "Registry.h"
 #include "Util.h"
 
 #pragma comment(lib, "wevtapi.lib")
@@ -12,20 +13,23 @@ namespace Syslog_agent {
         : subscription_name_(source.subscription_name_),
         channel_(source.channel_),
         query_(source.query_),
-        bookmark_xml_(source.bookmark_xml_),
         event_handler_(std::move(source.event_handler_)),
         bookmark_(source.bookmark_),
 		only_while_running_(source.only_while_running_),
         subscription_handle_(source.subscription_handle_),
-        subscription_active_(false)
+        subscription_active_(false),
+        bookmark_modified_(source.bookmark_modified_),
+        last_bookmark_save_(source.last_bookmark_save_)
     {
+        memcpy(bookmark_xml_buffer_, source.bookmark_xml_buffer_, sizeof(bookmark_xml_buffer_));
+
         source.bookmark_ = NULL;
         source.subscription_handle_ = NULL;
+        source.bookmark_xml_buffer_[0] = 0;
 
         if (source.subscription_active_) {
             source.subscription_active_ = false;
-            auto bookmark = source.getBookmark();
-            subscribe(bookmark, source.only_while_running_);
+            subscribe(bookmark_xml_buffer_, source.only_while_running_);
         }
     }
 
@@ -49,7 +53,7 @@ namespace Syslog_agent {
             return;
         }
 
-        bookmark_xml_ = bookmark_xml;
+        memcpy(bookmark_xml_buffer_, bookmark_xml.c_str(), sizeof(bookmark_xml_buffer_));
         only_while_running_ = only_while_running;
         if (bookmark_) {
             EvtClose(bookmark_);
@@ -60,10 +64,10 @@ namespace Syslog_agent {
         EVT_HANDLE subscribe_bookmark = NULL;  // Separate bookmark for subscription
 
         // Check if we're in catch-up mode (has bookmark or wants all past events)
-        bool catchup_mode = !bookmark_xml_.empty() || (query_.find(L"catch_up=true") != wstring::npos);
+        // bool catchup_mode = (bookmark_xml_buffer_[0] != 0) || (query_.find(L"catch_up=true") != wstring::npos);
 
-        if (!only_while_running && catchup_mode) {
-            if (bookmark_xml_.empty()) {
+        if (!only_while_running) {
+            if (bookmark_xml_buffer_[0] == 0) {
                 flags = EvtSubscribeStartAtOldestRecord;
                 bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
                 if (bookmark_ == NULL) {
@@ -77,7 +81,7 @@ namespace Syslog_agent {
                     channel_buf);
             } else {
                 flags = EvtSubscribeStartAfterBookmark;
-                bookmark_ = EvtCreateBookmark(bookmark_xml_.c_str());
+                bookmark_ = EvtCreateBookmark(bookmark_xml_buffer_);
                 if (bookmark_ == NULL) {
                     auto error = GetLastError();
                     Logger::warning("EventLogSubscription::subscribe()> Failed to create bookmark for %s (error %d), falling back to all events from start\n",
@@ -154,128 +158,121 @@ namespace Syslog_agent {
     DWORD WINAPI EventLogSubscription::handleSubscriptionEvent(
         EVT_SUBSCRIBE_NOTIFY_ACTION action,
         PVOID pContext,
-        EVT_HANDLE hEvent
-    ) {
-        EventLogSubscription* subscription = reinterpret_cast<EventLogSubscription*>(pContext);
-        char channel_buf[1024];
-        Util::wstr2str(channel_buf, sizeof(channel_buf), subscription->channel_.c_str());
-
-        if (!subscription->subscription_active_) {
-            Logger::debug2("handleSubscriptionEvent()> Subscription not active for %s, ignoring event\n", 
-                channel_buf);
-            return ERROR_SUCCESS;
+        EVT_HANDLE hEvent)
+    {
+        auto subscription = reinterpret_cast<EventLogSubscription*>(pContext);
+        if (!subscription) {
+            Logger::critical("EventLogSubscription::handleSubscriptionEvent()> Invalid subscription context\n");
+            return ERROR_INVALID_PARAMETER;
         }
 
-        switch (action) {
-        case EvtSubscribeActionError:
-        {
-            DWORD errorCode = static_cast<DWORD>(reinterpret_cast<std::uintptr_t>(hEvent));
-            if (ERROR_EVT_QUERY_RESULT_STALE == errorCode) {
-                Logger::recoverable_error(
-                    "EventLogSubscription::handleSubscriptionEvent()> The subscription callback "
-                    "for %s was notified that event records are missing.\n", channel_buf);
-            }
-            else {
-                Logger::recoverable_error(
-                    "EventLogSubscription::handleSubscriptionEvent()> The subscription callback "
-                    "for %s received Win32 error: %lu\n", channel_buf, errorCode);
-            }
-            break;
-        }
+        try {
+            switch (action) {
+            case EvtSubscribeActionError:
+                if (hEvent && (DWORD_PTR)hEvent != ERROR_EVT_QUERY_RESULT_STALE) {
+                    Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Received error event, error code: %lu\n",
+                        (DWORD_PTR)hEvent);
+                }
+                break;
 
-        case EvtSubscribeActionDeliver:
-        {
-            Logger::debug2("handleSubscriptionEvent()> Got event for %s with bookmark %p\n", 
-                channel_buf, subscription->bookmark_);
+            case EvtSubscribeActionDeliver:
+                if (hEvent && subscription->event_handler_) {
+                    // Update the bookmark with the current event
+                    if (subscription->bookmark_) {
+                        if (!EvtUpdateBookmark(subscription->bookmark_, hEvent)) {
+                            Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Failed to update bookmark, error: %lu\n",
+                                GetLastError());
+                        } else {
+                            subscription->bookmark_modified_ = true;
+                        }
+                    }
 
-            if (subscription->bookmark_ == NULL) {
-                Logger::recoverable_error(
-                    "EventLogSubscription::handleSubscriptionEvent()> Null bookmark handle for %s\n", 
-                    channel_buf);
+                    // Create EventLogEvent from handle
+                    EventLogEvent evt(hEvent);
+                    // Handle the event with proper arguments
+                    subscription->event_handler_->handleEvent(subscription->subscription_name_.c_str(), evt);
+                    subscription->incrementedSaveBookmark();
+                }
                 break;
             }
-
-            // Wrap the hEvent in an EventLogEvent object
-            EventLogEvent processed_event(hEvent);
-            try {
-                Logger::debug2("handleSubscriptionEvent()> Processing event for %s\n", channel_buf);
-                subscription->event_handler_->handleEvent(subscription->subscription_name_.c_str(), processed_event);
-                Logger::debug3("handleSubscriptionEvent()> Successfully processed event for %s\n", channel_buf);
-
-                if (!EvtUpdateBookmark(subscription->bookmark_, hEvent)) {
-                    auto error = GetLastError();
-                    Logger::recoverable_error(
-                        "EventLogSubscription::handleSubscriptionEvent()> could not update bookmark for %s (error %d)\n",
-                        channel_buf, error);
-                } else {
-                    Logger::debug3("handleSubscriptionEvent()> Successfully updated bookmark for %s\n", channel_buf);
-                }
-            }
-            catch (const std::exception& e) {
-                Logger::recoverable_error(
-                    "EventLogSubscription::handleSubscriptionEvent()> Exception in event handler for %s: %s\n", 
-                    channel_buf, e.what());
-            }
-            break;
+            return ERROR_SUCCESS;
         }
-
-        default:
-            Logger::recoverable_error(
-                "EventLogSubscription::handleSubscriptionEvent()> Unknown action for %s.\n",
-                channel_buf);
+        catch (const std::exception& e) {
+            Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Exception: %s\n", e.what());
+            return ERROR_INVALID_DATA;
         }
-
-        return ERROR_SUCCESS;
     }
 
-    void EventLogSubscription::saveBookmark() {
-        if (!subscription_active_ || !bookmark_) {
-            return;
+    bool EventLogSubscription::saveBookmark()
+    {
+        if (!bookmark_modified_) {
+            Logger::debug3("EventLogSubscription::saveBookmark()> No changes to save for %ls\n", channel_.c_str());
+            return true;
         }
 
-        DWORD buffer_used;
-        DWORD property_count;
-        std::vector<wchar_t> xml_buffer(2048);
+        try {
+            if (!bookmark_) {
+                Logger::debug3("EventLogSubscription::saveBookmark()> No bookmark to save for %ls\n", channel_.c_str());
+                return false;
+            }
 
-        if (xml_buffer.size() * sizeof(wchar_t) > MAXDWORD) {
-            Logger::recoverable_error("EventLogSubscription::saveBookmark()> "
-                "Buffer size exceeds DWORD maximum\n");
-            return;
-        }
-
-        if (!EvtRender(NULL, bookmark_, EvtRenderBookmark,
-            static_cast<DWORD>(xml_buffer.size() * sizeof(wchar_t)),
-            xml_buffer.data(),
-            &buffer_used, &property_count))
-        {
-            auto status = GetLastError();
-            if (status == ERROR_INSUFFICIENT_BUFFER) {
-                xml_buffer.resize((buffer_used / sizeof(wchar_t)) + 1);
-
-                if (xml_buffer.size() * sizeof(wchar_t) > MAXDWORD) {
-                    Logger::recoverable_error("EventLogSubscription::saveBookmark()> "
-                        "Resized buffer exceeds DWORD maximum\n");
-                    return;
-                }
-
-                if (!EvtRender(NULL, bookmark_, EvtRenderBookmark,
-                    static_cast<DWORD>(xml_buffer.size() * sizeof(wchar_t)),
-                    xml_buffer.data(),
-                    &buffer_used, &property_count))
-                {
-                    Logger::recoverable_error("EventLogSubscription::saveBookmark()> error %d on retry\n",
-                        GetLastError());
-                    return;
+            // First call EvtRender with NULL buffer to get required size
+            DWORD bufferSize = 0;
+            DWORD propertyCount = 0;
+            if (!EvtRender(NULL, bookmark_, EvtRenderBookmark, 0, NULL, &bufferSize, &propertyCount)) {
+                DWORD error = GetLastError();
+                if (error != ERROR_INSUFFICIENT_BUFFER) {  // This error is expected when getting buffer size
+                    Logger::recoverable_error("EventLogSubscription::saveBookmark()> Failed to get required buffer size, error: %lu\n",
+                        error);
+                    return false;
                 }
             }
-            else {
-                Logger::recoverable_error("EventLogSubscription::saveBookmark()> error %d\n", status);
-                return;
+
+            // Typical bookmark XML is small, but let's be safe
+            if (bufferSize > MAX_BOOKMARK_SIZE) {
+                Logger::recoverable_error("EventLogSubscription::saveBookmark()> Bookmark size %lu exceeds maximum %lu\n",
+                    bufferSize, MAX_BOOKMARK_SIZE);
+                return false;
+            }
+
+            // Get buffer from global pool
+            DWORD bufferUsed = 0;
+
+            // Suppress false positive warning - bookmark_xml_buffer_ is a fixed array, not a pointer
+            #pragma warning(push)
+            #pragma warning(disable: 6387)
+            // Now render the bookmark into our buffer
+            if (!EvtRender(
+                NULL, 
+                bookmark_, 
+                EvtRenderBookmark, 
+                MAX_BOOKMARK_SIZE, 
+                bookmark_xml_buffer_, 
+                &bufferUsed, 
+                &propertyCount)) {
+                Logger::recoverable_error("EventLogSubscription::saveBookmark()> Failed to render bookmark, error: %lu\n",
+                    GetLastError());
+                return false;
+            }
+            #pragma warning(pop)
+
+            try {
+                Registry::writeBookmark(channel_.c_str(), bookmark_xml_buffer_, bufferUsed * sizeof(wchar_t));
+                bookmark_modified_ = false;
+                events_since_last_save_ = 0;
+                last_bookmark_save_ = time(nullptr);
+                Logger::debug2("EventLogSubscription::saveBookmark()> Saved bookmark for %ls\n", channel_.c_str());
+                return true;
+            }
+            catch (const Result& r) {
+                Logger::recoverable_error("EventLogSubscription::saveBookmark()> Failed to save bookmark: %s\n", r.what());
+                return false;
             }
         }
-
-        xml_buffer[buffer_used / sizeof(wchar_t)] = 0;
-        bookmark_xml_ = wstring(xml_buffer.data());
+        catch (const std::exception& e) {
+            Logger::recoverable_error("EventLogSubscription::saveBookmark()> Exception: %s\n", e.what());
+            return false;
+        }
     }
 
 } // namespace Syslog_agent

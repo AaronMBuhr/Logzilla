@@ -5,6 +5,7 @@ Copyright 2021 Logzilla Corp.
 
 #include "stdafx.h"
 #include "MessageQueue.h"
+#include <semaphore>
 
 MessageQueue::MessageQueue(
     uint32_t message_queue_size,
@@ -13,7 +14,7 @@ MessageQueue::MessageQueue(
     message_queue_size_(message_queue_size),
     message_queue_chunk_size_(message_buffers_chunk_size),
     in_use_counter_(0),
-    items_sem_(0)
+    items_sem_(0)  // Initialize semaphore with 0 count
 {
     send_buffers_queue_ = std::make_unique<ArrayQueue<Message>>(message_queue_size_);
     send_buffers_ = std::make_unique<BitmappedObjectPool<MessageBuffer>>(message_buffers_chunk_size, MESSAGE_QUEUE_SLACK_PERCENT);
@@ -48,13 +49,13 @@ bool MessageQueue::enqueue(const char* message_content, const uint32_t message_l
 
     Message message = {};
     message.data_length = message_len;
-    
+
     try {
         std::lock_guard<std::recursive_mutex> lock(queue_mutex_);
         
         const char* src_ptr = message_content;
         uint32_t remaining = message_len;
-        
+
         for (int i = 0; i < num_chunks; ++i) {
             MessageBuffer* buffer = send_buffers_->getAndMarkNextUnused();
             if (!buffer) {
@@ -63,7 +64,7 @@ bool MessageQueue::enqueue(const char* message_content, const uint32_t message_l
                 releaseMessageBuffers(message);
                 return false;
             }
-            
+
             const uint32_t chunk_size = (std::min)(remaining, static_cast<uint32_t>(MESSAGE_BUFFER_SIZE));
             memcpy(buffer->buffer, src_ptr, chunk_size);
             
