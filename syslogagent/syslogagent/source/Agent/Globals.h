@@ -24,6 +24,10 @@ namespace Syslog_agent {
         static constexpr unsigned int BUFFER_CHUNK_SIZE = 12;
         static constexpr unsigned int PERCENT_SLACK = -1;
 
+        unsigned int batched_count_ = 0;
+        unsigned int peek_count_ = 0;
+        unsigned int queued_count_ = 0;
+
         // Deleted copy/move operations to ensure singleton semantics
         Globals(const Globals&) = delete;
         Globals& operator=(const Globals&) = delete;

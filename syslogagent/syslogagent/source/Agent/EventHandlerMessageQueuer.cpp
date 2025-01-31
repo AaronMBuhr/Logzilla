@@ -402,6 +402,7 @@ namespace Syslog_agent {
 
                 primary_message_queue_->enqueue(json_buffer,
                     static_cast<int>(strlen(json_buffer)));
+                Globals::instance()->queued_count_++;
                 Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Message enqueued to primary queue\n");
 
                 if (secondary_message_queue_) {

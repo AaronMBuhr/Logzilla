@@ -103,45 +103,50 @@ int SyslogSender::sendMessageBatch(
     uint32_t& batch_buf_length,
     int64_t& oldest_message_time) const
 {
-    if (!network_client || !msg_queue || !batch_buf) {
-        Logger::critical("SyslogSender::sendMessageBatch() Invalid parameters\n");
+    if (!network_client || !msg_queue || !batch_buf || batch_count == 0) {
+        Logger::critical("SyslogSender::sendMessageBatch()> Invalid parameters\n");
         return 0;
     }
 
     try {
-        Logger::debug2("sendMessageBatch() Attempting to send batch of %u messages\n", batch_count);
+        Logger::debug3("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages\n", batch_count);
 
-        INetworkClient::RESULT_TYPE result = network_client->post(
-            batch_buf, batch_buf_length);
+        // Attempt to send the batch
+        INetworkClient::RESULT_TYPE result = network_client->post(batch_buf, batch_buf_length);
 
-        Logger::debug2("sendMessageBatch() Network post result: %d\n", result);
-
-        if (result == INetworkClient::RESULT_SUCCESS) {
-            Logger::debug2("sendMessageBatch() Successfully sent batch of %u messages\n", batch_count);
-            // Only remove messages after successful send
-            bool remove_error = false;
-            for (uint32_t i = 0; i < batch_count && !remove_error; i++) {
-                if (!msg_queue->removeFront()) {
-                    Logger::critical("SyslogSender::sendMessageBatch() Failed to remove sent message %u\n", i + 1);
-                    remove_error = true;
-                }
-            }
-            if (!remove_error) {
-                oldest_message_time = 0;  // Reset timer after successful send
-                Logger::debug2("sendMessageBatch() Successfully removed all sent messages from queue\n");
-            } else {
-                Logger::critical("SyslogSender::sendMessageBatch() Failed to remove some messages from queue\n");
-                return -1;
-            }
-            return static_cast<int>(batch_count);
-        } else {
-            Logger::critical("SyslogSender::sendMessageBatch() Failed to send batch, network error: %d\n", result);
-            return -1;
+        if (result != INetworkClient::RESULT_SUCCESS) {
+            Logger::critical("SyslogSender::sendMessageBatch()> Failed to send batch, network error: %d\n", result);
+            return 0; // Return 0 to indicate no messages were processed
         }
+
+        Logger::debug3("SyslogSender::sendMessageBatch()> Network send successful\n");
+
+        // Only remove messages after successful send
+        uint32_t messages_removed = 0;
+        for (uint32_t i = 0; i < batch_count; i++) {
+            if (!msg_queue->removeFront()) {
+                Logger::critical("SyslogSender::sendMessageBatch()> Failed to remove message %u of %u\n", 
+                    i + 1, batch_count);
+                break;
+            }
+            messages_removed++;
+        }
+
+        // Update oldest message time if we removed all messages
+        if (messages_removed == batch_count) {
+            oldest_message_time = 0;  // Reset timer after successful send
+            Logger::debug2("SyslogSender::sendMessageBatch()> Successfully sent and removed %u messages\n", 
+                messages_removed);
+        } else {
+            Logger::critical("SyslogSender::sendMessageBatch()> Only removed %u of %u messages\n", 
+                messages_removed, batch_count);
+        }
+
+        return static_cast<int>(messages_removed);
     }
     catch (const std::exception& e) {
-        Logger::critical("SyslogSender::sendMessageBatch() Exception: %s\n", e.what());
-        return -1;
+        Logger::critical("SyslogSender::sendMessageBatch()> Exception: %s\n", e.what());
+        return 0; // Return 0 to indicate no messages were processed
     }
 }
 
