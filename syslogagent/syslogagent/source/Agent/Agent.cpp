@@ -20,10 +20,10 @@ static SERVICE_STATUS_HANDLE	service_status_handle;
 static DWORD					service_error;
 
 static void service_install();
-static void WINAPI service_main(DWORD argc, wchar_t **argv);
+static void WINAPI service_main(DWORD argc, const wchar_t* const* argv);
 static void service_remove();
 static void WINAPI service_ctrl(DWORD ctrlCode);
-static void service_start(DWORD argc, wchar_t **argv);
+static void service_start(DWORD argc, const wchar_t* const* argv);
 static void service_stop();
 static bool service_report_status(DWORD currentState, DWORD exitCode, DWORD waitHint);
 static void service_addEventSource(const wchar_t* path);
@@ -31,10 +31,10 @@ static void service_addEventSource(const wchar_t* path);
 
 static int run_as_console();
 
-
 int wmain(int argc, wchar_t *argv[]) {
 
-    Options options(argc, argv);
+    // Cast argv to const wchar_t* const* since we won't modify the strings
+    Options options(argc, const_cast<const wchar_t* const*>(argv));
 
     bool running_as_service = !options.has(L"-console");
 
@@ -58,7 +58,7 @@ int wmain(int argc, wchar_t *argv[]) {
 
     if (options.has(L"-tofile")) {
         Logger::setLogDestination(Logger::DEST_CONSOLE_AND_FILE);
-        wchar_t* destination = options.getArgument(L"-tofile");
+        const wchar_t* destination = options.getArgument(L"-tofile");
         if (destination != nullptr) {
             std::wstring destination_ws(destination);
             if (destination_ws[0] != L'-') {
@@ -94,8 +94,12 @@ int wmain(int argc, wchar_t *argv[]) {
         Logger::always("%s starting as service. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
     }
 
+    // Create a non-const buffer for the service name since Windows API requires LPWSTR
+    static wchar_t serviceNameBuffer[256];
+    wcscpy_s(serviceNameBuffer, SERVICE_NAME);
+
     SERVICE_TABLE_ENTRY dispatchTable[] = {
-        { SERVICE_NAME, service_main },
+        { serviceNameBuffer, reinterpret_cast<LPSERVICE_MAIN_FUNCTION>(service_main) },
         { NULL, NULL }
     };
     if (!StartServiceCtrlDispatcher(dispatchTable)) {
@@ -270,7 +274,7 @@ static void service_remove()
 *  Return value:
 *		none
 *----------------------------------------------------------------------------*/
-static void WINAPI service_main(DWORD argc, wchar_t **argv) {
+static void WINAPI service_main(DWORD argc, const wchar_t* const* argv) {
 
     Logger::info("Start service %s Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
 
@@ -341,7 +345,7 @@ void WINAPI service_ctrl(DWORD ctrlCode) {
 /*------------------------------[ service_start ]------------------------------
 * Starts and runs the service
 *----------------------------------------------------------------------------*/
-void service_start(DWORD argc, wchar_t **argv) {
+void service_start(DWORD argc, const wchar_t* const* argv) {
 
     // report the status to the service control manager.
     if (!service_report_status(SERVICE_START_PENDING, NO_ERROR, 3000)) {

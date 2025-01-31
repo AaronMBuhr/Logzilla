@@ -15,6 +15,7 @@ namespace Syslog_agent {
         bookmark_xml_(source.bookmark_xml_),
         event_handler_(std::move(source.event_handler_)),
         bookmark_(source.bookmark_),
+		only_while_running_(source.only_while_running_),
         subscription_handle_(source.subscription_handle_),
         subscription_active_(false)
     {
@@ -24,7 +25,7 @@ namespace Syslog_agent {
         if (source.subscription_active_) {
             source.subscription_active_ = false;
             auto bookmark = source.getBookmark();
-            subscribe(bookmark);
+            subscribe(bookmark, source.only_while_running_);
         }
     }
 
@@ -38,7 +39,7 @@ namespace Syslog_agent {
         }
     }
 
-    void EventLogSubscription::subscribe(const wstring& bookmark_xml) {
+    void EventLogSubscription::subscribe(const wstring& bookmark_xml, const bool only_while_running) {
         char channel_buf[1024];
         Util::wstr2str(channel_buf, sizeof(channel_buf), channel_.c_str());
         Logger::debug("EventLogSubscription::subscribe()> Subscribing to %s\n", channel_buf);
@@ -49,6 +50,7 @@ namespace Syslog_agent {
         }
 
         bookmark_xml_ = bookmark_xml;
+        only_while_running_ = only_while_running;
         if (bookmark_) {
             EvtClose(bookmark_);
             bookmark_ = NULL;
@@ -56,25 +58,12 @@ namespace Syslog_agent {
 
         EVT_SUBSCRIBE_FLAGS flags;
         EVT_HANDLE subscribe_bookmark = NULL;  // Separate bookmark for subscription
-        if (bookmark_xml_.empty()) {
-            flags = EvtSubscribeStartAtOldestRecord;
-            bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
-            if (bookmark_ == NULL) {
-                auto error = GetLastError();
-                Logger::recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
-                return;
-            }
-            Logger::debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s\n", 
-                bookmark_, channel_buf);
-            Logger::debug("EventLogSubscription::subscribe()> No bookmark, subscribing to all events from start for %s\n", 
-                channel_buf);
-        } else {
-            flags = EvtSubscribeStartAfterBookmark;
-            bookmark_ = EvtCreateBookmark(bookmark_xml_.c_str());
-            if (bookmark_ == NULL) {
-                auto error = GetLastError();
-                Logger::warning("EventLogSubscription::subscribe()> Failed to create bookmark for %s (error %d), falling back to all events from start\n",
-                    channel_buf, error);
+
+        // Check if we're in catch-up mode (has bookmark or wants all past events)
+        bool catchup_mode = !bookmark_xml_.empty() || (query_.find(L"catch_up=true") != wstring::npos);
+
+        if (!only_while_running && catchup_mode) {
+            if (bookmark_xml_.empty()) {
                 flags = EvtSubscribeStartAtOldestRecord;
                 bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
                 if (bookmark_ == NULL) {
@@ -82,14 +71,44 @@ namespace Syslog_agent {
                     Logger::recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
                     return;
                 }
-                Logger::debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s after bookmark load failed\n", 
+                Logger::debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s\n", 
                     bookmark_, channel_buf);
+                Logger::debug("EventLogSubscription::subscribe()> Catch-up mode: subscribing to all events from start for %s\n", 
+                    channel_buf);
             } else {
-                Logger::debug2("EventLogSubscription::subscribe()> Created bookmark %p from XML for %s\n", 
-                    bookmark_, channel_buf);
-                Logger::debug("EventLogSubscription::subscribe()> Using bookmark for %s\n", channel_buf);
-                subscribe_bookmark = bookmark_;  // Use existing bookmark for subscription
+                flags = EvtSubscribeStartAfterBookmark;
+                bookmark_ = EvtCreateBookmark(bookmark_xml_.c_str());
+                if (bookmark_ == NULL) {
+                    auto error = GetLastError();
+                    Logger::warning("EventLogSubscription::subscribe()> Failed to create bookmark for %s (error %d), falling back to all events from start\n",
+                        channel_buf, error);
+                    flags = EvtSubscribeStartAtOldestRecord;
+                    bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
+                    if (bookmark_ == NULL) {
+                        auto error = GetLastError();
+                        Logger::recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
+                        return;
+                    }
+                    Logger::debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s after bookmark load failed\n", 
+                        bookmark_, channel_buf);
+                } else {
+                    Logger::debug2("EventLogSubscription::subscribe()> Created bookmark %p from XML for %s\n", 
+                        bookmark_, channel_buf);
+                    Logger::debug("EventLogSubscription::subscribe()> Catch-up mode: Using bookmark for %s\n", channel_buf);
+                    subscribe_bookmark = bookmark_;  // Use existing bookmark for subscription
+                }
             }
+        } else {
+            // Future-only mode
+            flags = EvtSubscribeToFutureEvents;
+            bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
+            if (bookmark_ == NULL) {
+                auto error = GetLastError();
+                Logger::recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
+                return;
+            }
+            Logger::debug("EventLogSubscription::subscribe()> Future-only mode: subscribing to new events only for %s\n", 
+                channel_buf);
         }
 
         Logger::debug2("EventLogSubscription::subscribe()> Attempting subscription to %s with flags %d and bookmark %p (tracking bookmark %p)\n", 

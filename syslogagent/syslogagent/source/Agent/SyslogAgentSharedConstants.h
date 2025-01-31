@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 /* SyslogAgentSharedContants.h
@@ -20,16 +20,16 @@ namespace Syslog_agent {
     class SharedConstants {
     public:
         // Misc
-        static constexpr wchar_t const* USER_AGENT              = L"LZ Syslog Agent/" SYSLOGAGENT_CURRENT_VERSION;
-        static constexpr wchar_t const* HTTP_API_PATH           = L"/incoming";
-        static constexpr wchar_t const* LOGZILLA_VERSION_PATH   = L"/version";
-        static constexpr wchar_t const* CERT_FILE_PRIMARY       = L"primary.pfx";
-        static constexpr wchar_t const* CERT_FILE_SECONDARY     = L"secondary.pfx";
+        static constexpr const wchar_t* USER_AGENT              = L"LZ Syslog Agent/" SYSLOGAGENT_CURRENT_VERSION;
+        static constexpr const wchar_t* HTTP_API_PATH           = L"/incoming";
+        static constexpr const wchar_t* LOGZILLA_VERSION_PATH   = L"/version";
+        static constexpr const wchar_t* CERT_FILE_PRIMARY       = L"primary.pfx";
+        static constexpr const wchar_t* CERT_FILE_SECONDARY     = L"secondary.pfx";
         static constexpr unsigned int   LZ_JSON_PORT            = 515;
 
         // Version strings
-        static constexpr wchar_t const* CURRENT_VERSION         = SYSLOGAGENT_CURRENT_VERSION;
-        static constexpr wchar_t const* CURRENT_CONFIG_VERSION  = L"6.30.0.0";
+        static constexpr const wchar_t* CURRENT_VERSION         = SYSLOGAGENT_CURRENT_VERSION;
+        static constexpr const wchar_t* CURRENT_CONFIG_VERSION  = L"6.30.0.0";
 
         // HTTP settings
         static constexpr bool USE_HTTP2                = true;  // Enable HTTP/2 if available
@@ -50,19 +50,21 @@ namespace Syslog_agent {
         public:
             static constexpr unsigned int       FACILITY            = 20;
             static constexpr unsigned int       SEVERITY            = 8;
-            static constexpr wchar_t const*     PRIMARY_HOST        = L"";
-            static constexpr wchar_t const*     SECONDARY_HOST      = L"";
+            static constexpr const wchar_t*     PRIMARY_HOST        = L"";
+            static constexpr const wchar_t*     SECONDARY_HOST      = L"";
             static constexpr bool               USE_FORWARDER       = false;
-            static constexpr wchar_t const*     FORWARDER_DEST      = L"";
-            static constexpr wchar_t const*     UDP_FWD_PORT_S      = L"";
-            static constexpr wchar_t const*     TCP_FWD_PORT_S      = L"";
-            static constexpr wchar_t const*     SUFFIX              = L"";
-            static constexpr wchar_t const*     DEBUG_LOG_FILENAME  = L"";
-            static constexpr wchar_t const*     TAIL_FILENAME       = L"";
-            static constexpr wchar_t const*     TAIL_PROGRAMNAME    = L"";
+            static constexpr const wchar_t*     FORWARDER_DEST      = L"";
+            static constexpr const wchar_t*     UDP_FWD_PORT_S      = L"";
+            static constexpr const wchar_t*     TCP_FWD_PORT_S      = L"";
+            static constexpr const wchar_t*     SUFFIX              = L"";
+            static constexpr const wchar_t*     DEBUG_LOG_FILENAME  = L"";
+            static constexpr const wchar_t*     TAIL_FILENAME       = L"";
+            static constexpr const wchar_t*     TAIL_PROGRAMNAME    = L"";
             static constexpr int                BATCH_INTERVAL      = 1000;
-            static constexpr char*              VERSION_DETECT_STR  = "detect";
-            static constexpr char*              LOGZILLA_VER        = VERSION_DETECT_STR;
+            // Note: Using a string literal for version detection to ensure it's a compile-time constant
+            static constexpr const char         VERSION_DETECT_STR_DATA[] = "detect";
+            static constexpr const char* const  VERSION_DETECT_STR  = VERSION_DETECT_STR_DATA;
+            static constexpr const char* const  LOGZILLA_VER        = VERSION_DETECT_STR;
             static constexpr int                POLL_INTERVAL_SEC   = 2;
         };
 
@@ -117,51 +119,51 @@ namespace Syslog_agent {
         static constexpr int                LOGFORMAT_DETECT        = 0;
         static constexpr int                LOGFORMAT_JSONPORT      = 1;
         static constexpr int                LOGFORMAT_HTTPPORT      = 2;
-        static constexpr char const*        LOGFORMAT_LZ_VERSION_HTTP = "6.34";
+        static constexpr const char*        LOGFORMAT_LZ_VERSION_HTTP = "6.34";
 
         class RegistryKey {
         public:
-            static constexpr wchar_t const* MAIN_KEY                    = L"SOFTWARE\\LogZilla\\SyslogAgent";
-            static constexpr wchar_t const* CHANNELS_KEY                = L"SOFTWARE\\LogZilla\\SyslogAgent\\Channels";
-            static constexpr wchar_t const* CONFIG_VERSION              = L"ConfigVersion";
-            static constexpr wchar_t const* INCLUDE_VS_IGNORE_EVENT_IDS = L"IncludeVsIgnoreEventIds";
-            static constexpr wchar_t const* EVENT_ID_FILTER             = L"EventIDFilterList";
-            static constexpr wchar_t const* ONLY_WHILE_RUNNING          = L"OnlyWhileRunning";
-            static constexpr wchar_t const* EVENT_LOG_POLL_INTERVAL     = L"EventLogPollInterval";
-            static constexpr wchar_t const* FORWARD_TO_SECONDARY        = L"ForwardToMirror";
-            static constexpr wchar_t const* LOOKUP_ACCOUNTS             = L"LookupAccountSID";
-            static constexpr wchar_t const* EXTRA_KEY_VALUE_PAIRS       = L"ExtraKeyValuePairs";
-            static constexpr wchar_t const* PRIMARY_HOST                = L"Syslog";
-            static constexpr wchar_t const* PRIMARY_PORT                = L"SendToPort"; // deprecated
-            static constexpr wchar_t const* PRIMARY_API_KEY             = L"PrimaryLogZillaApiKey";
-            static constexpr wchar_t const* PRIMARY_USE_TLS             = L"PrimaryUseTLS";
-            static constexpr wchar_t const* PRIMARY_USE_HTTP2           = L"PrimaryUseHTTP2";
-            static constexpr wchar_t const* PRIMARY_USE_COMPRESSION     = L"PrimaryUseCompression";
-            static constexpr wchar_t const* SECONDARY_HOST              = L"Syslog1";
-            static constexpr wchar_t const* SECONDARY_PORT              = L"SendToBackupPort";
-            static constexpr wchar_t const* SECONDARY_API_KEY           = L"SecondaryLogZillaApiKey";
-            static constexpr wchar_t const* SECONDARY_USE_TLS           = L"SecondaryUseTLS";
-            static constexpr wchar_t const* SECONDARY_USE_HTTP2         = L"SecondaryUseHTTP2";
-            static constexpr wchar_t const* SECONDARY_USE_COMPRESSION   = L"SecondaryUseCompression";
-            static constexpr wchar_t const* FACILITY                    = L"Facility";
-            static constexpr wchar_t const* SEVERITY                    = L"Severity";
-            static constexpr wchar_t const* SUFFIX                      = L"Suffix";
-            static constexpr wchar_t const* DEBUG_LEVEL_SETTING         = L"DebugLevel";
-            static constexpr wchar_t const* DEBUG_LOG_FILE              = L"DebugLogFile";
-            static constexpr wchar_t const* TAIL_FILENAME               = L"TailFilename";
-            static constexpr wchar_t const* TAIL_PROGRAM_NAME           = L"TailProgramName";
-            static constexpr wchar_t const* CHANNEL_ENABLED             = L"Enabled";
-            static constexpr wchar_t const* CHANNEL_BOOKMARK            = L"Bookmark";
-            static constexpr wchar_t const* PRIMARY_TLS_FILENAME        = L"PrimaryTlsFileName";
-            static constexpr wchar_t const* SECONDARY_TLS_FILENAME      = L"SecondaryTlsFileName";
-            static constexpr wchar_t const* LOGZILLA_REGISTRY_KEY       = L"SOFTWARE\\LogZilla\\SyslogAgent";
-            static constexpr wchar_t const* WINDOWS_EVENT_CHANNELS_KEY  = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Channels";
-            static constexpr wchar_t const* SELECTED_EVENT_CHANNELS_KEY = L"SOFTWARE\\LogZilla\\SyslogAgent\\Channels";
-            static constexpr wchar_t const* INITIAL_SETUP_REG_FILE_KEY  = L"InitialSetupRegFile";
-            static constexpr wchar_t const* BATCH_INTERVAL              = L"BatchInterval";
-            static constexpr wchar_t const* PRIMARY_BACKWARDS_COMPAT_VER = L"PrimaryBackwardsCompatibleVersion";
-            static constexpr wchar_t const* SECONDARY_BACKWARDS_COMPAT_VER = L"SecondaryBackwardsCompatibleVersion";
-            static constexpr wchar_t const* INITIAL_SETUP_FILE          = L"InitialSetupRegFile";
+            static constexpr const wchar_t* MAIN_KEY                    = L"SOFTWARE\\LogZilla\\SyslogAgent";
+            static constexpr const wchar_t* CHANNELS_KEY                = L"SOFTWARE\\LogZilla\\SyslogAgent\\Channels";
+            static constexpr const wchar_t* CONFIG_VERSION              = L"ConfigVersion";
+            static constexpr const wchar_t* INCLUDE_VS_IGNORE_EVENT_IDS = L"IncludeVsIgnoreEventIds";
+            static constexpr const wchar_t* EVENT_ID_FILTER             = L"EventIDFilterList";
+            static constexpr const wchar_t* ONLY_WHILE_RUNNING          = L"OnlyWhileRunning";
+            static constexpr const wchar_t* EVENT_LOG_POLL_INTERVAL     = L"EventLogPollInterval";
+            static constexpr const wchar_t* FORWARD_TO_SECONDARY        = L"ForwardToMirror";
+            static constexpr const wchar_t* LOOKUP_ACCOUNTS             = L"LookupAccountSID";
+            static constexpr const wchar_t* EXTRA_KEY_VALUE_PAIRS       = L"ExtraKeyValuePairs";
+            static constexpr const wchar_t* PRIMARY_HOST                = L"Syslog";
+            static constexpr const wchar_t* PRIMARY_PORT                = L"SendToPort"; // deprecated
+            static constexpr const wchar_t* PRIMARY_API_KEY             = L"PrimaryLogZillaApiKey";
+            static constexpr const wchar_t* PRIMARY_USE_TLS             = L"PrimaryUseTLS";
+            static constexpr const wchar_t* PRIMARY_USE_HTTP2           = L"PrimaryUseHTTP2";
+            static constexpr const wchar_t* PRIMARY_USE_COMPRESSION     = L"PrimaryUseCompression";
+            static constexpr const wchar_t* SECONDARY_HOST              = L"Syslog1";
+            static constexpr const wchar_t* SECONDARY_PORT              = L"SendToBackupPort";
+            static constexpr const wchar_t* SECONDARY_API_KEY           = L"SecondaryLogZillaApiKey";
+            static constexpr const wchar_t* SECONDARY_USE_TLS           = L"SecondaryUseTLS";
+            static constexpr const wchar_t* SECONDARY_USE_HTTP2         = L"SecondaryUseHTTP2";
+            static constexpr const wchar_t* SECONDARY_USE_COMPRESSION   = L"SecondaryUseCompression";
+            static constexpr const wchar_t* FACILITY                    = L"Facility";
+            static constexpr const wchar_t* SEVERITY                    = L"Severity";
+            static constexpr const wchar_t* SUFFIX                      = L"Suffix";
+            static constexpr const wchar_t* DEBUG_LEVEL_SETTING         = L"DebugLevel";
+            static constexpr const wchar_t* DEBUG_LOG_FILE              = L"DebugLogFile";
+            static constexpr const wchar_t* TAIL_FILENAME               = L"TailFilename";
+            static constexpr const wchar_t* TAIL_PROGRAM_NAME           = L"TailProgramName";
+            static constexpr const wchar_t* CHANNEL_ENABLED             = L"Enabled";
+            static constexpr const wchar_t* CHANNEL_BOOKMARK            = L"Bookmark";
+            static constexpr const wchar_t* PRIMARY_TLS_FILENAME        = L"PrimaryTlsFileName";
+            static constexpr const wchar_t* SECONDARY_TLS_FILENAME      = L"SecondaryTlsFileName";
+            static constexpr const wchar_t* LOGZILLA_REGISTRY_KEY       = L"SOFTWARE\\LogZilla\\SyslogAgent";
+            static constexpr const wchar_t* WINDOWS_EVENT_CHANNELS_KEY  = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Channels";
+            static constexpr const wchar_t* SELECTED_EVENT_CHANNELS_KEY = L"SOFTWARE\\LogZilla\\SyslogAgent\\Channels";
+            static constexpr const wchar_t* INITIAL_SETUP_REG_FILE_KEY  = L"InitialSetupRegFile";
+            static constexpr const wchar_t* BATCH_INTERVAL              = L"BatchInterval";
+            static constexpr const wchar_t* PRIMARY_BACKWARDS_COMPAT_VER = L"PrimaryBackwardsCompatibleVersion";
+            static constexpr const wchar_t* SECONDARY_BACKWARDS_COMPAT_VER = L"SecondaryBackwardsCompatibleVersion";
+            static constexpr const wchar_t* INITIAL_SETUP_FILE          = L"InitialSetupRegFile";
         };
     };
 

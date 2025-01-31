@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 #pragma once
@@ -13,10 +13,10 @@ namespace Syslog_agent {
     class Result : public std::exception {
     public:
         Result();
-		Result(const char* message);
+        Result(const char* message);
         Result(DWORD status);
         Result(DWORD status, const char* from, const char* format, ...);
-        Result(Result& other);
+        Result(const Result& other);  
         static Result ResultLog(DWORD status, Logger::LogLevel log_level, 
             const char* name, const char* format, ...);
         const char* what() const override;

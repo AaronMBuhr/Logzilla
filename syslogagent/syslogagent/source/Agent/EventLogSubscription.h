@@ -19,11 +19,13 @@ namespace Syslog_agent {
             const wstring& channel,
             const wstring& query,
             const wstring& bookmark_xml,
+            const bool only_while_running,
             unique_ptr<IEventHandler> event_handler)
             : subscription_name_(subscription_name),
             channel_(channel),
             query_(query),
             bookmark_xml_(bookmark_xml),
+            only_while_running_(only_while_running),
             event_handler_(move(event_handler)),
             bookmark_(NULL),
             subscription_handle_(NULL),
@@ -34,7 +36,7 @@ namespace Syslog_agent {
         EventLogSubscription(EventLogSubscription&& source) noexcept;
         ~EventLogSubscription();
 
-        void subscribe(const wstring& bookmark_xml);
+        void subscribe(const wstring& bookmark_xml, const bool only_while_running);
         void cancelSubscription();
         void saveBookmark();
         wstring getBookmark() const { return bookmark_xml_; }
@@ -55,6 +57,7 @@ namespace Syslog_agent {
         wstring channel_;
         wstring query_;
         wstring bookmark_xml_;
+        bool only_while_running_;
 
         // Now store a pointer to IEventHandler instead of ChannelEventHandlerBase
         unique_ptr<IEventHandler> event_handler_;

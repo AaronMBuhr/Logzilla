@@ -473,12 +473,13 @@ void Service::initializeEventLogSubscriptions(const vector<LogConfiguration>& lo
                 log_channel,
                 query,
                 bookmark,
+                config_.getOnlyWhileRunning(),
                 std::move(handler));
 
             subscriptions_.push_back(std::move(subscription));
             try {
                 // Subscribe with the appropriate flag based on whether we have a bookmark
-                subscriptions_.back().subscribe(bookmark);
+                subscriptions_.back().subscribe(bookmark, config_.getOnlyWhileRunning());
             }
             catch (const ::std::exception& e) {
                 Logger::recoverable_error("Failed to subscribe to event log '%s': %s\n", 

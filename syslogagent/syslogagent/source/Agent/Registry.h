@@ -22,7 +22,7 @@ namespace Syslog_agent {
         char readChar(const wchar_t* name, char default_value) const;
         int readInt(const wchar_t* name, int default_value) const;
         time_t readTime(const wchar_t* name, time_t default_value) const;
-        std::wstring readString(const wchar_t* name, wchar_t* default_value) const;
+        std::wstring readString(const wchar_t* name, const wchar_t* default_value) const;
         void writeUint(const wchar_t* name, DWORD value) const;
         void writeTime(const wchar_t* name, time_t value) const;
         std::vector<std::wstring> readChannels() const;

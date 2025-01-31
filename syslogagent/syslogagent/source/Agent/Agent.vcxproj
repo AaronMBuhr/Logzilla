@@ -79,7 +79,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>D:\Source\Logzilla\syslogagent_with_forwarder\syslogagent\source\Agent\include\libgnutls-30;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

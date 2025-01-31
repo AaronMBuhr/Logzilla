@@ -51,39 +51,40 @@ void SyslogSender::run() const
     unique_ptr<char[]> batch_buffer = make_unique<char[]>(MAX_MESSAGE_SIZE);
     uint32_t batch_buffer_length = 0;
 
-    WindowsTimer batch_timer;
-    batch_timer.set(MIN_BATCH_INTERVAL);
-
     while (!isStopRequested()) {
         try {
-            // Process primary queue
+            bool messages_processed = false;
+
+            // Process primary queue if messages are available
             if (primary_queue_ && primary_network_client_ && primary_batcher_) {
-                uint32_t batch_count = primary_batcher_->BatchEvents(primary_queue_, batch_buffer.get());
-                if (batch_count > 0) {
-                    batch_buffer_length = static_cast<uint32_t>(strlen(batch_buffer.get()));
-                    sendMessageBatch(primary_queue_, primary_network_client_, batch_count, 
-                        batch_buffer.get(), batch_buffer_length, primary_oldest_message_time_);
+                if (primary_queue_->waitForMessages(MIN_BATCH_INTERVAL)) {
+                    uint32_t batch_count = primary_batcher_->BatchEvents(primary_queue_, batch_buffer.get());
+                    if (batch_count > 0) {
+                        messages_processed = true;
+                        batch_buffer_length = static_cast<uint32_t>(strlen(batch_buffer.get()));
+                        sendMessageBatch(primary_queue_, primary_network_client_, batch_count, 
+                            batch_buffer.get(), batch_buffer_length, primary_oldest_message_time_);
+                    }
                 }
             }
 
-            // Process secondary queue
+            // Process secondary queue if messages are available
             if (secondary_queue_ && secondary_network_client_ && secondary_batcher_) {
-                uint32_t batch_count = secondary_batcher_->BatchEvents(secondary_queue_, batch_buffer.get());
-                if (batch_count > 0) {
-                    batch_buffer_length = static_cast<uint32_t>(strlen(batch_buffer.get()));
-                    sendMessageBatch(secondary_queue_, secondary_network_client_, batch_count, 
-                        batch_buffer.get(), batch_buffer_length, secondary_oldest_message_time_);
+                if (secondary_queue_->waitForMessages(MIN_BATCH_INTERVAL)) {
+                    uint32_t batch_count = secondary_batcher_->BatchEvents(secondary_queue_, batch_buffer.get());
+                    if (batch_count > 0) {
+                        messages_processed = true;
+                        batch_buffer_length = static_cast<uint32_t>(strlen(batch_buffer.get()));
+                        sendMessageBatch(secondary_queue_, secondary_network_client_, batch_count, 
+                            batch_buffer.get(), batch_buffer_length, secondary_oldest_message_time_);
+                    }
                 }
             }
 
-            // Sleep for a short interval if no messages were processed
-            if (primary_queue_->isEmpty() && (!secondary_queue_ || secondary_queue_->isEmpty())) {
-                batch_timer.wait(MIN_BATCH_INTERVAL);
+            // If no messages were processed, do a longer wait
+            if (!messages_processed) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(MIN_BATCH_INTERVAL));
             }
-
-            // Reset and set timer for next batch
-            batch_timer.reset();
-            batch_timer.set(MIN_BATCH_INTERVAL);
         }
         catch (const std::exception& e) {
             Logger::recoverable_error("SyslogSender::run()> Exception: %s\n", e.what());

@@ -7,9 +7,10 @@ Copyright c 2021 Logzilla Corp.
 #include <stdarg.h>
 #include <mutex>
 #include <vector>
+#include <fstream>
+#include <Windows.h>
 
 using namespace std;
-
 
 /* LOG LEVELS
 	INFO	Basic operational info
@@ -32,18 +33,17 @@ using namespace std;
 	FORC	(Log level) Log at all settings even NONE
 	*/
 
-
 #define LOG_CURRENT_LOCATION(p) Logger::debug( "Debug marker (%s) - ::%s() in file: %s(%d)\n", p, __func__ , __FILE__, __LINE__ )
 class Logger
 {
 public:
-	static constexpr wchar_t* DEFAULT_LOG_FILENAME = L"syslogagent.log";
+	static constexpr const wchar_t* DEFAULT_LOG_FILENAME = L"syslogagent.log";
 	typedef void (*FATAL_ERROR_HANDLER)(const char* fatal_error_message);
 
 	static constexpr int MAX_LOGMSG_LENGTH = 16384;
 	enum LogLevel { DEBUG3, DEBUG2, DEBUG, VERBOSE, INFO, WARN, RECOVERABLE_ERROR, 
 		CRITICAL, FATAL, NOLOG, ALWAYS, FORCE };
-	static constexpr char const* LOGLEVEL_ABBREVS[12] = { "DBG3", "DBG2", "DEBG", 
+	static constexpr const char* const LOGLEVEL_ABBREVS[12] = { "DBG3", "DBG2", "DEBG", 
 		"VERB", "INFO", "WARN", "RCVR", "CRIT", "FATL", "NONE", "ALWY", "FORC" };
 	static vector<string> LOGLEVEL_ABBREVS_WITHBRACKET;
 	enum LogDestination { DEST_CONSOLE, DEST_FILE, DEST_CONSOLE_AND_FILE };
@@ -52,10 +52,10 @@ public:
 		singleton()->fatal_error_handler_ = fatal_error_handler;
 	}
 	static void setLogLevel(const LogLevel log_level);
-	static LogLevel getLogLevel();
+    static LogLevel getLogLevel();
 	static LogDestination getlogDestination() { return singleton()->log_destination_; }
 	static void setLogDestination(LogDestination log_destination);
-	static void setLogFile(const wstring const_log_path_and_filename);
+	static void setLogFile(const std::wstring& log_path_and_filename);
 	static bool log(const LogLevel log_level, const char* format, ...);
 	static bool log_no_datetime(const LogLevel log_level, const char* format, ...);
 	static void setLogEventsToFile() { singleton()->log_events_to_file_ = true; }
@@ -63,7 +63,7 @@ public:
 	static void getDateTimeStr(char* buf, int bufsize);
 	static bool isUnittestRunning();
 	static string getUnitTestLog();
-	static int writeToFile(const char *filename, bool append, const char* format, ...);
+	static int writeToFile(const char* filename, bool append, const char* format, ...);
 	static void fatal(const char* format, ...);
 	template<typename... _args> static bool debug3(const char* format, _args... args) {
 		return log(DEBUG3, format, args...);
@@ -102,7 +102,7 @@ public:
 
 
 #if _UNITTEST
-	static void logUnittest(const char* format, ...) {
+	static void logUnittest(const char* format, ...) const {
 		char buf[4096];
 		va_list args;
 		va_start(args, format);
@@ -121,7 +121,7 @@ public:
 #endif
 
 #if RELEASE
-	static void breakPoint() { }
+	static void breakPoint() const { }
 #else
 	static void breakPoint() { __debugbreak(); }
 #endif
@@ -129,19 +129,20 @@ public:
 
 private:
 	Logger();
-	LogLevel current_log_level_ = NOLOG;
-	LogDestination log_destination_ = DEST_CONSOLE;
-	mutex logger_lock_;
-	char log_message_buffer_[MAX_LOGMSG_LENGTH];
-	wstring log_path_and_filename_;
-	bool log_events_to_file_;
-	short is_unittest_running_;
-	vector<string> unit_test_messages_;
-	FATAL_ERROR_HANDLER fatal_error_handler_;
-
 	static Logger* singleton();
-	bool logToConsole(const char* log_message_cstring) const;
-	bool logToFile(const char* log_message_cstring) const;
-	bool logToConsoleAndFile(const char* log_message_cstring) const;
-};
 
+	LogLevel current_log_level_ = INFO;
+	LogDestination log_destination_ = DEST_CONSOLE;
+	std::wstring log_path_and_filename_;
+	std::wofstream log_file_;  
+	bool log_events_to_file_;
+	int is_unittest_running_;
+	FATAL_ERROR_HANDLER fatal_error_handler_;
+	char log_message_buffer_[MAX_LOGMSG_LENGTH];
+	mutable std::mutex logger_lock_;
+	std::vector<std::string> unit_test_messages_;
+
+	bool logToConsole(const char* log_message_cstring);
+	bool logToFile(const char* log_message_cstring);
+	bool logToConsoleAndFile(const char* log_message_cstring);
+};

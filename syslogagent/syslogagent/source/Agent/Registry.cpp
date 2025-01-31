@@ -98,7 +98,7 @@ int Registry::readInt(const wchar_t* name, int default_value) const {
 }
 
 
-std::wstring Registry::readString(const wchar_t* name, wchar_t* default_value) const {
+std::wstring Registry::readString(const wchar_t* name, const wchar_t* default_value) const {
     wchar_t value[1024];
     DWORD size = sizeof value;
     auto status = RegQueryValueEx(main_key_, name, nullptr, nullptr, (LPBYTE)&value, &size);

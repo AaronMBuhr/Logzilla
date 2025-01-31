@@ -1,6 +1,6 @@
 /*
 SyslogAgent: a syslog agent for Windows
-Copyright © 2021 Logzilla Corp.
+Copyright 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
@@ -13,23 +13,19 @@ Result::Result() {
     status_ = ERROR_SUCCESS;
 }
 
-
-Result::Result(Result& other) {
+Result::Result(const Result& other) {
     status_ = other.status_;
     message_str_ = other.message_str_;
 }
-
 
 Result::Result(DWORD status) {
     setResult(status, "", "");
 }
 
-
 Result::Result(const char* message) {
-	status_ = ERROR_INVALID_FUNCTION;
-	this->message_str_ = message;
+    status_ = ERROR_INVALID_FUNCTION;
+    this->message_str_ = message;
 }
-
 
 Result::Result(DWORD status, const char* name, const char* format, ...) {
     va_list args;
@@ -38,7 +34,6 @@ Result::Result(DWORD status, const char* name, const char* format, ...) {
     _vsnprintf_s(message, 1024, _TRUNCATE, format, args);
     setResult(status, name, message);
 }
-
 
 Result Result::ResultLog(DWORD status, Logger::LogLevel log_level, 
     const char* name, const char* format, ...) {
@@ -50,9 +45,7 @@ Result Result::ResultLog(DWORD status, Logger::LogLevel log_level,
     retval.setResult(status, name, message);
     Logger::log(log_level, "%s\n", message);
     return retval;
-
 }
-
 
 void Result::setResult(DWORD status, const char* from, const char* message) {
     this->status_ = status;
@@ -77,23 +70,17 @@ void Result::setResult(DWORD status, const char* from, const char* message) {
     }
 }
 
-
 bool Result::isSuccess() const { return status_ == ERROR_SUCCESS; }
-
 
 DWORD Result::statusCode() const { return this->status_; }
 
-
 const char* Result::what() const { return message_str_.c_str(); }
-
 
 void Result::log() const { Logger::log(isSuccess() ? Logger::INFO 
     : Logger::CRITICAL, "%s\n", what()); }
- 
 
 void Result::logLastError(const char* from, const char* message) 
 { Result(GetLastError(), from, message).log(); }
-
 
 void Result::throwLastError(const char* from, const char* message) 
 { throw Result(GetLastError(), from, message); }

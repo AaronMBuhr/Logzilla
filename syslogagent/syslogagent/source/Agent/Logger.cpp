@@ -7,7 +7,6 @@ Copyright ? 2021 Logzilla Corp.
 #include "Logger.h"
 #include <algorithm>
 #include <clocale>
-#include <codecvt>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -182,49 +181,80 @@ void Logger::setLogDestination(LogDestination log_destination) {
 	singleton()->log_destination_ = log_destination;
 }
 
-bool Logger::logToConsole(const char* log_message_cstring) const {
-	if (log_message_cstring) {
-		printf("%s", log_message_cstring);
-	}
-	return true;
+bool Logger::logToConsole(const char* log_message_cstring) {
+    if (log_message_cstring) {
+        printf("%s", log_message_cstring);
+    }
+    return true;
 }
 
-bool Logger::logToFile(const char* log_message_cstring) const {
-	if (log_message_cstring) {
-		FILE* logfile;
-		_wfopen_s(&logfile, log_path_and_filename_.c_str(), L"a");
-		if (!logfile) {
-			return false;
-		}
-		fputs(log_message_cstring, logfile);
-		fclose(logfile);
-	}
-	return true;
+bool Logger::logToFile(const char* log_message_cstring) {
+    if (!log_message_cstring) {
+        return true;
+    }
+
+    if (!log_file_.is_open()) {
+        log_file_.open(log_path_and_filename_, std::ios::out | std::ios::app);
+        if (!log_file_.is_open()) {
+            return false;
+        }
+    }
+
+    // Convert UTF-8 to UTF-16 using Windows API
+    int wide_size = MultiByteToWideChar(CP_UTF8, 0, log_message_cstring, -1, nullptr, 0);
+    if (wide_size <= 0) {
+        return false;
+    }
+
+    std::wstring wide_message(wide_size, L'\0');
+    if (MultiByteToWideChar(CP_UTF8, 0, log_message_cstring, -1, &wide_message[0], wide_size) <= 0) {
+        return false;
+    }
+
+    // Remove the null terminator that MultiByteToWideChar adds
+    wide_message.resize(wide_size - 1);
+    
+    log_file_ << wide_message;
+    log_file_.flush();
+    return true;
 }
 
-bool Logger::logToConsoleAndFile(const char* log_message_cstring) const {
-	logToConsole(log_message_cstring);
-	logToFile(log_message_cstring);
-	return true;
+bool Logger::logToConsoleAndFile(const char* log_message_cstring) {
+    return logToConsole(log_message_cstring) && logToFile(log_message_cstring);
 }
 
 
-void Logger::setLogFile(const wstring const_log_path_and_filename) {
-	// if no spec given then use the default
-	wstring log_path_and_filename;
-	if (const_log_path_and_filename.length() < 2) {
-		log_path_and_filename = DEFAULT_LOG_FILENAME;
-	}
-	else {
-		log_path_and_filename = const_log_path_and_filename;
-	}
-	// if no drive and no leading backslash then use the exe dir
-	if (log_path_and_filename.substr(1, 1) != L":"
-		&& log_path_and_filename.substr(0, 1) != L"\\") {
-		wstring path_str = Syslog_agent::Util::getThisPath();
-		log_path_and_filename = path_str + L"\\" + log_path_and_filename;
-	}
-	singleton()->log_path_and_filename_ = log_path_and_filename;
+void Logger::setLogFile(const std::wstring& log_path_and_filename_param) {
+    std::unique_lock<std::mutex> lock(singleton()->logger_lock_);
+    
+    // if no spec given then use the default
+    std::wstring log_path_and_filename;
+    if (log_path_and_filename_param.length() < 2) {
+        log_path_and_filename = DEFAULT_LOG_FILENAME;
+    } else {
+        log_path_and_filename = log_path_and_filename_param;
+    }
+
+    // if no drive and no leading backslash then use the exe dir
+    if (log_path_and_filename.substr(1, 1) != L":" 
+        && log_path_and_filename.substr(0, 1) != L"\\") {
+        std::wstring path_str = Syslog_agent::Util::getThisPath();
+        log_path_and_filename = path_str + L"\\" + log_path_and_filename;
+    }
+    
+    singleton()->log_path_and_filename_ = log_path_and_filename;
+    
+    // Close existing file if open
+    if (singleton()->log_file_.is_open()) {
+        singleton()->log_file_.close();
+    }
+    
+    // Open new file in append mode
+    singleton()->log_file_.open(log_path_and_filename, std::ios::out | std::ios::app);
+    if (!singleton()->log_file_.is_open()) {
+        Logger::recoverable_error("Logger::setLogFile() Failed to open log file: %ls\n", 
+            log_path_and_filename.c_str());
+    }
 }
 
 
@@ -317,4 +347,3 @@ void Logger::fatal(const char* format, ...) {
 
 	va_end(args_list);
 }
-
