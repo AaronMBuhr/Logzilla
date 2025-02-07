@@ -17,8 +17,6 @@ Copyright 2021 Logzilla Corp.
 #include "SyslogSender.h"
 #include "StatefulLogger.h"
 
-#include "EventLogger.h"
-#include "XMLToJsonConverter.h"
 
 using namespace std;
 using namespace Syslog_agent;
@@ -365,10 +363,6 @@ namespace Syslog_agent {
         event.renderEvent();
         Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Event rendered\n");
 
-        // DEBUGGING
-        if (++generated_count_ <= 1000)
-            Sleep(20);
-
         char* json_buffer = Globals::instance()->getMessageBuffer("EventHandlerMessageQueuer::handleEvent()");
         if (!json_buffer) {
             Logger::recoverable_error("Failed to allocate JSON buffer for event from %S\n", subscription_name);
@@ -381,14 +375,14 @@ namespace Syslog_agent {
             int primary_logformat = configuration_.getPrimaryLogformat();
             Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Using primary format %d\n",
                 primary_logformat);
-            string eventJsonString = "Message: " + XMLToJSONConverter::escapeJSONString(string(event.getEventText())) + " (" + XMLToJSONConverter::convert(event.getEventXml()) + ")";
-            EventLogger::log(EventLogger::LogDestination::SubscribedEvents,
-                "Event from %S received: %s\n", subscription_name, eventJsonString.c_str());
+            //string eventJsonString = "Message: " + XMLToJSONConverter::escapeJSONString(string(event.getEventText())) + " (" + XMLToJSONConverter::convert(event.getEventXml()) + ")";
+            //EventLogger::log(EventLogger::LogDestination::SubscribedEvents,
+            //    "Event from %S received: %s\n", subscription_name, eventJsonString.c_str());
         
             if (generateLogMessage(event, primary_logformat, json_buffer,
                 Globals::MESSAGE_BUFFER_SIZE)) {
-                EventLogger::log(EventLogger::LogDestination::GeneratedEvents,
-                    "Event from %S generated: %s\n", subscription_name, eventJsonString.c_str());
+                //EventLogger::log(EventLogger::LogDestination::GeneratedEvents,
+                //    "Event from %S generated: %s\n", subscription_name, eventJsonString.c_str());
 
                 Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Generated message: %s\n",
                     json_buffer);
@@ -399,7 +393,7 @@ namespace Syslog_agent {
                     primary_message_queue_->removeFront();
                 }
 
-                EventLogger::enqueueEventForLogging(eventJsonString);
+                //EventLogger::enqueueEventForLogging(eventJsonString);
                 Globals::instance()->queued_count_++;
                 Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Message enqueued to primary queue\n");
 

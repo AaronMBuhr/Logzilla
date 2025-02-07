@@ -13,7 +13,6 @@ Copyright 2021 Logzilla Corp.
 #include "SlidingWindowMetrics.h"
 #include "SyslogSender.h"
 #include "Util.h"
-#include "EventLogger.h"
 
 namespace Syslog_agent {
 
@@ -183,10 +182,10 @@ int SyslogSender::sendMessageBatch(
     }
 
     try {
-        //Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n", 
-        //    batch_count, batch_buf_length);
-        Logger::always("--------------------------------------------------------------------------------> %u messages (%u bytes)\n",
+        Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n", 
             batch_count, batch_buf_length);
+        //Logger::always("--------------------------------------------------------------------------------> %u messages (%u bytes)\n",
+        //    batch_count, batch_buf_length);
         // Logger::debug3("SyslogSender::sendMessageBatch()> Batch content: %.*s\n", 
         //     (std::min)(batch_buf_length, 1000u), batch_buf);
 
@@ -209,9 +208,9 @@ int SyslogSender::sendMessageBatch(
                 break;
             }
             SlidingWindowMetrics::instance().recordOutgoing();
-            string eventJson = EventLogger::queuePopFront();
-            EventLogger::log(EventLogger::LogDestination::SentEvents,
-                "Event sent: %s\n", eventJson.c_str());
+            //string eventJson = EventLogger::queuePopFront();
+            //EventLogger::log(EventLogger::LogDestination::SentEvents,
+            //    "Event sent: %s\n", eventJson.c_str());
             messages_removed++;
         }
 

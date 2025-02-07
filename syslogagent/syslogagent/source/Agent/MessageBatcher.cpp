@@ -134,7 +134,7 @@ MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
         }
 
         Globals::instance()->batched_count_ += batch_count;
-        Logger::always("***** Message counts: queued %d, peeked %d, batched %d\n", 
+        Logger::debug2("***** Message counts: queued %d, peeked %d, batched %d\n", 
                       Globals::instance()->queued_count_, 
                       Globals::instance()->peek_count_, 
                       Globals::instance()->batched_count_);
