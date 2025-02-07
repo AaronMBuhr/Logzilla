@@ -114,6 +114,7 @@ namespace Syslog_agent {
         // Maximum lengths and sizes
         static constexpr int                MAX_SUFFIX_LENGTH       = 1000;
         static constexpr int                SENDER_MAINLOOP_DURATION = 1000;
+        static constexpr int                MAX_LOG_NAME_LENGTH     = 1000;
 
         // Log formats
         static constexpr int                LOGFORMAT_DETECT        = 0;

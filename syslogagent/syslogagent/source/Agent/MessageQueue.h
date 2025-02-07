@@ -8,6 +8,7 @@
 #include <chrono>
 #include <coroutine>
 #include <experimental/generator>
+#include <functional>
 #include "BitmappedObjectPool.h"
 #include "Logger.h"
 
@@ -27,6 +28,8 @@
 // - Pools grow dynamically as needed until system memory is exhausted
 // - No dynamic allocations during normal operation
 // - Pools can shrink when memory pressure is reduced (controlled by MESSAGE_QUEUE_SLACK_PERCENT)
+
+namespace Syslog_agent {
 class MessageBatcher;  // Forward declaration
 
 class MessageQueue
@@ -62,6 +65,7 @@ public:
 
     // Returns true if the queue is empty.
     bool isEmpty() const {
+        if (is_shutting_down_) return true;  // During shutdown, treat as empty
         std::lock_guard<std::mutex> lock(queue_mutex_);
         return (first_message_ == nullptr);
     }
@@ -94,6 +98,7 @@ public:
 
     // Return the number of queued messages.
     uint32_t length() const {
+        if (is_shutting_down_) return 0;  // During shutdown, treat as empty
         std::lock_guard<std::mutex> lock(queue_mutex_);
         return length_;
     }
@@ -127,6 +132,22 @@ public:
     // Note: This is primarily intended for use by MessageBatcher for efficient batch processing.
     std::experimental::generator<Message*> traverseQueue(Message* first = nullptr);
 
+    // Set a hook function to be called before/after each enqueue operation.
+    // The hook function should return true to proceed with the enqueue, or false to cancel it.
+    // The hook is called with the queue length, the message being enqueued, and a boolean indicating
+    // whether the enqueue is pre- or post- enqueue.
+    void setEnqueueHook(std::function<bool(size_t queue_length, Message* message, bool is_pre_enqueue)> hook) {
+        enqueue_hook_ = std::move(hook);
+    }
+
+    void beginShutdown() {
+        is_shutting_down_ = true;
+    }
+
+    bool isShuttingDown() const {
+        return is_shutting_down_;
+    }
+
 private:
     // Private helper that removes the front message from the linked list.
     // Assumes that queue_mutex_ is already held.
@@ -156,4 +177,11 @@ private:
     // Semaphore used to signal that messages are available.
     // Used in conjunction with mutex for proper synchronization.
     std::counting_semaphore<> items_sem_{ 0 };
+
+    // Handler gets: queue size, message to be queued, and whether this is pre/post enqueue
+    // Returns true to continue with the enqueue, false to cancel it
+    std::function<bool(size_t, Message*, bool)> enqueue_hook_{ nullptr };
+
+    std::atomic<bool> is_shutting_down_{false};
+};
 };

@@ -43,7 +43,12 @@ public:
     static void requestStop() { stop_requested_ = true; }
     static bool isStopRequested() { return stop_requested_; }
 
+    // Hook for message queue operations - called before/after message enqueue
+    bool enqueueHook(size_t queue_length, MessageQueue::Message* message, bool is_pre_enqueue) const;
+
 protected:
+    bool isShuttingDown() const { return stop_requested_; }
+
     int sendMessageBatch(
         shared_ptr<MessageQueue> msg_queue,
         shared_ptr<INetworkClient> network_client,

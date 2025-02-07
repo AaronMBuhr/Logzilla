@@ -3,7 +3,7 @@
 #include "Logger.h"
 #include "MessageBatcher.h"
 
-using namespace Syslog_agent;
+namespace Syslog_agent {
 
 MessageBatcher::MessageBatcher()
 {
@@ -66,7 +66,7 @@ MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
         size_t current_length = header_size;
 
         // Limit batch size
-        int max_batch = std::min<int>(queue_length, static_cast<int>(GetBatchSizeThreshold_()));
+        int max_batch = std::min<int>(queue_length, static_cast<int>(GetMaxBatchSize_()));
         Logger::debug3("MessageBatcher::BatchEventsInternal()> Will process up to %d messages\n", max_batch);
 
         uint32_t batch_count = 0;
@@ -149,4 +149,5 @@ MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
         Logger::recoverable_error("MessageBatcher::BatchEventsInternal()> Exception: %s\n", e.what());
         return BatchResult(BatchResult::Status::InvalidBuffer);
     }
+}
 }

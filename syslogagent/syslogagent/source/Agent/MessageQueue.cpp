@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cstring>
 
+namespace Syslog_agent {
+
 MessageQueue::MessageQueue(uint32_t message_queue_size, uint32_t message_buffers_chunk_size)
     : message_queue_chunk_size_(message_buffers_chunk_size),
       length_(0),
@@ -105,6 +107,10 @@ bool MessageQueue::enqueue(const char* message_content, const uint32_t message_l
         return false;
     }
 
+    if (enqueue_hook_ && !enqueue_hook_(length_,msg, false)) {
+            return false; // Handler cancelled the enqueue
+    }
+
     if (!first_message_) {
         first_message_ = msg;
         last_message_ = msg;
@@ -113,6 +119,12 @@ bool MessageQueue::enqueue(const char* message_content, const uint32_t message_l
         last_message_ = msg;
     }
     length_++;
+    
+    // Post-enqueue handler
+    if (enqueue_hook_) {
+        enqueue_hook_(length_, msg, true);
+    }
+
     items_sem_.release();
     items_cv_.notify_one();  // Only need to notify one waiter
     return true;
@@ -253,4 +265,5 @@ std::experimental::generator<MessageQueue::Message*> MessageQueue::traverseQueue
         }
         current = next;
     }
+}
 }

@@ -76,6 +76,9 @@ namespace {
     // Helper function to safely clean up message queues
     void cleanupMessageQueue(shared_ptr<MessageQueue>& queue) {
         if (queue) {
+            queue->beginShutdown();  // Signal shutdown to all threads
+            // Give a small delay for other threads to notice shutdown
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             while (!queue->isEmpty()) {
                 queue->removeFront();
             }
@@ -192,7 +195,7 @@ void Service::run(bool running_as_console) {
                 wfilename.c_str(),
                 config_.MAX_TAIL_FILE_LINE_LENGTH,
                 program_name.c_str(),
-                config_.getHostNameConfig().c_str(),
+                config_.getHostName().c_str(),
                 (config_.getSeverity() == SharedConstants::Severities::DYNAMIC 
                     ? SharedConstants::Severities::INFORMATIONAL : config_.getSeverity()),
                 config_.getFacility()
@@ -571,7 +574,7 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
                 double inRate = metrics.incomingRate();
                 double outRate = metrics.outgoingRate();
 				if (metrics.checkRates(Service::RATE_THRESHOLD_RATIO)) {
-					Logger::warning("SlidingWindowMetrics: Incoming rate %.2f events/s exceeds outgoing rate %.2f events/s (threshold ratio %.2f)",
+					Logger::debug("SlidingWindowMetrics: Incoming rate %.2f events/s exceeds outgoing rate %.2f events/s (threshold ratio %.2f)",
 						inRate, outRate, Service::RATE_THRESHOLD_RATIO);
 				}
 				else {

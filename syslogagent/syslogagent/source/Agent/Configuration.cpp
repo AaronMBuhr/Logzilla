@@ -21,6 +21,7 @@ int Configuration::event_log_poll_interval_ = SharedConstants::Defaults::POLL_IN
 
 Configuration::Configuration() {
     getTimeZoneOffset();
+    setHostName();
 }
 
 bool Configuration::hasSecondaryHost() const {
@@ -149,7 +150,6 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     }
 
     registry.close();
-    host_name_ = getHostName();
 
     Logger::debug("Loaded configuration from registry (from console: %s)\n", 
         (running_from_console ? "true" : "false"));
@@ -199,7 +199,7 @@ void Configuration::getTimeZoneOffset() {
     utc_offset_minutes_ = static_cast<int>(time_zone_info.Bias);
 }
 
-string Configuration::getHostName() const {
+void Configuration::setHostName() {
     static constexpr size_t HOSTNAME_BUFFER_SIZE = MAX_COMPUTERNAME_LENGTH + 1;
     WCHAR computerName[HOSTNAME_BUFFER_SIZE];
     DWORD size = HOSTNAME_BUFFER_SIZE;
@@ -207,10 +207,16 @@ string Configuration::getHostName() const {
     if (GetComputerNameW(computerName, &size) == TRUE) {
         char computer_name_buf[1024];
         Util::wstr2str(computer_name_buf, sizeof(computer_name_buf), computerName);
-        return computer_name_buf;
+        host_name_ = string(computer_name_buf);
+    } else {
+        Logger::warning("Configuration::setHostName() GetComputerNameW() failed: %u\n", GetLastError());
+        host_name_ = string("unknown");
     }
-    
-    return string();
+}
+
+const string& Configuration::getHostName() const {
+    shared_lock<shared_mutex> lock(mutex_);
+    return host_name_;
 }
 
 int Configuration::setLogformatForVersion(int& logformat, const string& version) {

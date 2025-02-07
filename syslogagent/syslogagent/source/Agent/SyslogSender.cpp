@@ -42,21 +42,37 @@ SyslogSender::SyslogSender(
     , message_buffer_(new char[MAX_MESSAGE_SIZE])
 {
     Logger::debug2("SyslogSender constructor\n");
+    using namespace std::placeholders;
+    std::function<bool(size_t, MessageQueue::Message*, bool)> hook = 
+        std::bind(&SyslogSender::enqueueHook, this, _1, _2, _3);
+    primary_queue_->setEnqueueHook(hook);
+    if (secondary_queue_) {
+        secondary_queue_->setEnqueueHook(hook);
+    }
 }
 
 uint64_t SyslogSender::next_wait_time_ms(uint64_t longest_wait_time_ms) const {
-    uint64_t primary_oldest_message_time_ = primary_queue_ ? primary_queue_->getOldestMessageTimestamp() : 0;
-    uint64_t secondary_oldest_message_time_ = secondary_queue_ ? secondary_queue_->getOldestMessageTimestamp() : 0;
-    uint64_t oldest_message_time = primary_oldest_message_time_ == 0 ? 
-        secondary_oldest_message_time_ : (secondary_oldest_message_time_ == 0 ? primary_oldest_message_time_ : 
-        (std::min)(primary_oldest_message_time_, secondary_oldest_message_time_));
+    auto primary_oldest_message_time = primary_queue_->getOldestMessageTimestamp();
+    auto secondary_oldest_message_time = secondary_queue_ ? secondary_queue_->getOldestMessageTimestamp() : 0;
+    
+    // If primary queue has no messages, use secondary queue time (which may be 0)
+    // If primary queue has messages but secondary is null or empty, use primary time
+    // If both have messages, use the older one
+    auto oldest_message_time = primary_oldest_message_time == 0 ? secondary_oldest_message_time :
+        secondary_oldest_message_time == 0 ? primary_oldest_message_time :
+        (std::min)(primary_oldest_message_time, secondary_oldest_message_time);
+    
     uint64_t time_to_wait = longest_wait_time_ms;
     if (oldest_message_time > 0) {
-        auto current_time = std::chrono::system_clock::now().time_since_epoch().count();
-        time_to_wait = longest_wait_time_ms - (current_time - oldest_message_time);
+       auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        // oldest_message_time is already in milliseconds
+        auto elapsed_ms = current_time - oldest_message_time;
+        time_to_wait = elapsed_ms >= longest_wait_time_ms ? 0 : longest_wait_time_ms - elapsed_ms;
     }
-    return (std::max)(time_to_wait, (uint64_t)0);
-}
+    return time_to_wait;
+}; 
+
 
 void SyslogSender::waitForBatch(MessageQueue* first_queue, MessageQueue* second_queue) const {
     std::unique_lock<std::mutex> lock(batch_mutex_);
@@ -96,7 +112,9 @@ void SyslogSender::run() const
             // Process primary queue if messages are available
             if (primary_queue) {
                 Logger::debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
-                do {
+                size_t initial_queue_size = primary_queue->length();
+                
+                for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
                     auto batch_result = primary_batcher_->BatchEvents(primary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
                     Logger::debug3("SyslogSender::run()> Primary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
@@ -104,22 +122,25 @@ void SyslogSender::run() const
                         batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
                         sendMessageBatch(primary_queue_, primary_network_client_, batch_result.messages_batched, 
                             batch_buffer.get(), batch_buffer_length);
+                        messages_processed += batch_result.messages_batched;
                         primary_has_messages = true;
                     } else {
                         primary_has_messages = (batch_result.status != MessageBatcher::BatchResult::Status::NoMessages);
-                        if (!primary_has_messages && primary_queue->length() > 0) {
-                            Logger::warning("SyslogSender::run()> Primary queue not sending, %d messages remaining\n", 
-                                primary_queue->length());
+                        if (!primary_has_messages && primary_queue->length() > messages_processed) {
+                            Logger::warning("SyslogSender::run()> Primary queue not sending, %d messages remaining from initial batch\n", 
+                                initial_queue_size - messages_processed);
                         }
                         break;
                     }
-                } while (primary_queue->length() > 0);
+                }
             }
 
             // Process secondary queue if messages are available
             if (secondary_queue) {
                 Logger::debug3("SyslogSender::run()> Attempting to batch secondary queue messages\n");
-                do {
+                size_t initial_queue_size = secondary_queue->length();
+                
+                for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
                     auto batch_result = secondary_batcher_->BatchEvents(secondary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
                     Logger::debug3("SyslogSender::run()> Secondary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
@@ -127,16 +148,17 @@ void SyslogSender::run() const
                         batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
                         sendMessageBatch(secondary_queue_, secondary_network_client_, batch_result.messages_batched, 
                             batch_buffer.get(), batch_buffer_length);
+                        messages_processed += batch_result.messages_batched;
                         secondary_has_messages = true;
                     } else {
                         secondary_has_messages = (batch_result.status != MessageBatcher::BatchResult::Status::NoMessages);
-                        if (!secondary_has_messages && secondary_queue->length() > 0) {
-                            Logger::warning("SyslogSender::run()> Secondary queue not sending, %d messages remaining\n", 
-                                secondary_queue->length());
+                        if (!secondary_has_messages && secondary_queue->length() > messages_processed) {
+                            Logger::warning("SyslogSender::run()> Secondary queue not sending, %d messages remaining from initial batch\n", 
+                                initial_queue_size - messages_processed);
                         }
                         break;
                     }
-                } while (secondary_queue->length() > 0);
+                }
             }
         }
         catch (const std::exception& e) {
@@ -161,7 +183,9 @@ int SyslogSender::sendMessageBatch(
     }
 
     try {
-        Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n", 
+        //Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n", 
+        //    batch_count, batch_buf_length);
+        Logger::always("--------------------------------------------------------------------------------> %u messages (%u bytes)\n",
             batch_count, batch_buf_length);
         // Logger::debug3("SyslogSender::sendMessageBatch()> Batch content: %.*s\n", 
         //     (std::min)(batch_buf_length, 1000u), batch_buf);
@@ -200,6 +224,25 @@ int SyslogSender::sendMessageBatch(
         Logger::critical("SyslogSender::sendMessageBatch()> Exception: %s\n", e.what());
         return 0; // Return 0 to indicate no messages were processed
     }
+}
+
+bool SyslogSender::enqueueHook(size_t queue_length, MessageQueue::Message* message, bool is_pre_enqueue) const {
+    // Check if queue is shutting down before proceeding
+    if (isShuttingDown()) {
+        return false;
+    }
+    
+    // Default pre-enqueue behavior
+    if (is_pre_enqueue) {
+        return true;  // Allow enqueue by default
+    }
+    
+    // Post-enqueue behavior
+    if (queue_length >= MAX_BATCH_SIZE) {
+        std::lock_guard<std::mutex> lock(batch_mutex_);
+        batch_cv_.notify_one();
+    }
+    return true;
 }
 
 } // namespace Syslog_agent

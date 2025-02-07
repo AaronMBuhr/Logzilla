@@ -5,6 +5,8 @@
 
 using std::shared_ptr;
 
+namespace Syslog_agent {
+
 class MessageBatcher
 {
 public:
@@ -32,7 +34,6 @@ public:
 
 protected:
     virtual uint32_t GetMaxMessageSize_() const = 0;
-    virtual uint32_t GetBatchSizeThreshold_() const = 0;
     virtual uint32_t GetMinBatchInterval_() const = 0;
     virtual uint32_t GetMaxBatchSize_() const = 0;
     
@@ -45,4 +46,5 @@ private:
     BatchResult BatchEventsInternal(shared_ptr<MessageQueue> message_queue, 
                                   char* batch_buffer, 
                                   size_t buffer_size) const;
+};
 };

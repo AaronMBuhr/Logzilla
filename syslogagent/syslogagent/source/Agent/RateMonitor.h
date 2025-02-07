@@ -74,7 +74,7 @@ public:
         double inRate = incoming.getRate();
         double outRate = outgoing.getRate();
         if (inRate > outRate * threshold_ratio) {
-            Logger::warning("RateMonitor: Incoming rate %.2f events/s exceeds outgoing rate %.2f events/s (threshold ratio %.2f)",
+            Logger::debug("RateMonitor: Incoming rate %.2f events/s exceeds outgoing rate %.2f events/s (threshold ratio %.2f)",
                 inRate, outRate, threshold_ratio);
         }
     }

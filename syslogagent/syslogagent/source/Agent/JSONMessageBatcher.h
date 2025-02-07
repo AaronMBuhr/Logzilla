@@ -30,7 +30,6 @@ public:
     ~JSONMessageBatcher() {}
 
     uint32_t GetMaxMessageSize_() const override { return MAX_MESSAGE_SIZE; }
-    uint32_t GetBatchSizeThreshold_() const override { return BATCH_SIZE_THRESHOLD; }
     uint32_t GetMinBatchInterval_() const override { return MIN_BATCH_INTERVAL; }
     uint32_t GetMaxBatchSize_() const override { return MAX_BATCH_SIZE; }
     

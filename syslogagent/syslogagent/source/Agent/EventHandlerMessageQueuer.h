@@ -116,8 +116,9 @@ namespace Syslog_agent {
         Configuration& configuration_;
         shared_ptr<MessageQueue> primary_message_queue_;
         shared_ptr<MessageQueue> secondary_message_queue_;
-        char log_name_utf8_[2000];
-        char suffix_utf8_[2000];
+        string log_name_utf8_;
+        string suffix_utf8_;
+        uint32_t generated_count_ = 0;
     };
 
 } // namespace Syslog_agent

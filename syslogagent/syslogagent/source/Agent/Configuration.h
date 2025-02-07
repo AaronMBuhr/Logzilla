@@ -44,7 +44,7 @@ namespace Syslog_agent {
 
         // Thread-safe accessors
         bool hasSecondaryHost() const;
-        string getHostName() const;
+        const string& getHostName() const;
         void setPrimaryLogzillaVersion(const string& version);
         void setSecondaryLogzillaVersion(const string& version);
         int getPrimaryLogformat() const;
@@ -91,11 +91,6 @@ namespace Syslog_agent {
         int getSeverity() const {
             shared_lock<shared_mutex> lock(mutex_);
             return severity_;
-        }
-
-        string getHostNameConfig() const {
-            shared_lock<shared_mutex> lock(mutex_);
-            return host_name_;
         }
 
         int getBatchInterval() const {
@@ -268,5 +263,7 @@ namespace Syslog_agent {
         // Static configuration
         static int debug_level_setting_;
         static int event_log_poll_interval_;
+
+        void setHostName();
     };
 }

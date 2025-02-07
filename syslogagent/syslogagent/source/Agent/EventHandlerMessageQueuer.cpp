@@ -115,7 +115,7 @@ namespace Syslog_agent {
         // extra_fields object
         estimated_size += 20;  // ", "extra_fields": {"
         estimated_size += 50;  // Basic fields (severity, facility, etc)
-        estimated_size += strlen(data.event_id) + strlen(log_name_utf8_) + 30;
+        estimated_size += strlen(data.event_id) + log_name_utf8_.length() + 30;
 
         if (data.timestamp[0] != '\0') {
             estimated_size += strlen(data.timestamp) + strlen(data.microsec) + 25;
@@ -130,7 +130,7 @@ namespace Syslog_agent {
 
         // Suffix if present
         if (!configuration_.getSuffix().empty()) {
-            estimated_size += strlen(suffix_utf8_);
+            estimated_size += suffix_utf8_.length();
         }
 
         return estimated_size;
@@ -167,7 +167,7 @@ namespace Syslog_agent {
         json_output << "{";
 
         // Add root level fields
-        string hostname = configuration_.getHostName();
+        const string& hostname = configuration_.getHostName();
 
         // http ingestion will accept these at root
         if (!hostname.empty()) {
@@ -184,15 +184,6 @@ namespace Syslog_agent {
         json_output << "\"program\":\"" << data.provider << "\"";
 
 
-        // don't know if http format will accept this directly, json won't, but current
-        // rule takes ts from extra_fields anyway
-        //if (logformat == SharedConstants::LOGFORMAT_HTTPPORT && data.timestamp[0] != '\0') {
-        //    if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
-        //        return false;
-        //    }
-        //    json_output << ", \"first_occurrence\": " << data.timestamp << "." << data.microsec;
-        //}
-
         json_output << ", ";
         // Start extra_fields for HTTP format
         if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
@@ -205,12 +196,12 @@ namespace Syslog_agent {
             << ", \"event_log\":\"" << log_name_utf8_ << "\"";
         json_output << ", \"severity\":\"" << static_cast<unsigned int>(data.severity) << "\""
             << ", \"facility\":\"" << configuration_.getFacility() << "\"";
-        //if (data.timestamp[0] != '\0') {
-        //    if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
-        //        return false;
-        //    }
-        //    json_output << ", \"ts\": \"" << data.timestamp << "." << data.microsec << "\"";
-        //}
+        if (data.timestamp[0] != '\0') {
+           if (!checkBufferSpace("timestamp", strlen(data.timestamp) + strlen(data.microsec) + 40)) {
+               return false;
+           }
+           json_output << ", \"ts\": \"" << data.timestamp << "." << data.microsec << "\"";
+        }
 
         if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
             // rule wants these two inside extra_fields
@@ -230,7 +221,7 @@ namespace Syslog_agent {
 
 
         StatefulLogger::setEventId(data.event_id);
-        StatefulLogger::setEventLog(log_name_utf8_);
+        StatefulLogger::setEventLog(log_name_utf8_.c_str());
         StatefulLogger::setEventDatetime(data.timestamp);
 
         // Add event data fields
@@ -257,10 +248,8 @@ namespace Syslog_agent {
         }
 
         // Add custom_suffix key-values to extra_fields if present
-        if (!configuration_.getSuffix().empty()) {
-            wstring suffix = configuration_.getSuffix();
-            string suffix_utf8(suffix.begin(), suffix.end());
-            json_output << ", " << suffix_utf8;  // Already in "key":"value" format
+        if (!suffix_utf8_.empty()) {
+            json_output << ", " << suffix_utf8_;  // Already in "key":"value" format
         }
 
         // Add message field
@@ -338,34 +327,32 @@ namespace Syslog_agent {
             throw std::runtime_error("Log name too long");
         }
 
+        log_name_utf8_.resize(SharedConstants::MAX_LOG_NAME_LENGTH + 1);
         chars_written = WideCharToMultiByte(CP_UTF8, 0, log_name,
-            static_cast<int>(length), log_name_utf8_, sizeof(log_name_utf8_) - 1,
+            static_cast<int>(length), log_name_utf8_.data(), log_name_utf8_.size() - 1,
             NULL, NULL);
 
         if (chars_written == 0) {
             throw std::runtime_error("Failed to convert log name to UTF-8");
         }
-        log_name_utf8_[chars_written] = 0;
+        log_name_utf8_.resize(chars_written);
 
         if (!configuration_.getSuffix().empty()) {
             auto suffix = configuration_.getSuffix();
             if (suffix.length() > SharedConstants::MAX_SUFFIX_LENGTH - 1) {
-                strcpy_s(suffix_utf8_, sizeof(suffix_utf8_),
-                    "\"error_suffix\": \"too long\"");
+                suffix_utf8_ = string("\"error_suffix\": \"too long\"");
             }
             else {
-                chars_written = WideCharToMultiByte(CP_UTF8, 0,
-                    suffix.c_str(), static_cast<int>(suffix.length()),
-                    suffix_utf8_, sizeof(suffix_utf8_) - 1, NULL, NULL);
-
+                suffix_utf8_.resize(SharedConstants::MAX_SUFFIX_LENGTH + 1);
+                chars_written = Util::wstr2str_truncate(const_cast<char*>(suffix_utf8_.c_str()), suffix_utf8_.size(), suffix.c_str());
                 if (chars_written == 0) {
                     throw std::runtime_error("Failed to convert suffix to UTF-8");
                 }
-                suffix_utf8_[chars_written] = 0;
+                suffix_utf8_.resize(chars_written);
             }
         }
         else {
-            suffix_utf8_[0] = 0;
+            suffix_utf8_.clear();
         }
     }
 
@@ -377,6 +364,10 @@ namespace Syslog_agent {
 
         event.renderEvent();
         Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Event rendered\n");
+
+        // DEBUGGING
+        if (++generated_count_ <= 1000)
+            Sleep(20);
 
         char* json_buffer = Globals::instance()->getMessageBuffer("EventHandlerMessageQueuer::handleEvent()");
         if (!json_buffer) {
@@ -393,6 +384,7 @@ namespace Syslog_agent {
             string eventJsonString = "Message: " + XMLToJSONConverter::escapeJSONString(string(event.getEventText())) + " (" + XMLToJSONConverter::convert(event.getEventXml()) + ")";
             EventLogger::log(EventLogger::LogDestination::SubscribedEvents,
                 "Event from %S received: %s\n", subscription_name, eventJsonString.c_str());
+        
             if (generateLogMessage(event, primary_logformat, json_buffer,
                 Globals::MESSAGE_BUFFER_SIZE)) {
                 EventLogger::log(EventLogger::LogDestination::GeneratedEvents,
@@ -428,21 +420,17 @@ namespace Syslog_agent {
                             Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Secondary queue full, removing front message\n");
                             secondary_message_queue_->removeFront();
                         }
-                        secondary_message_queue_->enqueue(json_buffer, static_cast<int>(strlen(json_buffer)));
                         Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Message enqueued to secondary queue\n");
-                    }
-                    else {
+                    } else {
                         Logger::warning("EventHandlerMessageQueuer::handleEvent()> Secondary message generation failed for event from %S\n",
                             subscription_name);
                     }
                 }
-            }
-            else {
+            } else {
                 Logger::warning("EventHandlerMessageQueuer::handleEvent()> Primary message generation failed for event from %S\n",
                     subscription_name);
             }
-        }
-        catch (const std::exception& e) {
+        } catch (const std::exception& e) {
             Logger::critical("Exception in handleEvent for %S: %s\n", subscription_name, e.what());
             Globals::instance()->releaseMessageBuffer(json_buffer);
             return Result(ERROR_INVALID_DATA);
@@ -451,7 +439,7 @@ namespace Syslog_agent {
         Globals::instance()->releaseMessageBuffer(json_buffer);
         Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Successfully processed event from %S\n",
             subscription_name);
-        return Result(static_cast<DWORD>(ERROR_SUCCESS));
+        return Result();
     }
 
     unsigned char EventHandlerMessageQueuer::unixSeverityFromWindowsSeverity(
