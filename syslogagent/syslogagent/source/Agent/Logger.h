@@ -16,7 +16,7 @@ using namespace std;
 	INFO	Basic operational info
 	VERB	Verbose operational info
 	WARN	Non-urgent things to be aware of to prevent future problems
-	RCVR	Something that is never supposed to happen has happened
+	RERR	Something that is never supposed to happen has happened
 			but the program will recover and continue to operate 
 			(near at least) normally
 	CRIT	An error has occurred that is urgent and is going to
@@ -44,7 +44,7 @@ public:
 	enum LogLevel { DEBUG3, DEBUG2, DEBUG, VERBOSE, INFO, WARN, RECOVERABLE_ERROR, 
 		CRITICAL, FATAL, NOLOG, ALWAYS, FORCE };
 	static constexpr const char* const LOGLEVEL_ABBREVS[12] = { "DBG3", "DBG2", "DEBG", 
-		"VERB", "INFO", "WARN", "RCVR", "CRIT", "FATL", "NONE", "ALWY", "FORC" };
+		"VERB", "INFO", "WARN", "RERR", "CRIT", "FATL", "NONE", "ALWY", "FORC" };
 	static vector<string> LOGLEVEL_ABBREVS_WITHBRACKET;
 	enum LogDestination { DEST_CONSOLE, DEST_FILE, DEST_CONSOLE_AND_FILE };
 
