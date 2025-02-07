@@ -3,18 +3,10 @@ SyslogAgent: a syslog agent for Windows
 Copyright 2021 Logzilla Corp.
 */
 
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include "Util.h"
-
 #include "stdafx.h"
-#include "Service.h"
-#include "Globals.h"
-#include "Logger.h"
-#include "HttpNetworkClient.h"
-#include "JsonNetworkClient.h"
-#include "SyslogAgentSharedConstants.h"
-#include "Util.h"
+
+#define WIN32_LEAN_AND_MEAN
+#include <chrono>
 #include <conio.h>
 #include <fileapi.h>
 #include <fstream>
@@ -25,16 +17,23 @@ Copyright 2021 Logzilla Corp.
 #include <vector>
 #include <windows.h>
 #include <atomic>
-#include "INetworkClient.h"
-#include "Logger.h"
+#include <Windows.h>
+
 #include "Configuration.h"
 #include "EventHandlerMessageQueuer.h"
 #include "EventLogEvent.h"
 #include "EventLogSubscription.h"
 #include "FileWatcher.h"
+#include "Globals.h"
+#include "HttpNetworkClient.h"
+#include "INetworkClient.h"
+#include "JsonNetworkClient.h"
+#include "Logger.h"
 #include "Service.h"
+#include "SlidingWindowMetrics.h"
 #include "SyslogAgentSharedConstants.h"
 #include "SyslogSender.h"
+#include "Util.h"
 
 using std::shared_ptr;
 using std::unique_ptr;
@@ -62,6 +61,8 @@ WindowsEvent Service::shutdown_event_(L"LogZilla_SyslogAgent_Service_Shutdown");
 shared_ptr<FileWatcher> Service::filewatcher_;
 vector<EventLogSubscription> Service::subscriptions_;
 static SERVICE_STATUS_HANDLE service_status_handle_ = nullptr;
+HANDLE Service::g_StopEvent = nullptr;
+HANDLE Service::g_ShutdownCompleteEvent = nullptr;
 
 namespace {
     // Helper function to safely clean up network clients
@@ -110,8 +111,51 @@ void sendMessagesThread() {
     Logger::debug2("sendMessagesThread() ending\n");
 }
 
+void Service::RegisterServiceCtrlHandler() {
+    service_status_handle_ = ::RegisterServiceCtrlHandlerExW(SERVICE_NAME, ServiceHandlerEx, nullptr);
+    if (!service_status_handle_) {
+        Logger::fatal("Failed to register service control handler. Error: %d\n", GetLastError());
+        throw std::runtime_error("Failed to register service control handler");
+    }
+}
+
+DWORD WINAPI Service::ServiceHandlerEx(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
+    switch (dwControl) {
+        case SERVICE_CONTROL_STOP:
+            // Signal main thread to stop
+            if (g_StopEvent) {
+                SetEvent(g_StopEvent);
+                
+                // Wait max 10 seconds for clean shutdown
+                if (WaitForSingleObject(g_ShutdownCompleteEvent, 10000) != WAIT_OBJECT_0) {
+                    Logger::warning("Timer expired, forcing termination\n");
+                    // Force terminate if clean shutdown fails
+                    ExitProcess(0);
+                }
+            }
+            break;
+    }
+    return NO_ERROR;
+}
+
 void Service::run(bool running_as_console) {
     try {
+        // Create shutdown event handles
+        g_StopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+        g_ShutdownCompleteEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+        
+        if (!g_StopEvent || !g_ShutdownCompleteEvent) {
+            Logger::fatal("Failed to create shutdown event handles\n");
+            throw std::runtime_error("Failed to create shutdown event handles");
+        }
+
+        SlidingWindowMetrics::instance().setWindowDuration(Service::RATE_CHECK_INTERVAL_SEC);
+
+        // Register service control handler if running as service
+        if (!running_as_console) {
+            RegisterServiceCtrlHandler();
+        }
+
         Logger::setFatalErrorHandler(Service::fatalErrorHandler);
 
         Logger::debug("Service::run()> loading setup file (if present)\n");
@@ -292,6 +336,10 @@ bool Service::initializeSecondaryComponents() {
         Logger::debug2("No secondary host configured\n");
         return true;
     }
+
+    // Initialize secondary message queue
+    secondary_message_queue_ = make_shared<MessageQueue>(MESSAGE_QUEUE_SIZE, MESSAGE_BUFFERS_CHUNK_SIZE);
+    Logger::debug2("Service::initializeSecondaryComponents()> initialized secondary message queue\n");
 
     bool isJsonPort = false;
     unsigned int port = config_.getSecondaryPort();
@@ -498,6 +546,8 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
     Logger::debug2("Service::mainLoop()> Starting main loop\n");
 
     int loop_count = 0;
+    auto rateCheckStart = std::chrono::steady_clock::now();
+
     while (!checkForShutdown(running_as_console, restart_needed)) {
         try {
             if (first_loop) {
@@ -515,6 +565,20 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
                 Logger::debug("Service::mainLoop()> heartbeat: 100 loops\n");
                 loop_count = 0;
             }
+			if (std::chrono::steady_clock::now() - rateCheckStart >= std::chrono::seconds(Service::RATE_CHECK_INTERVAL_SEC)) {
+				rateCheckStart = std::chrono::steady_clock::now();
+                auto& metrics = SlidingWindowMetrics::instance();
+                double inRate = metrics.incomingRate();
+                double outRate = metrics.outgoingRate();
+				if (metrics.checkRates(Service::RATE_THRESHOLD_RATIO)) {
+					Logger::warning("SlidingWindowMetrics: Incoming rate %.2f events/s exceeds outgoing rate %.2f events/s (threshold ratio %.2f)",
+						inRate, outRate, Service::RATE_THRESHOLD_RATIO);
+				}
+				else {
+					Logger::debug("SlidingWindowMetrics: Incoming rate %.2f events/s, outgoing rate %.2f events (%.2f)/s",
+                        inRate, outRate, inRate / outRate);
+                }
+			}
         }
         catch (const std::exception& e) {
             Logger::recoverable_error("Service::mainLoop()> Exception: %s\n", e.what());
@@ -523,6 +587,14 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
 }
 
 bool Service::checkForShutdown(bool running_as_console, int& restart_needed) {
+    // Check if shutdown was requested through service control
+    if (g_StopEvent && WaitForSingleObject(g_StopEvent, 0) == WAIT_OBJECT_0) {
+        shutdown_requested_ = true;
+        service_shutdown_requested_ = true;
+        return true;
+    }
+
+    // Check other shutdown conditions
     if (shutdown_requested_) {
         return true;
     }
@@ -556,37 +628,61 @@ void Service::handleQueueStatusAndConfig() {
 void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
     Logger::debug2("Service::cleanupAndShutdown()> starting\n");
 
-    // Set shutdown flags
-    shutdown_requested_ = true;
-    service_shutdown_requested_ = true;
+    try {
+        // Close all subscriptions
+        for (auto& subscription : subscriptions_) {
+            subscription.cancelSubscription();
+        }
+        subscriptions_.clear();
 
-    // Signal shutdown event
-    shutdown_event_.signal();
+        // Clean up file watcher if active
+        if (filewatcher_) {
+            filewatcher_.reset();
+        }
 
-    // Wait for send thread to finish
-    if (send_thread_ && send_thread_->joinable()) {
-        Logger::debug2("Service::cleanupAndShutdown()> waiting for send thread to finish\n");
-        send_thread_->join();
-        send_thread_.reset();
+        // Wait for send thread to complete
+        if (send_thread_ && send_thread_->joinable()) {
+            send_thread_->join();
+        }
+
+        // Cleanup network clients and message queues
+        cleanupNetworkClient(primary_network_client_);
+        cleanupNetworkClient(secondary_network_client_);
+        cleanupMessageQueue(primary_message_queue_);
+        cleanupMessageQueue(secondary_message_queue_);
+
+        // Signal that shutdown is complete
+        if (g_ShutdownCompleteEvent) {
+            SetEvent(g_ShutdownCompleteEvent);
+        }
+
+        // Cleanup event handles
+        if (g_StopEvent) {
+            CloseHandle(g_StopEvent);
+            g_StopEvent = nullptr;
+        }
+        if (g_ShutdownCompleteEvent) {
+            CloseHandle(g_ShutdownCompleteEvent);
+            g_ShutdownCompleteEvent = nullptr;
+        }
+
+        if (!running_as_console) {
+            // Update service status
+            if (service_status_handle_) {
+                SERVICE_STATUS status = {};
+                status.dwCurrentState = SERVICE_STOPPED;
+                status.dwControlsAccepted = 0;
+                status.dwWin32ExitCode = 0;
+                status.dwServiceSpecificExitCode = 0;
+                status.dwCheckPoint = 0;
+                status.dwWaitHint = 0;
+                SetServiceStatus(service_status_handle_, &status);
+            }
+        }
     }
-
-    // Clean up network clients first to ensure no more sends
-    cleanupNetworkClient(primary_network_client_);
-    cleanupNetworkClient(secondary_network_client_);
-
-    // Clean up message queues
-    cleanupMessageQueue(primary_message_queue_);
-    cleanupMessageQueue(secondary_message_queue_);
-
-    // Clean up batchers
-    primary_batcher_.reset();
-    secondary_batcher_.reset();
-
-    // Reset shutdown flags
-    shutdown_requested_ = false;
-    service_shutdown_requested_ = false;
-
-    Logger::debug2("Service::cleanupAndShutdown()> cleanup complete\n");
+    catch (const std::exception& e) {
+        Logger::fatal("Error in cleanupAndShutdown: %s\n", e.what());
+    }
 
     if (restart_needed) {
         Logger::info("Service::cleanupAndShutdown()> restarting service\n");

@@ -2,6 +2,7 @@
 #include "EventLogSubscription.h"
 #include "Logger.h"
 #include "Registry.h"
+#include "SlidingWindowMetrics.h"
 #include "Util.h"
 
 #pragma comment(lib, "wevtapi.lib")
@@ -19,7 +20,8 @@ namespace Syslog_agent {
         subscription_handle_(source.subscription_handle_),
         subscription_active_(false),
         bookmark_modified_(source.bookmark_modified_),
-        last_bookmark_save_(source.last_bookmark_save_)
+        last_bookmark_save_(source.last_bookmark_save_),
+        events_since_last_save_(0)
     {
         memcpy(bookmark_xml_buffer_, source.bookmark_xml_buffer_, sizeof(bookmark_xml_buffer_));
 
@@ -160,6 +162,7 @@ namespace Syslog_agent {
         PVOID pContext,
         EVT_HANDLE hEvent)
     {
+
         auto subscription = reinterpret_cast<EventLogSubscription*>(pContext);
         if (!subscription) {
             Logger::critical("EventLogSubscription::handleSubscriptionEvent()> Invalid subscription context\n");
@@ -186,6 +189,8 @@ namespace Syslog_agent {
                             subscription->bookmark_modified_ = true;
                         }
                     }
+
+					SlidingWindowMetrics::instance().recordIncoming();
 
                     // Create EventLogEvent from handle
                     EventLogEvent evt(hEvent);

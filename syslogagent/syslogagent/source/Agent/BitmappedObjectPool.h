@@ -41,7 +41,7 @@ public:
 
     T* getAndMarkNextUnused() {
         // no maximum, if you do too much you'll get an out-of-memory error
-        const std::lock_guard<std::mutex> lock(in_use_);
+        std::lock_guard<std::mutex> lock(in_use_);
         int32_t bitmap_index = -1;
         int bitnum = -1;
         for (unsigned int i = 0; i < usage_bitmaps_.size(); ++i) {
@@ -67,12 +67,14 @@ public:
     }
 
     bool markAsUnused(T*& now_unused) {
-        const std::lock_guard<std::mutex> lock(in_use_);
+        std::lock_guard<std::mutex> lock(in_use_);
+        if (!belongs(now_unused)) {
+            return false;
+        }
+
         for (size_t i = 0; i < usage_bitmaps_.size(); ++i) {
-            T* start_address = &data_elements_[i][0];
-            T* end_address = &data_elements_[i][chunk_size_ - 1];
-            
-            if (now_unused >= start_address && now_unused <= end_address) {
+            T* start_address = getPoolStart(i);
+            if (now_unused >= start_address && now_unused <= getPoolEnd(i)) {
                 // Calculate offset safely using ptrdiff_t
                 std::ptrdiff_t offset = now_unused - start_address;
                 // Validate offset is within expected range
@@ -113,6 +115,42 @@ public:
         return false;  // Not found in any chunk
     }
 
+    bool belongs(const T* item) const {
+        if (!item) return false;
+        
+        for (size_t i = 0; i < data_elements_.size(); ++i) {
+            T* start = getPoolStart(i);
+            T* end = getPoolEnd(i);
+            if (item >= start && item <= end) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isValidObject(const T* item) const {
+        if (!item || !belongs(item)) {
+            return false;
+        }
+        
+        std::lock_guard<std::mutex> lock(in_use_);
+        // Find which chunk this item belongs to
+        for (size_t i = 0; i < data_elements_.size(); ++i) {
+            T* start = getPoolStart(i);
+            T* end = getPoolEnd(i);
+            if (item >= start && item <= end) {
+                // Calculate offset
+                std::ptrdiff_t offset = item - start;
+                if (offset >= 0 && offset < chunk_size_) {
+                    // Check if this slot is marked as in use
+                    return usage_bitmaps_[i]->isSet(static_cast<int>(offset));
+                }
+                return false;
+            }
+        }
+        return false;
+    }
+
     int countBuffers() const {
         int count = 0;
         for (auto& bm : usage_bitmaps_) {
@@ -138,7 +176,21 @@ public:
     }
 
 private:
-    std::mutex in_use_;
+    T* getPoolStart(size_t index) const {
+        if (index < data_elements_.size()) {
+            return &data_elements_[index][0];
+        }
+        return nullptr;
+    }
+
+    T* getPoolEnd(size_t index) const {
+        if (index < data_elements_.size()) {
+            return &data_elements_[index][chunk_size_ - 1];
+        }
+        return nullptr;
+    }
+
+    mutable std::mutex in_use_;
     std::vector<std::shared_ptr<Bitmap>> usage_bitmaps_;
     std::vector<std::shared_ptr<T[]>> data_elements_;
     int chunk_size_;

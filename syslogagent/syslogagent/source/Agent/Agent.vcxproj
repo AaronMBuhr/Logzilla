@@ -135,6 +135,7 @@
     <ClInclude Include="ChannelEventHandlerBase.h" />
     <ClInclude Include="EventHandlerMessageQueuer.h" />
     <ClInclude Include="EventLogEvent.h" />
+    <ClInclude Include="EventLogger.h" />
     <ClInclude Include="EventLogSubscription.h" />
     <ClInclude Include="external\pugixml\src\pugiconfig.hpp" />
     <ClInclude Include="external\pugixml\src\pugixml.hpp" />
@@ -152,6 +153,7 @@
     <ClInclude Include="MessageBatcher.h" />
     <ClInclude Include="MessageQueue.h" />
     <ClInclude Include="OStreamBuf.h" />
+    <ClInclude Include="RateMonitor.h" />
     <ClInclude Include="RecordNumber.h" />
     <ClInclude Include="Configuration.h" />
     <ClInclude Include="Result.h" />
@@ -159,6 +161,7 @@
     <ClInclude Include="LogConfiguration.h" />
     <ClInclude Include="Registry.h" />
     <ClInclude Include="Service.h" />
+    <ClInclude Include="SlidingWindowMetrics.h" />
     <ClInclude Include="StatefulLogger.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="SyslogAgentSharedConstants.h" />
@@ -170,11 +173,13 @@
     <ClInclude Include="WindowsTimer.h" />
     <ClInclude Include="HttpNetworkClient.h" />
     <ClInclude Include="JsonNetworkClient.h" />
+    <ClInclude Include="XMLToJsonConverter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Agent.cpp" />
     <ClCompile Include="EventHandlerMessageQueuer.cpp" />
     <ClCompile Include="EventLogEvent.cpp" />
+    <ClCompile Include="EventLogger.cpp" />
     <ClCompile Include="EventLogSubscription.cpp" />
     <ClCompile Include="external\pugixml\src\pugixml.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -192,6 +197,7 @@
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="Registry.cpp" />
     <ClCompile Include="Service.cpp" />
+    <ClCompile Include="SlidingWindowMetrics.cpp" />
     <ClCompile Include="StatefulLogger.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -205,6 +211,7 @@
     <ClCompile Include="WindowsTimer.cpp" />
     <ClCompile Include="HttpNetworkClient.cpp" />
     <ClCompile Include="JsonNetworkClient.cpp" />
+    <ClCompile Include="XMLToJsonConverter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="message.mc" />

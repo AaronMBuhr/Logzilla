@@ -95,7 +95,14 @@ namespace Syslog_agent {
             &buffer_size_needed);
         if (!succeeded) {
             auto err = GetLastError();
-            Logger::recoverable_error("EventLogEvent::renderText()> error %d\n", err);
+            // Check specifically for message not found
+            if (err == 15029) {
+                Logger::debug("EventLogEvent::renderText()> Message template not found\n");
+                strcpy_s(text_buffer_, Globals::MESSAGE_BUFFER_SIZE, "(Message template unavailable)");
+            }
+            else {
+                Logger::recoverable_error("EventLogEvent::renderText()> Failed to format message: %d\n", err);
+            }
             text_buffer_w[0] = L'\0';
             buffer_size_needed = 0;
         }

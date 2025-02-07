@@ -33,9 +33,27 @@ public:
     uint32_t GetBatchSizeThreshold_() const override { return BATCH_SIZE_THRESHOLD; }
     uint32_t GetMinBatchInterval_() const override { return MIN_BATCH_INTERVAL; }
     uint32_t GetMaxBatchSize_() const override { return MAX_BATCH_SIZE; }
-    char* GetMessageHeader_() const override { return const_cast<char*>(header_); }
-    char* GetMessageSeparator_() const override { return const_cast<char*>(separator_); }
-    char* GetMessageTrailer_() const override { return const_cast<char*>(trailer_); }   
+    
+    void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
+        size_out = strlen(header_);
+        if (size_out < max_size) {
+            strcpy_s(dest, max_size, header_);
+        }
+    }
+    
+    void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
+        size_out = strlen(separator_);
+        if (size_out < max_size) {
+            strcpy_s(dest, max_size, separator_);
+        }
+    }
+    
+    void GetMessageTrailer_(char* dest, size_t max_size, size_t& size_out) const override {
+        size_out = strlen(trailer_);
+        if (size_out < max_size) {
+            strcpy_s(dest, max_size, trailer_);
+        }
+    }
 };
 
 }

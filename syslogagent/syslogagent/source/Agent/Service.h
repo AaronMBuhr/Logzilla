@@ -6,20 +6,22 @@ Copyright 2021 Logzilla Corp.
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
-#include <vector>
 #include <thread>
-#include "WindowsEvent.h"
+#include <vector>
+
 #include "Configuration.h"
-#include "LogConfiguration.h"
-#include "MessageQueue.h"
-#include "INetworkClient.h"
-#include "MessageBatcher.h"
-#include "HTTPMessageBatcher.h"
-#include "JSONMessageBatcher.h"
 #include "EventLogSubscription.h"
 #include "FileWatcher.h"
+#include "HTTPMessageBatcher.h"
+#include "INetworkClient.h"
+#include "JSONMessageBatcher.h"
+#include "LogConfiguration.h"
+#include "MessageBatcher.h"
+#include "MessageQueue.h"
+#include "WindowsEvent.h"
 
 namespace Syslog_agent {
 
@@ -33,9 +35,11 @@ namespace Syslog_agent {
 class Service {
 public:
 
-    static constexpr size_t MESSAGE_QUEUE_SIZE = 1000000;
+    static constexpr size_t MESSAGE_QUEUE_SIZE = 10000;
     static constexpr size_t MESSAGE_BUFFERS_CHUNK_SIZE = 1000;
     static constexpr int DEFAULT_EVENT_LOG_POLL_INTERVAL = 1;
+    static constexpr int RATE_CHECK_INTERVAL_SEC{ 30 };  
+    static constexpr double RATE_THRESHOLD_RATIO{ 1.5 };
 
     // Static member variables, visible for use by sendMessagesThread
     static Configuration config_;
@@ -45,6 +49,10 @@ public:
     static shared_ptr<INetworkClient> secondary_network_client_;
     static shared_ptr<MessageBatcher> primary_batcher_;
     static shared_ptr<MessageBatcher> secondary_batcher_;
+
+    // Service control handler
+    static DWORD WINAPI ServiceHandlerEx(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext);
+    static void RegisterServiceCtrlHandler();
 
     // Public interface
     static void run(bool running_as_console);
@@ -75,6 +83,8 @@ private:
     static WindowsEvent shutdown_event_;
     static shared_ptr<FileWatcher> filewatcher_;
     static vector<EventLogSubscription> subscriptions_;
+    static HANDLE g_StopEvent;
+    static HANDLE g_ShutdownCompleteEvent;
 
     // Prevent instantiation
     Service() = delete;
