@@ -53,6 +53,7 @@ shared_ptr<INetworkClient> Service::primary_network_client_;
 shared_ptr<INetworkClient> Service::secondary_network_client_;
 shared_ptr<MessageBatcher> Service::primary_batcher_;
 shared_ptr<MessageBatcher> Service::secondary_batcher_;
+unique_ptr<SyslogSender> Service::sender_;
 std::atomic<bool> Service::fatal_shutdown_in_progress = false;
 unique_ptr<thread> Service::send_thread_ = nullptr;
 volatile bool Service::shutdown_requested_ = false;
@@ -93,7 +94,7 @@ void Service::loadConfiguration(bool running_from_console, bool override_log_lev
 
 void sendMessagesThread() {
     Logger::debug2("sendMessagesThread() starting\n");
-    auto sender = make_unique<SyslogSender>(
+    Service::sender_ = make_unique<SyslogSender>(
         Service::config_,
         Service::primary_message_queue_,
         Service::secondary_message_queue_,
@@ -104,7 +105,7 @@ void sendMessagesThread() {
     );
 
     try {
-        sender->run();
+        Service::sender_->run();
     }
     catch (const std::exception& e) {
         Logger::critical("Exception in sendMessagesThread: %s\n", e.what());
@@ -632,7 +633,15 @@ void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
     Logger::debug2("Service::cleanupAndShutdown()> starting\n");
 
     try {
-        // Close all subscriptions
+        // First signal queues to stop accepting new messages
+        if (primary_message_queue_) {
+            primary_message_queue_->beginShutdown();
+        }
+        if (secondary_message_queue_) {
+            secondary_message_queue_->beginShutdown();
+        }
+
+        // Close all subscriptions to stop incoming messages
         for (auto& subscription : subscriptions_) {
             subscription.cancelSubscription();
         }
@@ -643,14 +652,19 @@ void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
             filewatcher_.reset();
         }
 
-        // Wait for send thread to complete
+        // Close network connections before waiting for send thread
+        cleanupNetworkClient(primary_network_client_);
+        cleanupNetworkClient(secondary_network_client_);
+
+        Service::sender_->requestStop();
+
+        // Now wait for send thread to complete
         if (send_thread_ && send_thread_->joinable()) {
+            Logger::debug2("Service::cleanupAndShutdown()> Waiting for send thread to complete\n");
             send_thread_->join();
         }
 
-        // Cleanup network clients and message queues
-        cleanupNetworkClient(primary_network_client_);
-        cleanupNetworkClient(secondary_network_client_);
+        // Finally cleanup message queues
         cleanupMessageQueue(primary_message_queue_);
         cleanupMessageQueue(secondary_message_queue_);
 

@@ -14,6 +14,9 @@ Copyright 2021 Logzilla Corp.
 #include "SyslogSender.h"
 #include "Util.h"
 
+#include "EventLogger.h"
+
+
 namespace Syslog_agent {
 
 // Define static members
@@ -108,6 +111,10 @@ void SyslogSender::run() const
                 primary_has_messages ? primary_queue : nullptr, 
                 secondary_has_messages ? secondary_queue : nullptr);
 
+			if (isStopRequested()) {
+				break;
+			}
+
             // Process primary queue if messages are available
             if (primary_queue) {
                 Logger::debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
@@ -181,20 +188,27 @@ int SyslogSender::sendMessageBatch(
         return 0;
     }
 
+    // Check if we're shutting down
+    if (isShuttingDown() || msg_queue->isShuttingDown()) {
+        Logger::debug2("SyslogSender::sendMessageBatch()> Shutdown in progress, skipping batch send\n");
+        return 0;
+    }
+
     try {
         Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n", 
             batch_count, batch_buf_length);
-        //Logger::always("--------------------------------------------------------------------------------> %u messages (%u bytes)\n",
-        //    batch_count, batch_buf_length);
-        // Logger::debug3("SyslogSender::sendMessageBatch()> Batch content: %.*s\n", 
-        //     (std::min)(batch_buf_length, 1000u), batch_buf);
 
         // Attempt to send the batch
         INetworkClient::RESULT_TYPE result = network_client->post(batch_buf, batch_buf_length);
 
         if (result != INetworkClient::RESULT_SUCCESS) {
-            Logger::critical("SyslogSender::sendMessageBatch()> Failed to send batch, network error: %d\n", result);
-            return 0; // Return 0 to indicate no messages were processed
+            // Don't log as critical during shutdown - it's expected to fail
+            if (isShuttingDown() || msg_queue->isShuttingDown()) {
+                Logger::debug2("SyslogSender::sendMessageBatch()> Network send failed during shutdown\n");
+            } else {
+                Logger::critical("SyslogSender::sendMessageBatch()> Failed to send batch, network error: %d\n", result);
+            }
+            return 0;
         }
 
         Logger::debug3("SyslogSender::sendMessageBatch()> Network send successful\n");
@@ -208,9 +222,9 @@ int SyslogSender::sendMessageBatch(
                 break;
             }
             SlidingWindowMetrics::instance().recordOutgoing();
-            //string eventJson = EventLogger::queuePopFront();
-            //EventLogger::log(EventLogger::LogDestination::SentEvents,
-            //    "Event sent: %s\n", eventJson.c_str());
+            string eventJson = EventLogger::queuePopFront();
+            EventLogger::log(EventLogger::LogDestination::SentEvents,
+                "Event sent: %s\n", eventJson.c_str());
             messages_removed++;
         }
 

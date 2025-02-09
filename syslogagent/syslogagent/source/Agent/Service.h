@@ -21,6 +21,7 @@ Copyright 2021 Logzilla Corp.
 #include "LogConfiguration.h"
 #include "MessageBatcher.h"
 #include "MessageQueue.h"
+#include "SyslogSender.h"
 #include "WindowsEvent.h"
 
 namespace Syslog_agent {
@@ -49,6 +50,7 @@ public:
     static shared_ptr<INetworkClient> secondary_network_client_;
     static shared_ptr<MessageBatcher> primary_batcher_;
     static shared_ptr<MessageBatcher> secondary_batcher_;
+    static unique_ptr<SyslogSender> sender_;
 
     // Service control handler
     static DWORD WINAPI ServiceHandlerEx(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext);
