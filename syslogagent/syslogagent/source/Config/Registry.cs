@@ -1,5 +1,5 @@
-﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
+/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright 2021 LogZilla Corp.
 */
 
 #define OTHER_NEW_METHOD
@@ -76,8 +76,14 @@ namespace SyslogAgent.Config
             config.AllEventLogPaths = Registry.AllEventLogPaths;
             config.SelectedEventLogPaths = Registry.SelectedEventLogPaths;
             config.BatchInterval 
-                = (int)mainKey.GetValue( SharedConstants.RegistryKey.BatchInterval, 
-                SharedConstants.ConfigDefaults.BatchInterval );
+                = ReadIntegerValue(mainKey, SharedConstants.RegistryKey.BatchInterval, 
+                SharedConstants.ConfigDefaults.DefaultBatchInterval);
+            config.MaxBatchSize 
+                = ReadIntegerValue(mainKey, SharedConstants.RegistryKey.MaxBatchSize, 
+                (int)SharedConstants.ConfigDefaults.MAX_BATCH_SIZE);
+            config.MaxBatchAge 
+                = ReadIntegerValue(mainKey, SharedConstants.RegistryKey.MaxBatchAge, 
+                (int)SharedConstants.ConfigDefaults.MAX_BATCH_AGE);
             config.PrimaryBackwardsCompatVer 
                 = mainKey.GetValue(SharedConstants.RegistryKey.PrimaryBackwardsCompatVer, 
                 SharedConstants.ConfigDefaults.BackwardsCompatVer).ToString();
@@ -113,6 +119,10 @@ namespace SyslogAgent.Config
                 config.Severity, RegistryValueKind.DWord);
             mainKey.SetValue(SharedConstants.RegistryKey.BatchInterval, 
                 config.BatchInterval, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.MaxBatchSize, 
+                config.MaxBatchSize, RegistryValueKind.DWord);
+            mainKey.SetValue(SharedConstants.RegistryKey.MaxBatchAge, 
+                config.MaxBatchAge, RegistryValueKind.DWord);
             mainKey.SetValue(SharedConstants.RegistryKey.Suffix, config.Suffix, 
                 RegistryValueKind.String);
             mainKey.SetValue(SharedConstants.RegistryKey.PrimaryHost, 
@@ -180,6 +190,11 @@ namespace SyslogAgent.Config
         {
             parent.SetValue(key, 
                 new byte[] { value ? (byte)1 : (byte)0 }, RegistryValueKind.Binary);
+        }
+
+        int ReadIntegerValue(RegistryKey parent, string key, int defaultValue)
+        {
+            return (int)parent.GetValue(key, defaultValue);
         }
 
         RegistryKey mainKey = null;
@@ -362,6 +377,10 @@ namespace SyslogAgent.Config
                 WriteRegfileKeyValue(writer, 
                     SharedConstants.RegistryKey.BatchInterval, config.BatchInterval);
                 WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.MaxBatchSize, config.MaxBatchSize);
+                WriteRegfileKeyValue(writer, 
+                    SharedConstants.RegistryKey.MaxBatchAge, config.MaxBatchAge);
+                WriteRegfileKeyValue(writer, 
                     SharedConstants.RegistryKey.Suffix, config.Suffix ?? "");
                 WriteRegfileKeyValue(writer, 
                     SharedConstants.RegistryKey.PrimaryHost, config.PrimaryHost ?? "");
@@ -459,6 +478,16 @@ namespace SyslogAgent.Config
 
                                 case SharedConstants.RegistryKey.BatchInterval:
                                     config.BatchInterval 
+                                        = System.Convert.ToInt32( ValuePortion( parts[1]), 16);
+                                    break;
+
+                                case SharedConstants.RegistryKey.MaxBatchSize:
+                                    config.MaxBatchSize 
+                                        = System.Convert.ToInt32( ValuePortion( parts[1]), 16);
+                                    break;
+
+                                case SharedConstants.RegistryKey.MaxBatchAge:
+                                    config.MaxBatchAge 
                                         = System.Convert.ToInt32( ValuePortion( parts[1]), 16);
                                     break;
 

@@ -1,5 +1,5 @@
-﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
+/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright 2021 LogZilla Corp.
 */
 
 using System;
@@ -64,6 +64,8 @@ namespace SyslogAgent
             public const string BatchInterval               =   "BatchInterval";
             public const string PrimaryBackwardsCompatVer   =   "PrimaryBackwardsCompatibleVersion";
             public const string SecondaryBackwardsCompatVer =   "SecondaryBackwardsCompatibleVersion";
+            public const string MaxBatchSize                =   "MaxBatchSize";
+            public const string MaxBatchAge                 =   "MaxBatchAge";
         }
 
         public static class ConfigDefaults
@@ -93,6 +95,11 @@ namespace SyslogAgent
             public const string     TailFilename            =   "";
             public const string     TailProgramName         =   "";
             public const string     SyslogAgentHttpPath     =   "SyslogAgentHttpPath";
+            public const int        DefaultDebugLevel       =   0;
+            public const int        DefaultBatchInterval    =   1000;
+            public const uint       MAX_BATCH_SIZE          =   1000;
+            public const uint       MAX_BATCH_AGE           =   1000;
+            public const string     DefaultTailProgramName  =   "tail";
             public const int        BatchInterval           =   1000;
             public const string     BackwardsCompatVer      =   "detect";
         }
@@ -110,4 +117,3 @@ namespace SyslogAgent
 
     }
 }
-

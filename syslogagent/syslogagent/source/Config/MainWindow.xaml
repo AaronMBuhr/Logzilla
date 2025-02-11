@@ -216,9 +216,13 @@ Copyright 2021 LogZilla Corp.
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
-                                <!--
                                 <RowDefinition Height="Auto" />
-                                -->
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Grid.Column="0" Grid.Row="0" Margin="2,2,2,2">Look up account IDs</TextBlock>
                             <!--
@@ -270,6 +274,12 @@ Copyright 2021 LogZilla Corp.
                                 <ComboBoxItem>Debug</ComboBoxItem>
                             </ComboBox>
                             <TextBox Grid.Column="1" Grid.Row="4" Margin="2,0,0,0" Width="200" Name="suffixText" ToolTip="Enter a quoted key-value pair(s) to be appended"></TextBox>
+                            <TextBlock Grid.Column="0" Grid.Row="8" Margin="2,2,2,2">Extra Key/Value Pairs</TextBlock>
+                            <TextBox Grid.Column="1" Grid.Row="8" Margin="2,2,2,2" Name="extraKeyValuePairsText" Width="200"/>
+                            <TextBlock Grid.Column="0" Grid.Row="9" Margin="2,2,2,2">Max Batch Size</TextBlock>
+                            <TextBox Grid.Column="1" Grid.Row="9" Margin="2,2,2,2" Name="maxBatchSizeText" Width="200"/>
+                            <TextBlock Grid.Column="0" Grid.Row="10" Margin="2,2,2,2">Max Batch Age (ms)</TextBlock>
+                            <TextBox Grid.Column="1" Grid.Row="10" Margin="2,2,2,2" Name="maxBatchAgeText" Width="200"/>
                         </Grid>
                     </GroupBox>
 

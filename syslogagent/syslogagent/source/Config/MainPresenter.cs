@@ -1,5 +1,5 @@
-﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
+/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright 2021 LogZilla Corp.
 */
 
 using Newtonsoft.Json;
@@ -213,6 +213,8 @@ namespace SyslogAgent.Config
             view.SecondaryBackwardsCompatVer.Option
                 = Array.IndexOf(SharedConstants.BackwardsCompatVersions,
                 config_.SecondaryBackwardsCompatVer);
+            view.MaxBatchSize.Content = config_.MaxBatchSize.ToString();
+            view.MaxBatchAge.Content = config_.MaxBatchAge.ToString();
             view.LogzillaFileVersion = GetLogzillaFileVersion();
 
             //foreach (var log in config.EventLogs) view.Logs.Add(log.DisplayName, log.IsChosen);
@@ -255,6 +257,8 @@ namespace SyslogAgent.Config
                 = SharedConstants.BackwardsCompatVersions[view.PrimaryBackwardsCompatVer.Option];
             config.SecondaryBackwardsCompatVer
                 = SharedConstants.BackwardsCompatVersions[view.SecondaryBackwardsCompatVer.Option];
+            config.MaxBatchSize = Convert.ToInt32(view.MaxBatchSize.Content);
+            config.MaxBatchAge = Convert.ToInt32(view.MaxBatchAge.Content);
 
             var selected_logs = GetSelectedLogPaths(this.eventLogTreeviewRoot);
             config.SelectedEventLogPaths = selected_logs;
@@ -391,29 +395,25 @@ namespace SyslogAgent.Config
                     view.PrimaryApiKey, SharedConstants.PrimaryCertFilename, "Invalid primary API key")),
 
                 (5, "Secondary Host", () =>
-                    ValidateInternetHost(view.SecondaryHost, view.SendToSecondary.IsSelected,
-                    "Invalid secondary host")),
+                    ValidateInternetHost(view.SecondaryHost, false, "Invalid secondary host")),
 
                 (6, "Secondary Host Connectivity", () =>
                     ValidateHostConnectivity(view.SecondaryHost, view.SecondaryUseTls,
-                    view.SendToSecondary.IsSelected, "Secondary host")),
+                    false, "Secondary host")),
 
                 (7, "Secondary TLS Certificate", () =>
-                    ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost,
-                    view.SendToSecondary.IsSelected, true,
-                    "Secondary host certificate does not match the .pfx file")),
+                    ValidateTlsCertificate(view.SecondaryUseTls, view.SecondaryHost, false,
+                    true, "Secondary host certificate does not match the .pfx file")),
 
                 (8, "Secondary API Key", () =>
-                    ValidateApiKeyInternal(view.SendToSecondary.IsSelected, view.SecondaryUseTls.IsSelected,
-                    view.SecondaryHost, view.SecondaryApiKey, SharedConstants.SecondaryCertFilename,
-                    "Invalid secondary API key")),
+                    ValidateApiKeyInternal(false, view.SecondaryUseTls.IsSelected, view.SecondaryHost,
+                    view.SecondaryApiKey, SharedConstants.SecondaryCertFilename, "Invalid secondary API key")),
 
-                (9, "Event ID Selection", () =>
-                    ValidateIgnoreVsIncludeEventIds(view.EventIdFilter, view.IncludeEventIds,
-                    view.IgnoreEventIds, "Select either \"Include\" or \"Ignore\" event ids")),
+                (9, "Event IDs", () =>
+                    ValidateEventIds(view.EventIdFilter, "Invalid event ID filter")),
 
-                (10, "Event IDs", () =>
-                    ValidateEventIds(view.EventIdFilter, "Invalid event id filter")),
+                (10, "Batch Interval", () =>
+                    ValidateInterval(view.BatchInterval, "Invalid batch interval")),
 
                 (11, "Debug Log Filename", () =>
                     ValidateFilename(view.DebugLogFilename, "Invalid debug log filename")),
@@ -421,20 +421,17 @@ namespace SyslogAgent.Config
                 (12, "Tail Filename", () =>
                     ValidateFilename(view.TailFilename, "Invalid tail filename")),
 
-                (13, "JSON Suffix", () =>
-                    ValidatedSuffix(view.Suffix, "Invalid JSON")),
-
-                (14, "Primary TLS Configuration", () =>
-                    ValidatePrimaryTLS(view.PrimaryUseTls, "Push \"Select Primary Cert\"" +
-                    " to choose a certificate file")),
-
-                (15, "Secondary TLS Configuration", () =>
-                    ValidateSecondaryTLS(view.SecondaryUseTls, "Push \"Select Secondary Cert\"" +
-                    " to choose a certificate file")),
-
-                (16, "Tail Program Name", () =>
+                (13, "Tail Program Name", () =>
                     ValidateTailProgramName(view.TailProgramName, view.TailFilename.Content,
-                    "Set a short program name for the tail log messages"))
+                    "Set a short program name for the tail log messages")),
+
+                (index: 14, name: "Max Batch Size", validator: () =>
+                    ValidateNumericRange(view.MaxBatchSize, 1, 100000, 
+                    "Max Batch Size must be between 1 and 100000")),
+
+                (index: 15, name: "Max Batch Age", validator: () =>
+                    ValidateNumericRange(view.MaxBatchAge, 0, 86400000, 
+                    "Max Batch Age must be between 0 and 86400000 milliseconds (24 hours)"))
             };
 
                     // Run each validation function unless it's skipped
@@ -490,23 +487,62 @@ namespace SyslogAgent.Config
             return isValid ? null : failureMsg;
         }
 
+        static string ValidateNumericRange(IValidatedStringView value, int min, int max, string failureMsg)
+        {
+            int result;
+            var isValid = int.TryParse(value.Content, out result);
+            isValid &= result >= min && result <= max;
+            value.IsValid = isValid;
+            return isValid ? null : failureMsg;
+        }
+
         static string ValidateFilename(IValidatedStringView filename, string failureMsg)
         {
-            bool isValid = filename.IsValid = filename.Content.Trim().Length < 1
-                || Regex.Match(filename.Content, @"^[\:\\\w\-. ]+$").Success;
-            return isValid ? null : failureMsg;
+            using (Logger.LogScope("ValidateFilename"))
+            {
+                try
+                {
+                    var content = filename.Content.Trim();
+                    Logger.LogInfo($"Validating filename: '{content}'");
+
+                    // Empty filename is valid (used when debug level is None)
+                    if (content.Length < 1)
+                    {
+                        filename.IsValid = true;
+                        Logger.LogInfo("Empty filename is valid");
+                        return null;
+                    }
+
+                    // For simple filenames without path, only check basic filename characters
+                    if (!content.Contains("\\") && !content.Contains("/"))
+                    {
+                        var isValid = Regex.Match(content, @"^[\w\-. ]+$").Success;
+                        filename.IsValid = isValid;
+                        Logger.LogInfo($"Simple filename validation {(isValid ? "passed" : "failed")}: '{content}'");
+                        return isValid ? null : failureMsg;
+                    }
+
+                    // For paths, validate the full path format
+                    var isPathValid = Regex.Match(content, @"^[a-zA-Z]:\\[\\\w\-. ]+$").Success;
+                    filename.IsValid = isPathValid;
+                    Logger.LogInfo($"Full path validation {(isPathValid ? "passed" : "failed")}: '{content}'");
+                    return isPathValid ? null : failureMsg;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Filename validation failed", ex);
+                    throw;
+                }
+            }
         }
 
-        static string ValidateStringLength(IValidatedStringView value, int minLen,
-            int maxLen, string failureMsg)
+        static string ValidateStringLength(IValidatedStringView value, int minLen, int maxLen, string failureMsg)
         {
-            bool isValid = value.IsValid = !(value.Content.Length < minLen
-                || value.Content.Length > maxLen);
+            bool isValid = value.IsValid = !(value.Content.Length < minLen || value.Content.Length > maxLen);
             return isValid ? null : failureMsg;
         }
 
-        public static string ValidateInternetHost(IValidatedStringView host, bool required,
-            string failureMsg)
+        public static string ValidateInternetHost(IValidatedStringView host, bool required, string failureMsg)
         {
             if (!required) return null;
 
@@ -553,7 +589,7 @@ namespace SyslogAgent.Config
             if (!required)
                 return null;
 
-            string url = host.Content.Trim();
+            string url = host.Content;
             if (!url.Contains("://"))
             {
                 url = "http://" + url; // Prepend with default scheme (http) if no

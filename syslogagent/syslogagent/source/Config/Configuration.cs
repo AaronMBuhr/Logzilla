@@ -1,5 +1,5 @@
-﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
+/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright 2021 LogZilla Corp.
 */
 
 using System.Collections.Generic;
@@ -31,6 +31,8 @@ namespace SyslogAgent.Config {
         public string TailProgramName { get; set; }
         public string PrimaryBackwardsCompatVer { get; set; }
         public string SecondaryBackwardsCompatVer { get; set; }
+        public int MaxBatchSize { get; set; }
+        public int MaxBatchAge { get; set; }
         public List<EventLogCandidate> EventLogs = new List<EventLogCandidate>();
         public List<string> AllEventLogPaths;
         public IEnumerable<string> SelectedEventLogPaths;

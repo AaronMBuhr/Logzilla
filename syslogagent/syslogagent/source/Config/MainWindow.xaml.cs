@@ -1,5 +1,5 @@
-﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
+/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright 2021 LogZilla Corp.
 */
 
 using System;
@@ -111,6 +111,9 @@ namespace SyslogAgent.Config
         public IValidatedStringView TailProgramName => new ValidatedTextBox(txtTailProgramName);
         public IOptionListView PrimaryBackwardsCompatVer => new OptionListCombo(primaryBackwardsCompatVerCombo);
         public IOptionListView SecondaryBackwardsCompatVer => new OptionListCombo(secondaryBackwardsCompatVerCombo);
+
+        public IValidatedStringView MaxBatchSize => new ValidatedTextBox(maxBatchSizeText);
+        public IValidatedStringView MaxBatchAge => new ValidatedTextBox(maxBatchAgeText);
 
         public string Message
         {

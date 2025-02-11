@@ -1,5 +1,5 @@
-﻿/* SyslogAgentConfig: configuring a syslog agent for Windows
-Copyright © 2021 LogZilla Corp.
+/* SyslogAgentConfig: configuring a syslog agent for Windows
+Copyright 2021 LogZilla Corp.
 */
 
 namespace SyslogAgent.Config {
@@ -33,6 +33,8 @@ namespace SyslogAgent.Config {
         IValidatedStringView DebugLogFilename { get; }
         IValidatedStringView TailFilename { get; }
         IValidatedStringView TailProgramName { get; }
+        IValidatedStringView MaxBatchSize { get; }
+        IValidatedStringView MaxBatchAge { get; }
 
         IOptionListView PrimaryBackwardsCompatVer { get; }
 
