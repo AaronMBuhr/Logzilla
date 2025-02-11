@@ -66,6 +66,8 @@ namespace Syslog_agent {
             static constexpr const char* const  VERSION_DETECT_STR  = VERSION_DETECT_STR_DATA;
             static constexpr const char* const  LOGZILLA_VER        = VERSION_DETECT_STR;
             static constexpr int                POLL_INTERVAL_SEC   = 2;
+            static constexpr uint32_t           MAX_BATCH_SIZE      = 1000;
+            static constexpr uint32_t           MAX_BATCH_AGE        = 1000;
         };
 
         // Severity levels
@@ -165,6 +167,8 @@ namespace Syslog_agent {
             static constexpr const wchar_t* PRIMARY_BACKWARDS_COMPAT_VER = L"PrimaryBackwardsCompatibleVersion";
             static constexpr const wchar_t* SECONDARY_BACKWARDS_COMPAT_VER = L"SecondaryBackwardsCompatibleVersion";
             static constexpr const wchar_t* INITIAL_SETUP_FILE          = L"InitialSetupRegFile";
+            static constexpr const wchar_t* MAX_BATCH_SIZE              = L"MaxBatchSize";
+            static constexpr const wchar_t* MAX_BATCH_AGE               = L"MaxBatchAge";
         };
     };
 

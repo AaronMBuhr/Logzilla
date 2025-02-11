@@ -133,6 +133,12 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     include_vs_ignore_eventids_ = registry.readBool(SharedConstants::RegistryKey::INCLUDE_VS_IGNORE_EVENT_IDS, false);
     loadFilterIds(registry.readString(SharedConstants::RegistryKey::EVENT_ID_FILTER, L""));
 
+    // Load batch configuration
+    max_batch_size_ = static_cast<uint32_t>(registry.readInt(SharedConstants::RegistryKey::MAX_BATCH_SIZE,
+        SharedConstants::Defaults::MAX_BATCH_SIZE));
+    max_batch_age_ = static_cast<uint32_t>(registry.readInt(SharedConstants::RegistryKey::MAX_BATCH_AGE,
+        SharedConstants::Defaults::MAX_BATCH_AGE));
+
     auto channels = registry.readChannels();
     logs_.clear();
     logs_.reserve(channels.size());

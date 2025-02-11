@@ -23,6 +23,7 @@ public:
     static constexpr uint32_t MAX_MESSAGE_SIZE = 65536;         // Maximum size of a message batch in bytes
     static constexpr uint32_t MAX_BATCH_SIZE = 100;            // Maximum messages in a single batch
     static constexpr uint32_t MAX_MESSAGE_AGE_MS = 1000;       // Maximum age of oldest message before forcing a batch
+    static constexpr uint32_t SEND_BUFFER_SIZE = 8 * 1024 * 1024; // Size of the send buffer in bytes
 
     SyslogSender(Configuration& config,
         shared_ptr<MessageQueue> primary_queue,
@@ -103,7 +104,7 @@ private:
     shared_ptr<MessageBatcher> secondary_batcher_;
     mutable std::mutex batch_mutex_;
     mutable std::condition_variable batch_cv_;
-    unique_ptr<char[]> message_buffer_;
+    unique_ptr<char[]> send_buffer_;
 
 };
 

@@ -41,7 +41,7 @@ SyslogSender::SyslogSender(
     , secondary_network_client_(secondary_network_client)
     , primary_batcher_(primary_batcher)
     , secondary_batcher_(secondary_batcher)
-    , message_buffer_(new char[MAX_MESSAGE_SIZE])
+    , send_buffer_(new char[SEND_BUFFER_SIZE])
 {
     Logger::debug2("SyslogSender constructor\n");
     using namespace std::placeholders;
@@ -93,9 +93,6 @@ void SyslogSender::run() const
 {
     Logger::debug2("SyslogSender::run()> Starting sender thread\n");
     
-    unique_ptr<char[]> batch_buffer = make_unique<char[]>(MAX_MESSAGE_SIZE);
-    uint32_t batch_buffer_length = 0;
-
     MessageQueue* primary_queue = (primary_network_client_ && primary_batcher_) ? primary_queue_.get() : nullptr;
     MessageQueue* secondary_queue = (secondary_network_client_ && secondary_batcher_) ? secondary_queue_.get() : nullptr;
     bool primary_has_messages = true;
@@ -119,15 +116,16 @@ void SyslogSender::run() const
             if (primary_queue) {
                 Logger::debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
                 size_t initial_queue_size = primary_queue->length();
+                uint32_t send_buffer_length = 0;
                 
                 for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
-                    auto batch_result = primary_batcher_->BatchEvents(primary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
+                    auto batch_result = primary_batcher_->BatchEvents(primary_queue_, send_buffer_.get(), SEND_BUFFER_SIZE);
                     Logger::debug3("SyslogSender::run()> Primary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
                     if (batch_result.status == MessageBatcher::BatchResult::Status::Success) {
-                        batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
+                        send_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
                         sendMessageBatch(primary_queue_, primary_network_client_, batch_result.messages_batched, 
-                            batch_buffer.get(), batch_buffer_length);
+                            send_buffer_.get(), send_buffer_length);
                         messages_processed += batch_result.messages_batched;
                         primary_has_messages = true;
                     } else {

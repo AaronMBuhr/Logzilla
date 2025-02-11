@@ -196,6 +196,16 @@ namespace Syslog_agent {
             return use_compression_;
         }
 
+        uint32_t getMaxBatchSize() const {
+            shared_lock<shared_mutex> lock(mutex_);
+            return max_batch_size_;
+        }
+
+        uint32_t getMaxBatchAge() const {
+            shared_lock<shared_mutex> lock(mutex_);
+            return max_batch_age_;
+        }
+
         // Protected data access for internal use
         class ScopedAccess {
         public:
@@ -256,6 +266,8 @@ namespace Syslog_agent {
         int primary_port_ = 0;  // Stores port from registry or 0 if not specified
         int secondary_port_ = 0;  // Stores secondary port from registry or 0 if not specified
 		bool use_compression_ = SharedConstants::USE_COMPRESSION;
+        uint32_t max_batch_size_ = SharedConstants::Defaults::MAX_BATCH_SIZE;
+        uint32_t max_batch_age_ = SharedConstants::Defaults::MAX_BATCH_AGE;
 
         // Thread synchronization
         mutable shared_mutex mutex_;

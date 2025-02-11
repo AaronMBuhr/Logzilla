@@ -58,6 +58,9 @@ void EventLogger::writeToFile(const LogDestination dest, const char* message) {
 }
 
 bool EventLogger::log(const LogDestination dest, const char* format, ...) {
+    if (Logger::getLogLevel() != Logger::DEBUG3) {
+        return false;
+    }
     try {
         char buffer[4096];
         va_list args;
@@ -77,6 +80,9 @@ bool EventLogger::log(const LogDestination dest, const char* format, ...) {
 }
 
 void EventLogger::enqueueEventForLogging(const string& event) {
+    if (Logger::getLogLevel() != Logger::DEBUG3) {
+        return;
+    }
     auto instance = singleton();
     std::lock_guard<std::mutex> lock(instance->logger_lock_);
     
