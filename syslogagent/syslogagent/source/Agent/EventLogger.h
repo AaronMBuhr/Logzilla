@@ -17,17 +17,24 @@ public:
     enum class LogDestination {
         SubscribedEvents,
         GeneratedEvents,
-        SentEvents
+        SentEvents,
+        SentData
     };
 
     static bool log(const LogDestination dest, const char* format, ...);
     static void enqueueEventForLogging(const string& event);
     static string queuePopFront();
     static bool queueEmpty();
+    static bool logNetworkSend(char* send_buffer, size_t send_buffer_length);
 
     // Delete copy constructor and assignment operator
     EventLogger(const EventLogger&) = delete;
     EventLogger& operator=(const EventLogger&) = delete;
+    // Delete move constructor and assignment operator
+    EventLogger(EventLogger&&) = delete;
+    EventLogger& operator=(EventLogger&&) = delete;
+    
+    ~EventLogger();
 
 private:
     struct LoggedEvent {
@@ -36,21 +43,25 @@ private:
         uint64_t timestamp;
     };
 
-    static EventLogger* singleton();
-    static EventLogger* instance_;
-    std::mutex logger_lock_;
+    static EventLogger& singleton();
+    static std::mutex logger_lock_;
+    static std::unique_ptr<EventLogger, std::default_delete<EventLogger>> instance_;
     std::queue<LoggedEvent> _queued_events_to_log;
 
-    const wstring SUBSCRIBED_EVENTS_FILENAME = L"subscribed_events.txt";
-    const wstring GENERATED_EVENTS_FILENAME = L"generated_events.txt";
-    const wstring SENT_EVENTS_FILENAME = L"sent_events.txt";
+    // File names
+    static const wstring SUBSCRIBED_EVENTS_FILENAME;
+    static const wstring GENERATED_EVENTS_FILENAME;
+    static const wstring SENT_EVENTS_FILENAME;
+    static const wstring SENT_DATA_FILENAME;
 
     // Private constructor for singleton
     EventLogger() = default;
-    ~EventLogger();
 
-    const wstring& getFilenameForDestination(const LogDestination dest) const;
+    // Helper methods
+    static const wstring& getFilenameForDestination(const LogDestination dest);
     void writeToFile(const LogDestination dest, const char* message);
+    void writeToFile(const LogDestination dest, const char* message, size_t length);
+    void writeSentData(const char* data, size_t length);
 };
 
 } // namespace Syslog_agent

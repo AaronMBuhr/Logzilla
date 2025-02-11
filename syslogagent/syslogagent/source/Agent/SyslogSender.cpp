@@ -98,6 +98,10 @@ void SyslogSender::run() const
     bool primary_has_messages = true;
     bool secondary_has_messages = true;
 
+    // Allocate send buffer from global pool
+    std::unique_ptr<char[]> batch_buffer(new char[MAX_MESSAGE_SIZE]);
+    uint32_t batch_buffer_length = 0;
+
     while (!isStopRequested()) {
         try {
             Logger::debug3("SyslogSender::run()> Queue lengths - Primary: %d, Secondary: %d\n",
@@ -116,27 +120,22 @@ void SyslogSender::run() const
             if (primary_queue) {
                 Logger::debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
                 size_t initial_queue_size = primary_queue->length();
-                uint32_t send_buffer_length = 0;
                 
                 for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
-                    auto batch_result = primary_batcher_->BatchEvents(primary_queue_, send_buffer_.get(), SEND_BUFFER_SIZE);
+                    auto batch_result = primary_batcher_->BatchEvents(primary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
                     Logger::debug3("SyslogSender::run()> Primary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
                     if (batch_result.status == MessageBatcher::BatchResult::Status::Success) {
-                        send_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
-                        sendMessageBatch(primary_queue_, primary_network_client_, batch_result.messages_batched, 
-                            send_buffer_.get(), send_buffer_length);
+                        batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
+                        sendMessageBatch(primary_queue_, primary_network_client_, batch_result.messages_batched,
+                            batch_buffer.get(), batch_buffer_length);
                         messages_processed += batch_result.messages_batched;
-                        primary_has_messages = true;
-                    } else {
-                        primary_has_messages = (batch_result.status != MessageBatcher::BatchResult::Status::NoMessages);
-                        if (!primary_has_messages && primary_queue->length() > messages_processed) {
-                            Logger::warning("SyslogSender::run()> Primary queue not sending, %d messages remaining from initial batch\n", 
-                                initial_queue_size - messages_processed);
-                        }
+                    }
+                    else {
                         break;
                     }
                 }
+                primary_has_messages = (primary_queue->length() > 0);
             }
 
             // Process secondary queue if messages are available
@@ -150,19 +149,15 @@ void SyslogSender::run() const
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
                     if (batch_result.status == MessageBatcher::BatchResult::Status::Success) {
                         batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
-                        sendMessageBatch(secondary_queue_, secondary_network_client_, batch_result.messages_batched, 
+                        sendMessageBatch(secondary_queue_, secondary_network_client_, batch_result.messages_batched,
                             batch_buffer.get(), batch_buffer_length);
                         messages_processed += batch_result.messages_batched;
-                        secondary_has_messages = true;
-                    } else {
-                        secondary_has_messages = (batch_result.status != MessageBatcher::BatchResult::Status::NoMessages);
-                        if (!secondary_has_messages && secondary_queue->length() > messages_processed) {
-                            Logger::warning("SyslogSender::run()> Secondary queue not sending, %d messages remaining from initial batch\n", 
-                                initial_queue_size - messages_processed);
-                        }
+                    }
+                    else {
                         break;
                     }
                 }
+                secondary_has_messages = (secondary_queue->length() > 0);
             }
         }
         catch (const std::exception& e) {
@@ -196,6 +191,10 @@ int SyslogSender::sendMessageBatch(
         Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n", 
             batch_count, batch_buf_length);
 
+        if (Logger::getLogLevel() == Logger::DEBUG3) {
+            EventLogger::logNetworkSend(batch_buf, batch_buf_length);
+        }
+        
         // Attempt to send the batch
         INetworkClient::RESULT_TYPE result = network_client->post(batch_buf, batch_buf_length);
 

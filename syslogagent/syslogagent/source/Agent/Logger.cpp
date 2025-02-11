@@ -7,6 +7,7 @@ Copyright ? 2021 Logzilla Corp.
 #include "Logger.h"
 #include <algorithm>
 #include <clocale>
+#include <chrono>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -259,10 +260,20 @@ void Logger::setLogFile(const std::wstring& log_path_and_filename_param) {
 
 
 void Logger::getDateTimeStr(char* buf, int bufsize) {
-	time_t     now = time(0);
-	struct tm  tstruct;
-	localtime_s(&tstruct, &now);
-	strftime(buf, bufsize, "%Y-%m-%d.%X", &tstruct);
+    auto now = std::chrono::system_clock::now();
+    auto now_time_t = std::chrono::system_clock::to_time_t(now);
+    struct tm tstruct;
+    localtime_s(&tstruct, &now_time_t);
+
+    // First format YYYYMMDD-HHMMSS
+    int chars = strftime(buf, bufsize, "%Y%m%d-%H%M%S", &tstruct);
+
+    // Now add the milliseconds
+    if (chars > 0 && chars + 5 <= bufsize) { // Need 5 more chars for ".XXX"
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()).count() % 1000;
+        snprintf(buf + chars, bufsize - chars, ".%03lld", now_ms);
+    }
 }
 
 
