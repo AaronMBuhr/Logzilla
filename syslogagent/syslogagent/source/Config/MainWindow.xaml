@@ -197,8 +197,8 @@ Copyright 2021 LogZilla Corp.
 
                             <!-- StackPanel for Radio Buttons 'Catch-up' and 'Only while running' on the third row, spanned across both columns -->
                             <StackPanel Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="2" HorizontalAlignment="Left">
-                                <RadioButton Content="Catch-up" Name="radioCatchUp" Margin="0,0,20,0" GroupName="EventMode" />
-                                <RadioButton Content="Only while running" Name="radioOnlyWhileRunning" GroupName="EventMode" />
+                                <RadioButton Content="Only while running" Name="radioOnlyWhileRunning" Margin="0,0,20,0" GroupName="EventMode" IsChecked="True" />
+                                <RadioButton Content="Catch-up" Name="radioCatchUp" GroupName="EventMode" />
                             </StackPanel>
                         </Grid>
                     </GroupBox>
