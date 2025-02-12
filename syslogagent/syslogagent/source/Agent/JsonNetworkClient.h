@@ -18,7 +18,7 @@ public:
     virtual bool initialize(const Configuration* config, const wchar_t* api_key,
         const wchar_t* url, bool use_ssl, unsigned int port = 0) override { return true; }  // No initialization needed for JSON client
     virtual bool connect() override;
-    virtual DWORD post(const char* buf, uint32_t length) override;
+    virtual RESULT_TYPE post(const char* buf, uint32_t length) override;
     virtual void close() override;
     virtual bool getLogzillaVersion(char* version_buf, size_t max_length, size_t& bytes_written) override;
     virtual SOCKET getSocket() override { return socket_; }

@@ -185,6 +185,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Globals.cpp" />
+    <ClCompile Include="INetworkClient.cpp" />
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="Bitmap.cpp" />
     <ClCompile Include="Configuration.cpp" />

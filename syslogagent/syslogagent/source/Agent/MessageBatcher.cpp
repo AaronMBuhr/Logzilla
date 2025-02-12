@@ -5,7 +5,8 @@
 
 namespace Syslog_agent {
 
-MessageBatcher::MessageBatcher()
+MessageBatcher::MessageBatcher(uint32_t max_batch_size, uint32_t max_batch_age)
+    : max_batch_size_(max_batch_size), max_batch_age_(max_batch_age)
 {
 }
 
@@ -21,7 +22,24 @@ MessageBatcher::BatchResult MessageBatcher::BatchEvents(
     if (!batch_buffer || buffer_size == 0) {
         return BatchResult(BatchResult::Status::InvalidBuffer);
     }
-    return BatchEventsInternal(msg_queue, batch_buffer, buffer_size);
+    auto result = BatchEventsInternal(msg_queue, batch_buffer, buffer_size);
+    
+    // DEBUGGING
+    if (result.status == BatchResult::Status::Success && result.bytes_written > 0) {
+        // Get trailer to verify
+        char trailer_check[64];
+        size_t trailer_size;
+        GetMessageTrailer_(trailer_check, sizeof(trailer_check), trailer_size);
+        
+        if (trailer_size > 0 && result.bytes_written >= trailer_size) {
+            // check if batch ends with trailer
+            if (memcmp(batch_buffer + result.bytes_written - trailer_size, 
+                      trailer_check, trailer_size) != 0) {
+                Logger::recoverable_error("MessageBatcher::BatchEvents()> Batch does not end with trailer\n");
+            }
+        }
+    }
+    return result;
 }
 
 MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
@@ -53,11 +71,23 @@ MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
             return BatchResult(BatchResult::Status::MessageTooLarge);
         }
 
-        // Check if buffer can hold at least header + trailer
-        if (buffer_size < header_size + trailer_size) {
-            Logger::recoverable_error("MessageBatcher::BatchEventsInternal()> Buffer too small for header and trailer\n");
-            return BatchResult(BatchResult::Status::BufferTooSmall);
-        }
+        int max_batch = std::min<int>(queue_length, static_cast<int>(max_batch_size_));
+        // if (max_batch > 1) {
+        //     max_overhead += (max_batch - 1) * separator_size;
+        // }
+
+        // // Check if buffer can hold maximum possible batch
+        // if (buffer_size < max_overhead) {
+        //     Logger::recoverable_error("MessageBatcher::BatchEventsInternal()> Buffer too small for maximum batch overhead\n");
+        //     return BatchResult(BatchResult::Status::BufferTooSmall);
+        // }
+
+        // // Reserve space for trailer and maximum separators up front
+        // size_t reserved_space = trailer_size;
+        // if (max_batch > 1) {
+        //     reserved_space += (max_batch - 1) * separator_size;
+        // }
+        // size_t available_space = buffer_size - header_size - reserved_space;
 
         // Copy header
         if (header_size > 0) {
@@ -65,9 +95,7 @@ MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
         }
         size_t current_length = header_size;
 
-        // Limit batch size
-        int max_batch = std::min<int>(queue_length, static_cast<int>(GetMaxBatchSize_()));
-        Logger::debug3("MessageBatcher::BatchEventsInternal()> Will process up to %d messages\n", max_batch);
+        Logger::debug3("MessageBatcher::BatchEventsInternal()> Will process max %d messages\n", max_batch);
 
         uint32_t batch_count = 0;
         auto queue_iter = msg_queue->traverseQueue();
@@ -86,13 +114,15 @@ MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
             }
 
             // Calculate total size needed for this message
-            size_t needed_size = msg->data_length + 
-                (batch_count > 0 ? separator_size : 0) + 
-                (batch_count == max_batch - 1 ? trailer_size : 0);
+            size_t message_space_needed = msg->data_length;
+            if (batch_count > 0) {
+                message_space_needed += separator_size;
+            }
 
-            // Check if adding this message would exceed buffer size
-            if (current_length + needed_size >= buffer_size) {
-                Logger::debug2("MessageBatcher::BatchEventsInternal()> Buffer full, stopping batch\n");
+            // Check if adding this message would exceed available space
+            if (current_length + message_space_needed + trailer_size > buffer_size) {
+                Logger::debug2("MessageBatcher::BatchEventsInternal()> Buffer space limit reached at %zu/%zu bytes\n",
+                    current_length, buffer_size);
                 break;
             }
 
@@ -116,17 +146,29 @@ MessageBatcher::BatchResult MessageBatcher::BatchEventsInternal(
             batch_count++;
 
             if (batch_count >= max_batch) {
+                Logger::debug3("MessageBatcher::BatchEventsInternal()> Batch count %d reached max batch size %d\n", batch_count, max_batch);
                 break;
             }
         }
 
         // Add trailer if we have any messages
-        if (batch_count > 0 && trailer_size > 0) {
-            GetMessageTrailer_(batch_buffer + current_length,
-                             buffer_size - current_length,
-                             trailer_size);
-            current_length += trailer_size;
-        }
+        if (batch_count > 0) {
+            if (trailer_size > 0) {
+                size_t temp_size;
+                GetMessageTrailer_(batch_buffer + current_length,
+                    buffer_size - current_length,
+                    temp_size);
+                current_length += temp_size;
+            }
+            else {
+				Logger::debug("MessageBatcher::BatchEventsInternal()> Trailer size is 0, but messages were batched\n");
+            }
+		}
+		else {
+			// No messages added, reset buffer
+			Logger::debug("MessageBatcher::BatchEventsInternal()> Couldn't add trailer, no messages added\n");
+			current_length = 0;
+		}
 
         // Ensure null termination if space allows
         if (current_length < buffer_size) {

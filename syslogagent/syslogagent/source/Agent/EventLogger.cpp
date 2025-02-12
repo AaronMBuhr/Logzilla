@@ -12,6 +12,7 @@ using std::string;
 
 namespace Syslog_agent {
 
+// Static member definitions
 std::mutex EventLogger::logger_lock_;
 std::unique_ptr<EventLogger, std::default_delete<EventLogger>> EventLogger::instance_;
 
@@ -172,24 +173,98 @@ string EventLogger::queuePopFront() {
     return result;
 }
 
-bool EventLogger::queueEmpty() {
+bool EventLogger::isQueueEmpty() {
     EventLogger& instance = singleton();
     std::lock_guard<std::mutex> lock(logger_lock_);
     return instance._queued_events_to_log.empty();
 }
 
-bool EventLogger::logNetworkSend(char* send_buffer, size_t send_buffer_length) {
-    if (!send_buffer || send_buffer_length == 0) {
+bool EventLogger::logNetworkSend(const char* buf, size_t length) {
+    if (!buf || length == 0) {
         return false;
     }
     try {
         EventLogger& instance = singleton();
         std::lock_guard<std::mutex> lock(logger_lock_);
-        instance.writeSentData(send_buffer, send_buffer_length);
+
+        // Get timestamp
+        char timestamp[40];
+        Logger::getDateTimeStr(timestamp, sizeof(timestamp));
+
+        // Write header with timestamp
+        FILE* file = nullptr;
+        wstring full_path = Util::getThisPath(true) + SENT_DATA_FILENAME;
+        if (_wfopen_s(&file, full_path.c_str(), L"ab") != 0 || !file) {
+            Logger::recoverable_error("EventLogger::logNetworkSend()> Failed to open file %S\n", full_path.c_str());
+            return false;
+        }
+
+        // Write header
+        fprintf(file, "## [%s] LogZilla Windows Agent network sent (%zu bytes):\n", timestamp, length);
+        
+        // Write code block with data
+        fputs("```\n", file);
+        fwrite(buf, 1, length, file);
+        if (length > 0 && buf[length - 1] != '\n') {
+            fputc('\n', file);
+        }
+        fputs("```\n\n", file);
+
+        fclose(file);
         return true;
     }
     catch (const std::exception& e) {
         Logger::recoverable_error("EventLogger::logNetworkSend()> %s\n", e.what());
+        return false;
+    }
+}
+
+bool EventLogger::logNetworkReceive(const char* result, size_t result_length) {
+    if (!result || result_length == 0) {
+        return false;
+    }
+    try {
+        EventLogger& instance = singleton();
+        std::lock_guard<std::mutex> lock(logger_lock_);
+
+        // Get timestamp
+        char timestamp[40];
+        Logger::getDateTimeStr(timestamp, sizeof(timestamp));
+
+        // Write header with timestamp
+        FILE* file = nullptr;
+        wstring full_path = Util::getThisPath(true) + SENT_DATA_FILENAME;
+        if (_wfopen_s(&file, full_path.c_str(), L"ab") != 0 || !file) {
+            Logger::recoverable_error("EventLogger::logNetworkReceive()> Failed to open file %S\n", full_path.c_str());
+            return false;
+        }
+
+        // Find the first line ending
+        const char* newline = (const char*)memchr(result, '\n', result_length);
+        size_t first_line_length = newline ? (newline - result) : result_length;
+        
+        // Write result header with first line
+        fprintf(file, "### [%s] LogZilla Windows Agent network receive result: %.*s\n", 
+            timestamp, (int)first_line_length, result);
+
+        // If there's more content after the first line, write it in a code block
+        if (newline && (result_length > first_line_length + 1)) {
+            const char* json_start = newline + 1;
+            size_t json_length = result_length - (json_start - result);
+            
+            fputs("```\n", file);
+            fwrite(json_start, 1, json_length, file);
+            if (json_length > 0 && json_start[json_length - 1] != '\n') {
+                fputc('\n', file);
+            }
+            fputs("```\n\n", file);
+        }
+
+        fclose(file);
+        return true;
+    }
+    catch (const std::exception& e) {
+        Logger::recoverable_error("EventLogger::logNetworkReceive()> %s\n", e.what());
         return false;
     }
 }

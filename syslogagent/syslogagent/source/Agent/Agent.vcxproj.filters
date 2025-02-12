@@ -233,6 +233,9 @@
     <ClCompile Include="SlidingWindowMetrics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="INetworkClient.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="message.mc" />

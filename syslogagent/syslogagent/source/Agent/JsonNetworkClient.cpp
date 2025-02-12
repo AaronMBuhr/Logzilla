@@ -144,24 +144,48 @@ bool JsonNetworkClient::connect()
     return true;
 }
 
-DWORD JsonNetworkClient::post(const char* buf, uint32_t length)
+INetworkClient::RESULT_TYPE JsonNetworkClient::post(const char* buf, uint32_t length)
 {
     if (!is_connected_) {
         Logger::recoverable_error("JsonNetworkClient::post() not connected\n");
-        return ERROR_NETWORK_UNREACHABLE;
+        return RESULT_TYPE(ERROR_NETWORK_UNREACHABLE, "Failed: not connected to server\n(no response)");
     }
 
     if (socket_ == INVALID_SOCKET) {
-        return ERROR_NETWORK_UNREACHABLE;
+        return RESULT_TYPE(ERROR_NETWORK_UNREACHABLE, "Failed: invalid socket\n(no response)");
     }
 
     int bytes_sent = ::send(socket_, buf, length, 0);
     if (bytes_sent == SOCKET_ERROR) {
-        Logger::recoverable_error("JsonNetworkClient::post() send failed: %d\n", WSAGetLastError());
-        return ERROR_NETWORK_UNREACHABLE;
+        DWORD error = WSAGetLastError();
+        char msg[1024];
+        snprintf(msg, sizeof(msg), "Failed: send error WSA %lu\n(no response)", error);
+        Logger::recoverable_error("JsonNetworkClient::post() send failed: %d\n", error);
+        return RESULT_TYPE(ERROR_NETWORK_UNREACHABLE, msg);
     }
 
-    return ERROR_SUCCESS;
+    if (static_cast<uint32_t>(bytes_sent) != length) {
+        char msg[1024];
+        snprintf(msg, sizeof(msg), "Failed: incomplete send - %d of %u bytes sent\n(no response)", bytes_sent, length);
+        return RESULT_TYPE(ERROR_NETWORK_UNREACHABLE, msg);
+    }
+
+    // Try to read response
+    char response[1024] = { 0 };
+    int bytes_received = ::recv(socket_, response, sizeof(response) - 1, 0);
+    
+    char msg[2048];  // Large enough for status + response
+    if (bytes_received == SOCKET_ERROR) {
+        DWORD error = WSAGetLastError();
+        snprintf(msg, sizeof(msg), "Success: data sent but receive failed with WSA %lu\n(no response)", error);
+    } else if (bytes_received == 0) {
+        snprintf(msg, sizeof(msg), "Success\n(no response)");
+    } else {
+        response[bytes_received] = '\0';  // Ensure null termination
+        snprintf(msg, sizeof(msg), "Success\n%s", response);
+    }
+
+    return RESULT_TYPE(ERROR_SUCCESS, msg);
 }
 
 void JsonNetworkClient::close()

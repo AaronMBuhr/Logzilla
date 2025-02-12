@@ -2,13 +2,49 @@
 
 #include <Windows.h>
 #include "Configuration.h"
+#include <cstring>
 
 namespace Syslog_agent {
 
+class NetworkResult {
+public:
+    static constexpr size_t MAX_MESSAGE_LENGTH = 1024;
+
+    // Constructor for success
+    NetworkResult() : code_(ERROR_SUCCESS) {
+        message_[0] = '\0';
+    }
+
+    // Constructor for error with code and optional message
+    NetworkResult(DWORD error_code, const char* message = nullptr) : code_(error_code) {
+        if (message) {
+            strncpy_s(message_, message, MAX_MESSAGE_LENGTH - 1);
+        } else {
+            message_[0] = '\0';
+        }
+    }
+
+    // Implicit conversion to DWORD for easy numeric comparisons
+    operator DWORD() const { return code_; }
+
+    // Equality operators to maintain existing comparison behavior
+    bool operator==(DWORD other) const { return code_ == other; }
+    bool operator!=(DWORD other) const { return code_ != other; }
+
+    // Getters
+    DWORD getCode() const { return code_; }
+    const char* getMessage() const { return message_; }
+    bool hasMessage() const { return message_[0] != '\0'; }
+
+private:
+    DWORD code_;
+    char message_[MAX_MESSAGE_LENGTH];
+};
+
 class INetworkClient {
 public:
-    typedef DWORD RESULT_TYPE;
-    static constexpr RESULT_TYPE RESULT_SUCCESS = ERROR_SUCCESS;
+    using RESULT_TYPE = NetworkResult;
+    static const RESULT_TYPE RESULT_SUCCESS; // Defined in cpp file
 
     virtual ~INetworkClient() = default;
 

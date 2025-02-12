@@ -73,29 +73,26 @@ bool Logger::log(const LogLevel log_level, const char* format, ...) {
 	}
 	bool result;
 
-	//Logger* logger = singleton();
-	//// Access the mutex through the logger instance
-	//logger->logger_lock_.lock();
-	//// ...
 	std::unique_lock<std::mutex> lock(singleton()->logger_lock_);
 
 	char dt_buf[40];
-	time_t now = time(0);
-	struct tm tstruct;
-	localtime_s(&tstruct, &now);
+	getDateTimeStr(dt_buf, sizeof(dt_buf));
+	char timestamp_buf[50];
+	snprintf(timestamp_buf, sizeof(timestamp_buf), "[%s ", dt_buf);  // Add opening bracket and space
+	
 	const char* log_abbrev = (log_level <= FORCE ? LOGLEVEL_ABBREVS_WITHBRACKET[static_cast<int>(log_level)].c_str() : nullptr);
-	strftime(dt_buf, sizeof(dt_buf), "[%Y%m%d.%H%M%S ", &tstruct);
+	
 	switch (singleton()->log_destination_) {
 	case DEST_CONSOLE:
-		result = singleton()->logToConsole(dt_buf);
+		result = singleton()->logToConsole(timestamp_buf);
 		result = singleton()->logToConsole(log_abbrev);
 		break;
 	case DEST_FILE:
-		result = singleton()->logToFile(dt_buf);
+		result = singleton()->logToFile(timestamp_buf);
 		result = singleton()->logToFile(log_abbrev);
 		break;
 	case DEST_CONSOLE_AND_FILE:
-		result = singleton()->logToConsoleAndFile(dt_buf);
+		result = singleton()->logToConsoleAndFile(timestamp_buf);
 		result = singleton()->logToConsoleAndFile(log_abbrev);
 		break;
 	default:

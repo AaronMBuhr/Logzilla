@@ -26,16 +26,18 @@ public:
             : status(s), messages_batched(msgs), bytes_written(bytes) {}
     };
 
-    MessageBatcher();
+    MessageBatcher(uint32_t max_batch_size, uint32_t max_batch_age);
     ~MessageBatcher();
     
     // Returns both status and number of messages batched
     BatchResult BatchEvents(shared_ptr<MessageQueue> message_queue, char* batch_buffer, size_t buffer_size) const;
 
 protected:
+    uint32_t max_batch_size_;
+    uint32_t max_batch_age_;
+
     virtual uint32_t GetMaxMessageSize_() const = 0;
     virtual uint32_t GetMinBatchInterval_() const = 0;
-    virtual uint32_t GetMaxBatchSize_() const = 0;
     
     // Modified virtual methods to include buffer safety
     virtual void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const = 0;

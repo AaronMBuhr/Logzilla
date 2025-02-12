@@ -95,13 +95,14 @@ void Service::loadConfiguration(bool running_from_console, bool override_log_lev
 void sendMessagesThread() {
     Logger::debug2("sendMessagesThread() starting\n");
     Service::sender_ = make_unique<SyslogSender>(
-        Service::config_,
         Service::primary_message_queue_,
         Service::secondary_message_queue_,
         Service::primary_network_client_,
         Service::secondary_network_client_,
         Service::primary_batcher_,
-        Service::secondary_batcher_
+        Service::secondary_batcher_,
+        Service::config_.getMaxBatchSize(),
+        Service::config_.getMaxBatchAge()
     );
 
     try {
@@ -291,12 +292,18 @@ bool Service::initializeNetworkComponents() {
         primary_network_client_ = std::static_pointer_cast<INetworkClient>(
             make_shared<JsonNetworkClient>(urlComponents.hostName, port)
         );
-        primary_batcher_ = make_shared<JSONMessageBatcher>();
+        primary_batcher_ = make_shared<JSONMessageBatcher>(
+            config_.getMaxBatchSize(),
+            config_.getMaxBatchAge()
+        );
         isJsonPort = true;
     } else {
         Logger::debug2("Using HTTP client for port %d\n", port);
         primary_network_client_ = make_shared<HttpNetworkClient>();
-        primary_batcher_ = make_shared<HTTPMessageBatcher>();
+        primary_batcher_ = make_shared<HTTPMessageBatcher>(
+            config_.getMaxBatchSize(),
+            config_.getMaxBatchAge()
+        );
     }
         
     Logger::debug2("Service::run()> initializing primary_network_client\n");
@@ -399,12 +406,18 @@ bool Service::initializeSecondaryComponents() {
         secondary_network_client_ = std::static_pointer_cast<INetworkClient>(
             make_shared<JsonNetworkClient>(urlComponents.hostName, port)
         );
-        secondary_batcher_ = make_shared<JSONMessageBatcher>();
+        secondary_batcher_ = make_shared<JSONMessageBatcher>(
+            config_.getMaxBatchSize(),
+            config_.getMaxBatchAge()
+        );
         isJsonPort = true;
     } else {
         Logger::debug2("Using HTTP client for secondary port %d\n", port);
         secondary_network_client_ = make_shared<HttpNetworkClient>();
-        secondary_batcher_ = make_shared<HTTPMessageBatcher>();
+        secondary_batcher_ = make_shared<HTTPMessageBatcher>(
+            config_.getMaxBatchSize(),
+            config_.getMaxBatchAge()
+        );
     }
         
     Logger::debug2("Service::run()> initializing secondary_network_client\n");

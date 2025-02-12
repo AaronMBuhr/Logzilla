@@ -188,7 +188,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
     if (!is_connected_ || !hConnection_) {
         Logger::debug2("HttpNetworkClient::post() Not connected, connection handle: %p, is_connected: %d\n", 
             hConnection_, is_connected_);
-        return ERROR_NOT_CONNECTED;
+        return NetworkResult(ERROR_NOT_CONNECTED, "Not connected to server (http 0)");
     }
 
     Logger::debug2("HttpNetworkClient::post() Starting post operation - Length: %d bytes\n", length);
@@ -199,10 +199,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
         Logger::debug2("HttpNetworkClient::post() Using SSL\n");
     }
 
-    // Log the request URL and data
-    Logger::debug2("HttpNetworkClient::post() URL: http%s://%ls:%d%ls\n", 
-        use_ssl_ ? "s" : "", host_, port_, path_);
-
+    // Create request handle
     hRequest_ = WinHttpOpenRequest(hConnection_,
         L"POST",
         path_,
@@ -213,49 +210,39 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
 
     if (!hRequest_) {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::post() Failed to open request: %d\n", error);
-        return error;
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Failed to open HTTP request: error %lu (http 0)", error);
+        return NetworkResult(error, msg);
     }
-    Logger::debug2("HttpNetworkClient::post() Successfully opened request\n");
 
-    // Set timeouts on the request handle
+    // Set timeouts for this request
     if (!applyTimeouts(hRequest_)) {
         Logger::warning("HttpNetworkClient::post() Failed to set request timeouts\n");
     }
 
-    // Build headers using fixed buffer
-    wchar_t headers_buffer[MAX_HEADERS_LENGTH];
-    int written = _snwprintf_s(headers_buffer, _countof(headers_buffer), _TRUNCATE,
-        L"Authorization: token %s",
-        api_key_);
-    
-    Logger::debug2("HttpNetworkClient::post() Adding headers\n");
+    // Add headers
+    std::wstring headers = L"Content-Type: application/json\r\n";
+    headers += L"Authorization: token ";
+    headers += api_key_;
+    headers += L"\r\n";
 
-    // Add authorization header
-    if (!WinHttpAddRequestHeaders(hRequest_, 
-        headers_buffer,
-        -1,
-        WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE)) 
-    {
-        DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::post() Failed to add authorization header: %d\n", error);
-        cleanup_request();
-        return error;
+    if (use_compression_) {
+        headers += L"Accept-Encoding: gzip, deflate\r\n";
     }
 
-    // Add content type header
     if (!WinHttpAddRequestHeaders(hRequest_,
-        L"Content-Type: application/json",
-        -1,
+        headers.c_str(),
+        -1L,
         WINHTTP_ADDREQ_FLAG_ADD | WINHTTP_ADDREQ_FLAG_REPLACE))
     {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::post() Failed to add content type header: %d\n", error);
         cleanup_request();
-        return error;
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Failed to add request headers: error %lu (http 0)", error);
+        return NetworkResult(error, msg);
     }
 
-    Logger::debug2("HttpNetworkClient::post() Sending request (%d bytes)...\n", length);
+    // Send the request
     if (!WinHttpSendRequest(hRequest_,
         WINHTTP_NO_ADDITIONAL_HEADERS,
         0,
@@ -265,88 +252,84 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
         0))
     {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::post() Send request failed: %d\n", error);
-        WinHttpCloseHandle(hRequest_);
-        hRequest_ = NULL;
-        return error;
+        cleanup_request();
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Failed to send request: error %lu (http 0)", error);
+        return NetworkResult(error, msg);
     }
 
-    Logger::debug2("HttpNetworkClient::post() Waiting for response\n");
+    // End the request
     if (!WinHttpReceiveResponse(hRequest_, NULL)) {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::post() Receive response failed: %d\n", error);
-        WinHttpCloseHandle(hRequest_);
-        hRequest_ = NULL;
-        return error;
+        cleanup_request();
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Failed to receive response: error %lu (http 0)", error);
+        return NetworkResult(error, msg);
     }
 
-    DWORD statusCode = 0;
-    DWORD statusCodeSize = sizeof(statusCode);
+    // Check status code
+    DWORD status_code = 0;
+    DWORD size = sizeof(status_code);
     if (!WinHttpQueryHeaders(hRequest_,
         WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-        NULL,
-        &statusCode,
-        &statusCodeSize,
-        NULL))
+        WINHTTP_HEADER_NAME_BY_INDEX,
+        &status_code,
+        &size,
+        WINHTTP_NO_HEADER_INDEX))
     {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::post() Query headers failed: %d\n", error);
-        WinHttpCloseHandle(hRequest_);
-        hRequest_ = NULL;
-        return error;
+        cleanup_request();
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Failed to query status code: error %lu (http 0)", error);
+        return NetworkResult(error, msg);
     }
 
-    Logger::debug2("HttpNetworkClient::post() Response status code: %d\n", statusCode);
-
-    // Use a single buffer for both success and error responses
-    char response_buffer[4096] = { 0 };
+    // Read response body
+    char response_buffer[1024] = { 0 };
     size_t total_read = 0;
+    DWORD bytes_available = 0;
+    DWORD bytes_read = 0;
     
-    // Read response body regardless of status code
-    {
-        DWORD bytes_available = 0;
-        DWORD bytes_read = 0;
-        BOOL result = TRUE;
+    while (WinHttpQueryDataAvailable(hRequest_, &bytes_available)) {
+        if (bytes_available == 0) break;
 
-        while (result && WinHttpQueryDataAvailable(hRequest_, &bytes_available)) {
-            if (bytes_available > 0) {
-                if (total_read >= sizeof(response_buffer)) {
-                    Logger::debug2("HttpNetworkClient::post() Response exceeds buffer size\n");
-                    break;
-                }
-
-                size_t remaining = sizeof(response_buffer) - total_read;
-                bytes_available = bytes_available > remaining ? static_cast<DWORD>(remaining) : bytes_available;
-
-                result = WinHttpReadData(hRequest_,
-                    response_buffer + total_read,
-                    bytes_available,
-                    &bytes_read);
-
-                if (!result || bytes_read == 0) {
-                    break;
-                }
-
-                total_read += bytes_read;
-            } else {
-                break;
-            }
+        // Ensure we don't overflow our buffer
+        if (total_read >= sizeof(response_buffer) - 1) {
+            Logger::warning("HttpNetworkClient::post() Response exceeds buffer size, truncating\n");
+            break;
         }
-    }
 
-    // Log response based on status code
-    if (total_read > 0) {
-        if (statusCode == 200 || statusCode == 202) {
-            Logger::debug2("HttpNetworkClient::post() Success response body:\n%.*s\n", 
-                static_cast<int>(total_read), response_buffer);
-        } else {
-            Logger::debug2("HttpNetworkClient::post() Error response body:\n%.*s\n", 
-                static_cast<int>(total_read), response_buffer);
+        // Calculate remaining buffer space
+        size_t remaining = sizeof(response_buffer) - total_read - 1;  // -1 for null terminator
+        DWORD to_read = (bytes_available > remaining) ? static_cast<DWORD>(remaining) : bytes_available;
+
+        if (!WinHttpReadData(hRequest_, 
+            response_buffer + total_read,
+            to_read,
+            &bytes_read) || bytes_read == 0)
+        {
+            break;
         }
+
+        total_read += bytes_read;
     }
+    response_buffer[total_read] = '\0';  // Ensure null termination
 
     cleanup_request();
-    return (statusCode == 200 || statusCode == 202) ? RESULT_SUCCESS : ERROR_INVALID_DATA;
+
+    // Format the result message with both status and response body
+    char msg[1024 + 256];  // Large enough for status line + response
+    if (status_code != 200 && status_code != 201 && status_code != 202) {
+        snprintf(msg, sizeof(msg), "Server returned error (http %lu)\n%s", 
+            status_code, 
+            total_read > 0 ? response_buffer : "No response body");
+        return NetworkResult(ERROR_BAD_ARGUMENTS, msg);
+    }
+
+    snprintf(msg, sizeof(msg), "Send succeeded (http %lu)\n%s", 
+        status_code,
+        total_read > 0 ? response_buffer : "No response body");
+    return NetworkResult(ERROR_SUCCESS, msg);
 }
 
 void HttpNetworkClient::cleanup_request() {

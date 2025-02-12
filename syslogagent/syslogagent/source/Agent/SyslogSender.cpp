@@ -3,44 +3,43 @@ SyslogAgent: a syslog agent for Windows
 Copyright 2021 Logzilla Corp.
 */
 
-#include <algorithm>
 #include "stdafx.h"
+#include "SyslogSender.h"
 #include "Configuration.h"
 #include "Globals.h"
 #include "HttpNetworkClient.h"
 #include "INetworkClient.h"
 #include "Logger.h"
 #include "SlidingWindowMetrics.h"
-#include "SyslogSender.h"
 #include "Util.h"
-
 #include "EventLogger.h"
-
 
 namespace Syslog_agent {
 
 // Define static members
-atomic<bool> SyslogSender::stop_requested_ = false;
+std::atomic<bool> SyslogSender::stop_requested_ = false;
 
 const char SyslogSender::event_header_[] = "{\"events\":[";
 const char SyslogSender::message_separator_[] = ",";
 const char SyslogSender::message_trailer_[] = "]}";
 
 SyslogSender::SyslogSender(
-    Configuration& config,
-    shared_ptr<MessageQueue> primary_queue,
-    shared_ptr<MessageQueue> secondary_queue,
-    shared_ptr<INetworkClient> primary_network_client,
-    shared_ptr<INetworkClient> secondary_network_client,
-    shared_ptr<MessageBatcher> primary_batcher,
-    shared_ptr<MessageBatcher> secondary_batcher)
-    : config_(config)
-    , primary_queue_(primary_queue)
-    , secondary_queue_(secondary_queue)
-    , primary_network_client_(primary_network_client)
-    , secondary_network_client_(secondary_network_client)
-    , primary_batcher_(primary_batcher)
-    , secondary_batcher_(secondary_batcher)
+    std::shared_ptr<MessageQueue> primary_queue,
+    std::shared_ptr<MessageQueue> secondary_queue,
+    std::shared_ptr<INetworkClient> primary_network_client,
+    std::shared_ptr<INetworkClient> secondary_network_client,
+    std::shared_ptr<MessageBatcher> primary_batcher,
+    std::shared_ptr<MessageBatcher> secondary_batcher,
+    uint32_t max_batch_size,
+    uint32_t max_batch_age)
+    : max_batch_size_(max_batch_size)
+    , max_batch_age_(max_batch_age)
+    , primary_queue_(std::move(primary_queue))
+    , secondary_queue_(std::move(secondary_queue))
+    , primary_network_client_(std::move(primary_network_client))
+    , secondary_network_client_(std::move(secondary_network_client))
+    , primary_batcher_(std::move(primary_batcher))
+    , secondary_batcher_(std::move(secondary_batcher))
     , send_buffer_(new char[SEND_BUFFER_SIZE])
 {
     Logger::debug2("SyslogSender constructor\n");
@@ -66,31 +65,35 @@ uint64_t SyslogSender::next_wait_time_ms(uint64_t longest_wait_time_ms) const {
     
     uint64_t time_to_wait = longest_wait_time_ms;
     if (oldest_message_time > 0) {
-       auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        auto current_time = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
         // oldest_message_time is already in milliseconds
         auto elapsed_ms = current_time - oldest_message_time;
         time_to_wait = elapsed_ms >= longest_wait_time_ms ? 0 : longest_wait_time_ms - elapsed_ms;
     }
     return time_to_wait;
-}; 
-
-
-void SyslogSender::waitForBatch(MessageQueue* first_queue, MessageQueue* second_queue) const {
-    std::unique_lock<std::mutex> lock(batch_mutex_);
-    auto wait_time_ms = next_wait_time_ms(MAX_MESSAGE_AGE_MS);
-    auto size_check = [first_queue, second_queue]() { 
-        return (first_queue && first_queue->length() >= MAX_BATCH_SIZE) 
-            || (second_queue && second_queue->length() >= MAX_BATCH_SIZE); 
-    };
-    if (size_check()) {
-        return;
-    }
-    batch_cv_.wait_for(lock, std::chrono::milliseconds(wait_time_ms), size_check);
 }
 
-void SyslogSender::run() const
-{
+bool SyslogSender::waitForBatch(MessageQueue* first_queue, MessageQueue* second_queue) const {
+    std::unique_lock<std::mutex> lock(batch_mutex_);
+    auto size_check = [this, first_queue, second_queue]() { 
+        return (first_queue && first_queue->length() >= max_batch_size_) 
+            || (second_queue && second_queue->length() >= max_batch_size_); 
+    };
+    if (size_check()) {
+        return false;
+    }
+    auto wait_time_ms = next_wait_time_ms(max_batch_age_);
+	if (wait_time_ms == 0) {
+		return false;
+	}
+    //Logger::debug3("-------------------------------------------------------------------> SyslogSender::waitForBatch()> queue sizes: %d %d, wait time %lu\n", (first_queue ? first_queue->length() : 0),
+    //    (second_queue ? second_queue->length() : 0), wait_time_ms);
+    batch_cv_.wait_for(lock, std::chrono::milliseconds(wait_time_ms), size_check);
+    return true;
+}
+
+void SyslogSender::run() const {
     Logger::debug2("SyslogSender::run()> Starting sender thread\n");
     
     MessageQueue* primary_queue = (primary_network_client_ && primary_batcher_) ? primary_queue_.get() : nullptr;
@@ -108,13 +111,13 @@ void SyslogSender::run() const
                 primary_queue ? primary_queue->length() : 0,
                 secondary_queue ? secondary_queue->length() : 0);
                 
-            waitForBatch(
+            while (waitForBatch(
                 primary_has_messages ? primary_queue : nullptr, 
-                secondary_has_messages ? secondary_queue : nullptr);
+                secondary_has_messages ? secondary_queue : nullptr));
 
-			if (isStopRequested()) {
-				break;
-			}
+            if (isStopRequested()) {
+                break;
+            }
 
             // Process primary queue if messages are available
             if (primary_queue) {
@@ -162,7 +165,7 @@ void SyslogSender::run() const
         }
         catch (const std::exception& e) {
             Logger::recoverable_error("SyslogSender::run()> Exception: %s\n", e.what());
-            Sleep(MAX_MESSAGE_AGE_MS); // Wait a bit before retrying
+            Sleep(max_batch_age_); // Wait a bit before retrying
         }
     }
 
@@ -188,21 +191,24 @@ int SyslogSender::sendMessageBatch(
     }
 
     try {
-        Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n", 
+        Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n",
             batch_count, batch_buf_length);
 
         if (Logger::getLogLevel() == Logger::DEBUG3) {
             EventLogger::logNetworkSend(batch_buf, batch_buf_length);
         }
-        
+
         // Attempt to send the batch
         INetworkClient::RESULT_TYPE result = network_client->post(batch_buf, batch_buf_length);
+
+        EventLogger::logNetworkReceive(result.getMessage(), strlen(result.getMessage()));
 
         if (result != INetworkClient::RESULT_SUCCESS) {
             // Don't log as critical during shutdown - it's expected to fail
             if (isShuttingDown() || msg_queue->isShuttingDown()) {
                 Logger::debug2("SyslogSender::sendMessageBatch()> Network send failed during shutdown\n");
-            } else {
+            }
+            else {
                 Logger::critical("SyslogSender::sendMessageBatch()> Failed to send batch, network error: %d\n", result);
             }
             return 0;
@@ -214,7 +220,7 @@ int SyslogSender::sendMessageBatch(
         uint32_t messages_removed = 0;
         for (uint32_t i = 0; i < batch_count; i++) {
             if (!msg_queue->removeFront()) {
-                Logger::critical("SyslogSender::sendMessageBatch()> Failed to remove message %u of %u\n", 
+                Logger::critical("SyslogSender::sendMessageBatch()> Failed to remove message %u of %u\n",
                     i + 1, batch_count);
                 break;
             }
@@ -225,7 +231,7 @@ int SyslogSender::sendMessageBatch(
             messages_removed++;
         }
 
-        Logger::debug2("SyslogSender::sendMessageBatch()> Successfully sent and removed %u messages\n", 
+        Logger::debug2("SyslogSender::sendMessageBatch()> Successfully sent and removed %u messages\n",
             messages_removed);
 
         return static_cast<int>(messages_removed);
@@ -237,22 +243,17 @@ int SyslogSender::sendMessageBatch(
 }
 
 bool SyslogSender::enqueueHook(size_t queue_length, MessageQueue::Message* message, bool is_pre_enqueue) const {
-    // Check if queue is shutting down before proceeding
-    if (isShuttingDown()) {
-        return false;
-    }
-    
-    // Default pre-enqueue behavior
     if (is_pre_enqueue) {
-        return true;  // Allow enqueue by default
+        // This is called before enqueue, we can do validation here
+        return true;
     }
-    
-    // Post-enqueue behavior
-    if (queue_length >= MAX_BATCH_SIZE) {
-        std::lock_guard<std::mutex> lock(batch_mutex_);
-        batch_cv_.notify_one();
+    else {
+        // This is called after successful enqueue
+        if (queue_length >= max_batch_size_) {
+            batch_cv_.notify_one();
+        }
+        return true;
     }
-    return true;
 }
 
 } // namespace Syslog_agent

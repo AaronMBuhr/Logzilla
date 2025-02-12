@@ -22,10 +22,11 @@ public:
     };
 
     static bool log(const LogDestination dest, const char* format, ...);
+    static bool logNetworkSend(const char* buf, size_t length);
+    static bool logNetworkReceive(const char* result, size_t result_length);
+    static bool isQueueEmpty();
     static void enqueueEventForLogging(const string& event);
     static string queuePopFront();
-    static bool queueEmpty();
-    static bool logNetworkSend(char* send_buffer, size_t send_buffer_length);
 
     // Delete copy constructor and assignment operator
     EventLogger(const EventLogger&) = delete;
