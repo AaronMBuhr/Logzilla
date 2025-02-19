@@ -365,6 +365,7 @@ namespace Syslog_agent {
         try {
             // Estimate message size and check buffer capacity
             EventData data;
+            event.renderEvent();
             data.parseFrom(event, configuration_);
             size_t estimated_size = estimateMessageSize(data, SharedConstants::LOGFORMAT_HTTPPORT);
 
@@ -376,7 +377,7 @@ namespace Syslog_agent {
             }
 
             // Generate JSON for primary queue
-            bool success = generateJson(data, configuration_.getPrimaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
+			bool success = generateLogMessage(event, configuration_.getPrimaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
             if (!success) {
                 logger->recoverable_error("Failed to generate JSON for primary queue\n");
                 Globals::instance()->releaseMessageBuffer(json_buffer);
@@ -385,6 +386,24 @@ namespace Syslog_agent {
 
             // Queue message for primary server
             primary_message_queue_->enqueue(json_buffer, strlen(json_buffer));
+
+            // DEBUGGING
+			if (true /* isTestModeEnabled() */) {
+				if (cached_events_.size() >= MAX_CACHED_EVENTS) {
+					for (int rep = 0; rep < MAX_REPEATS; rep++) {
+                        auto msg = cached_events_[rep % cached_events_.size()];
+                        logger->force("Enqueuing rep %zu\n", rep);
+                        primary_message_queue_->enqueue(msg, strlen(msg));
+                        // Simulate delay for test mode
+                        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                    }
+				}
+                else {
+                    // In test mode, cache the event for later replay
+                    cached_events_.push_back(json_buffer);
+					logger->force("Cached event %zu\n", cached_events_.size());
+                }
+			}
 
             // Handle secondary server if configured
             if (configuration_.hasSecondaryHost()) {
@@ -400,7 +419,8 @@ namespace Syslog_agent {
                 secondary_message_queue_->enqueue(json_buffer, strlen(json_buffer));
             }
 
-            Globals::instance()->releaseMessageBuffer(json_buffer);
+			// DEBUGGING
+            // Globals::instance()->releaseMessageBuffer(json_buffer);
             return Result();
         }
         catch (const std::exception& e) {

@@ -221,6 +221,8 @@ void Service::run(bool running_as_console) {
         bool first_loop = true;
         int restart_needed = 0;
 
+		initializeEventLogSubscriptions(config_.getLogs());
+
         mainLoop(running_as_console, first_loop, restart_needed);
         cleanupAndShutdown(running_as_console, restart_needed);
     }

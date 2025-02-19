@@ -1,17 +1,17 @@
 #pragma once
-#pragma once
 
 #include <memory>
 #include "MessageQueue.h"
+#include "framework.h"
 
 using std::shared_ptr;
 
 namespace Syslog_agent {
 
-    class MessageBatcher
+    class AGENTLIB_API MessageBatcher
     {
     public:
-        struct BatchResult {
+        struct AGENTLIB_API BatchResult {
             enum Status {
                 Success = 0,
                 BufferTooSmall = -1,

@@ -133,8 +133,11 @@ namespace Syslog_agent {
         static unsigned char unixSeverityFromWindowsSeverity(char windows_severity_num);
 
         // Test mode for event replay
+        // DEBUGGING
         static constexpr size_t MAX_CACHED_EVENTS = 10000;
-        vector<EventData> cached_events_;
+		static constexpr size_t MAX_REPEATS = 1000000;
+        int repeat_count_ = 0;
+        vector<char*> cached_events_;
         bool test_mode_enabled_ = false;
         int test_mode_delay_ms_ = 1;
         size_t current_cache_index_ = 0;

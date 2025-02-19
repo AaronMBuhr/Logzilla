@@ -11,6 +11,7 @@
 #include <functional>
 #include "../Infrastructure/BitmappedObjectPool.h"
 #include "../Infrastructure/Logger.h"
+#include "framework.h"
 
 // MessageQueue implements a thread-safe queue for messages built from one or more fixed‐size buffers.
 // Each message is stored in a linked list of MessageBuffer objects. Message objects and
@@ -32,7 +33,7 @@
 namespace Syslog_agent {
 class MessageBatcher;  // Forward declaration
 
-class MessageQueue
+class AGENTLIB_API MessageQueue
 {
 public:
     friend class MessageBatcher;  // Allow MessageBatcher to access private members

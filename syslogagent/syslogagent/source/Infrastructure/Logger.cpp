@@ -47,10 +47,13 @@ void Logger::setFatalErrorHandler(FATAL_ERROR_HANDLER fatal_error_handler) {
     fatal_error_handler_ = fatal_error_handler;
 }
 
-void Logger::setLogLevel(const LogLevel log_level) {
-    lock_guard<mutex> lock(pimpl_->logger_lock_);
-    // In this implementation we always update the log level.
-    current_log_level_ = log_level;
+void Logger::setLogLevel(const Logger::LogLevel log_level)
+{
+    {
+        std::lock_guard<std::mutex> lock(pimpl_->logger_lock_);
+        current_log_level_ = log_level;
+    }
+    // Now log outside of the locked section.
     log(ALWAYS, "Log level set to: %s\n", LOGLEVEL_ABBREVS[static_cast<int>(log_level)]);
 }
 
@@ -262,7 +265,7 @@ bool Logger::logToFile(const char* log_message_cstring) {
 }
 
 bool Logger::logToConsoleAndFile(const char* log_message_cstring) {
-    return logToConsole(log_message_cstring) && logToFile(log_message_cstring);
+    return logToConsole(log_message_cstring) && (logToFile(log_message_cstring) || !log_events_to_file_);
 }
 
 void Logger::getDateTimeStr(char* buf, int bufsize) {

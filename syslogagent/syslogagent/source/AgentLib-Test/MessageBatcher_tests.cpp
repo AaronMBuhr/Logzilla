@@ -1,0 +1,313 @@
+#include "pch.h"
+#include "MessageBatcher.h"
+#include "MessageQueue.h"
+
+#include <string>
+#include <vector>
+#include <memory>
+
+using namespace Syslog_agent;
+using namespace std;
+
+// -----------------------------------------------------------------------------
+// TestMessageBatcher: our test subclass using fixed header, separator, and trailer
+// -----------------------------------------------------------------------------
+class TestMessageBatcher : public MessageBatcher {
+public:
+    // Note: In production ordering is important so the batching code must flush
+    // the current batch when the next message does not fit (instead of skipping it).
+    TestMessageBatcher(uint32_t max_batch_size, uint32_t max_batch_age)
+        : MessageBatcher(max_batch_size, max_batch_age) {
+    }
+
+protected:
+    uint32_t GetMaxMessageSize_() const override {
+        return 1024; // For test purposes
+    }
+
+    uint32_t GetMinBatchInterval_() const override {
+        return 100;  // 100ms
+    }
+
+    void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* header = "[BATCH_START]";
+        size_t len = strlen(header);
+        if (max_size >= len) {
+            memcpy(dest, header, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+
+    void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* sep = "|";
+        size_t len = strlen(sep);
+        if (max_size >= len) {
+            memcpy(dest, sep, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+
+    void GetMessageTrailer_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* trailer = "[BATCH_END]";
+        size_t len = strlen(trailer);
+        if (max_size >= len) {
+            memcpy(dest, trailer, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+};
+
+// -----------------------------------------------------------------------------
+// MessageBatcherTest fixture
+// -----------------------------------------------------------------------------
+class MessageBatcherTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Create a message queue with initial pool sizes.
+        message_queue = std::make_shared<MessageQueue>(10, 20);
+
+        // By default, we create a batcher that batches at most 5 messages.
+        batcher = std::make_unique<TestMessageBatcher>(5, 1000);
+    }
+
+    void TearDown() override {
+        message_queue.reset();
+        batcher.reset();
+    }
+
+    // Helper: Enqueue each message from a vector of strings.
+    void AddTestMessages(const std::vector<std::string>& messages) {
+        for (const auto& msg : messages) {
+            message_queue->enqueue(msg.c_str(), msg.length());
+        }
+    }
+
+    // Helper: Simulate commit of a batch by removing the first 'count' messages.
+    // In production the commit happens only after a successful network send.
+    void CommitBatch(uint32_t count) {
+        for (uint32_t i = 0; i < count; ++i) {
+            message_queue->removeFront();
+        }
+    }
+
+    std::shared_ptr<MessageQueue> message_queue;
+    std::unique_ptr<TestMessageBatcher> batcher;
+};
+
+// -----------------------------------------------------------------------------
+// Basic tests (empty queue, invalid buffer, basic batching, etc.)
+// -----------------------------------------------------------------------------
+TEST_F(MessageBatcherTest, EmptyQueue) {
+    char buffer[1024];
+    auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::NoMessages);
+    EXPECT_EQ(result.messages_batched, 0);
+    EXPECT_EQ(result.bytes_written, 0);
+}
+
+TEST_F(MessageBatcherTest, InvalidBuffer) {
+    std::vector<std::string> messages = { "msg1" };
+    AddTestMessages(messages);
+
+    auto result = batcher->BatchEvents(message_queue, nullptr, 0);
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::InvalidBuffer);
+    EXPECT_EQ(result.messages_batched, 0);
+    EXPECT_EQ(result.bytes_written, 0);
+}
+
+TEST_F(MessageBatcherTest, BasicBatching) {
+    std::vector<std::string> messages = { "msg1", "msg2", "msg3" };
+    AddTestMessages(messages);
+
+    char buffer[1024];
+    auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_EQ(result.messages_batched, 3);
+    EXPECT_GT(result.bytes_written, 0);
+
+    // Verify that the batch has the proper format:
+    // It must start with the header, contain the messages (separated by '|'),
+    // and end with the trailer.
+    std::string batch(buffer, result.bytes_written);  // Include all bytes written
+    EXPECT_TRUE(batch.find("[BATCH_START]") == 0);
+    EXPECT_TRUE(batch.size() >= strlen("[BATCH_END]"));
+    EXPECT_EQ(batch.substr(batch.size() - strlen("[BATCH_END]")), "[BATCH_END]");
+    EXPECT_NE(batch.find("msg1|msg2|msg3"), std::string::npos);
+
+    // Messages should still be in the queue since we haven't committed yet
+    EXPECT_EQ(message_queue->length(), 3);
+}
+
+TEST_F(MessageBatcherTest, MaxBatchSize) {
+    // Add more messages than our max batch size
+    std::vector<std::string> messages = { "msg1", "msg2", "msg3", "msg4", "msg5", "msg6" };
+    AddTestMessages(messages);
+
+    char buffer[1024];
+    auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_EQ(result.messages_batched, 5);  // Should only batch up to max
+    EXPECT_GT(result.bytes_written, 0);
+}
+
+TEST_F(MessageBatcherTest, BufferSizeConstraints) {
+    std::vector<std::string> messages = { "msg1", "msg2", "msg3" };
+    AddTestMessages(messages);
+
+    // Test with buffer too small for even one message
+    char tiny_buffer[10];
+    auto result = batcher->BatchEvents(message_queue, tiny_buffer, sizeof(tiny_buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::BufferTooSmall);
+    EXPECT_EQ(result.messages_batched, 0);
+    EXPECT_EQ(result.bytes_written, 0);
+
+    // Test with buffer that can fit some but not all messages
+    char small_buffer[30];
+    result = batcher->BatchEvents(message_queue, small_buffer, sizeof(small_buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_GT(result.messages_batched, 0);
+    EXPECT_LT(result.messages_batched, 3);
+}
+
+TEST_F(MessageBatcherTest, LargeMessage) {
+    // Create a message larger than max size
+    std::string large_msg(2000, 'X');  // 2000 'X' characters
+    std::vector<std::string> messages = { large_msg };
+    AddTestMessages(messages);
+
+    char buffer[4096];
+    auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_EQ(result.messages_batched, 0);
+    EXPECT_EQ(result.bytes_written, 0);
+}
+
+TEST_F(MessageBatcherTest, BatchFormatConsistency) {
+    std::vector<std::string> messages = { "msg1", "msg2" };
+    AddTestMessages(messages);
+
+    char buffer[1024];
+    auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_EQ(result.messages_batched, 2);
+
+    std::string batch(buffer, result.bytes_written);
+    EXPECT_TRUE(batch.find("[BATCH_START]") == 0);
+    EXPECT_TRUE(batch.find("|") != std::string::npos);
+    EXPECT_EQ(batch.substr(batch.size() - strlen("[BATCH_END]")), "[BATCH_END]");
+}
+
+// -----------------------------------------------------------------------------
+// New tests for multi-batch flushing and trailer integrity
+// -----------------------------------------------------------------------------
+
+// This test simulates a situation where the next message would not fit (including trailer space)
+// so the current batch is flushed. The message ordering must be preserved.
+TEST_F(MessageBatcherTest, FlushOnInsufficientTrailerSpace) {
+    // Create messages that will fill most of the buffer
+    std::string msg1(400, 'A');  // 400 bytes
+    std::string msg2(400, 'B');  // 400 bytes
+    std::string msg3(200, 'C');  // 200 bytes - should force flush due to trailer
+
+    std::vector<std::string> messages = { msg1, msg2, msg3 };
+    AddTestMessages(messages);
+
+    char buffer[1024];  // Just enough for two large messages + overhead
+    auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_GT(result.messages_batched, 0);
+    EXPECT_LT(result.messages_batched, 3);  // Should not include msg3
+
+    std::string batch(buffer, result.bytes_written);
+    EXPECT_TRUE(batch.find("[BATCH_START]") == 0);
+    EXPECT_EQ(batch.substr(batch.size() - strlen("[BATCH_END]")), "[BATCH_END]");
+
+    // Commit the first batch
+    CommitBatch(result.messages_batched);
+
+    // Get the next batch
+    result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_GT(result.messages_batched, 0);
+
+    batch = std::string(buffer, result.bytes_written);
+    EXPECT_TRUE(batch.find("[BATCH_START]") == 0);
+    EXPECT_TRUE(batch.find(std::string(200, 'C')) != std::string::npos);
+    EXPECT_EQ(batch.substr(batch.size() - strlen("[BATCH_END]")), "[BATCH_END]");
+}
+
+// This test enqueues many messages (with sequence numbers) so that multiple batches are produced.
+// It then verifies that every batch ends with the trailer and that overall message order is preserved.
+TEST_F(MessageBatcherTest, MultipleBatchFlushAndOrdering) {
+    // Create 20 messages with sequence numbers
+    std::vector<std::string> messages;
+    for (int i = 0; i < 20; ++i) {
+        messages.push_back("msg" + std::to_string(i));
+    }
+    AddTestMessages(messages);
+
+    char buffer[1024];
+    std::vector<std::string> batches;
+    int total_messages = 0;
+
+    while (total_messages < 20) {
+        auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+        EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+        EXPECT_GT(result.messages_batched, 0);
+
+        std::string batch(buffer, result.bytes_written);
+        EXPECT_TRUE(batch.find("[BATCH_START]") == 0);
+        EXPECT_EQ(batch.substr(batch.size() - strlen("[BATCH_END]")), "[BATCH_END]");
+
+        batches.push_back(batch);
+        total_messages += result.messages_batched;
+        CommitBatch(result.messages_batched);
+    }
+
+    EXPECT_GT(batches.size(), 1);  // Should have produced multiple batches
+}
+
+// Stress test: simulate production conditions by enqueuing many JSON-like messages,
+// using a large buffer (e.g. ~65,536 bytes) and verifying that every produced batch
+// ends with the trailer. This test is designed to flush out any error that might cause
+// the trailer to be dropped after many batches.
+TEST_F(MessageBatcherTest, StressTestLongBatches) {
+    // Create 100 JSON-like messages
+    std::vector<std::string> messages;
+    for (int i = 0; i < 100; ++i) {
+        std::string msg = "{\"id\":" + std::to_string(i) + 
+                         ",\"timestamp\":\"2023-01-01T00:00:00Z\"," +
+                         "\"data\":\"" + std::string(100, 'X') + "\"}";
+        messages.push_back(msg);
+    }
+    AddTestMessages(messages);
+
+    char buffer[65536];
+    std::vector<std::string> batches;
+    int total_messages = 0;
+
+    while (total_messages < 100) {
+        auto result = batcher->BatchEvents(message_queue, buffer, sizeof(buffer));
+        EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+        EXPECT_GT(result.messages_batched, 0);
+
+        std::string batch(buffer, result.bytes_written);
+        EXPECT_TRUE(batch.find("[BATCH_START]") == 0);
+        EXPECT_EQ(batch.substr(batch.size() - strlen("[BATCH_END]")), "[BATCH_END]");
+
+        batches.push_back(batch);
+        total_messages += result.messages_batched;
+        CommitBatch(result.messages_batched);
+    }
+
+    EXPECT_GT(batches.size(), 1);
+}

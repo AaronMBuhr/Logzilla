@@ -166,6 +166,10 @@ int MessageQueue::peek(Message* msg, char* message_content, const uint32_t max_l
         memcpy(message_content + copied, buffer->buffer, toCopy);
         copied += toCopy;
     }
+    // Null terminate the output string
+    if (copied < max_len) {
+        message_content[copied] = '\0';
+    }
 
     logger->debug2("MessageQueue::peek() Successfully peeked message with length %d\n", msg->data_length);
     return msg->data_length;
@@ -228,6 +232,10 @@ int MessageQueue::dequeue(char* message_content, const uint32_t max_len) {
         memcpy(message_content + copied, buffer->buffer, toCopy);
         copied += toCopy;
     }
+    // Null terminate the output string
+    if (copied < max_len) {
+        message_content[copied] = '\0';
+    }
 
     int length = first_message_->data_length;
     removeFrontInternal();
@@ -251,17 +259,20 @@ bool MessageQueue::removeFront() {
 }
 
 std::experimental::generator<MessageQueue::Message*> MessageQueue::traverseQueue(Message* first) const {
-    auto logger = LOG_THIS;
-    std::lock_guard<std::mutex> lock(queue_mutex_);
-    
-    Message* current = first ? first : first_message_;
-    while (current) {
-        if (!messages_pool_->belongs(current)) {
-            logger->recoverable_error("MessageQueue::traverseQueue() : invalid message pointer\n");
-            break;
+    std::vector<Message*> messages;
+    {
+        // Lock only long enough to copy the pointers
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        Message* current = first ? first : first_message_;
+        while (current) {
+            // (Optional: you can add a check here if needed)
+            messages.push_back(current);
+            current = current->next;
         }
-        co_yield current;
-        current = current->next;
+    }
+    // Now yield messages without holding the lock.
+    for (auto msg : messages) {
+        co_yield msg;
     }
 }
 
