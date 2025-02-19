@@ -54,9 +54,6 @@
     <ClInclude Include="WindowsEvent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="MessageQueue.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="OStreamBuf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -106,9 +103,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="StatefulLogger.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MessageBatcher.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="JSONMessageBatcher.h">
@@ -198,9 +192,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="StatefulLogger.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="MessageBatcher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="EventLogger.cpp">

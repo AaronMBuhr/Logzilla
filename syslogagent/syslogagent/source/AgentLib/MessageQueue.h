@@ -9,8 +9,8 @@
 #include <coroutine>
 #include <experimental/generator>
 #include <functional>
-#include "BitmappedObjectPool.h"
-#include "Logger.h"
+#include "../Infrastructure/BitmappedObjectPool.h"
+#include "../Infrastructure/Logger.h"
 
 // MessageQueue implements a thread-safe queue for messages built from one or more fixed‐size buffers.
 // Each message is stored in a linked list of MessageBuffer objects. Message objects and

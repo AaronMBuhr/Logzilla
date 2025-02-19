@@ -148,8 +148,6 @@
     <ClInclude Include="ArrayQueue.h" />
     <ClInclude Include="FileWatcher.h" />
     <ClInclude Include="message.h" />
-    <ClInclude Include="MessageBatcher.h" />
-    <ClInclude Include="MessageQueue.h" />
     <ClInclude Include="OStreamBuf.h" />
     <ClInclude Include="RateMonitor.h" />
     <ClInclude Include="RecordNumber.h" />
@@ -185,7 +183,6 @@
     <ClCompile Include="INetworkClient.cpp" />
     <ClCompile Include="Configuration.cpp" />
     <ClCompile Include="FileWatcher.cpp" />
-    <ClCompile Include="MessageBatcher.cpp" />
     <ClCompile Include="MessageQueue.cpp" />
     <ClCompile Include="RecordNumber.cpp" />
     <ClCompile Include="Result.cpp" />
