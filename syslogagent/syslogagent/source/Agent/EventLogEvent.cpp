@@ -25,6 +25,7 @@ namespace Syslog_agent {
     }
 
     void EventLogEvent::renderXml() {
+        auto logger = LOG_THIS;
         DWORD buffer_size_needed;
         DWORD count;
         if (xml_buffer_ != nullptr)
@@ -42,7 +43,7 @@ namespace Syslog_agent {
             &count);
         if (!succeeded) {
             auto err = GetLastError();
-            Logger::recoverable_error("EventLogEvent::RenderXml()> error %d\n", err);
+            logger->recoverable_error("EventLogEvent::RenderXml()> error %d\n", err);
             Globals::instance()->releaseMessageBuffer(reinterpret_cast<char*>(xml_buffer_w));
             return;
         }
@@ -72,6 +73,7 @@ namespace Syslog_agent {
     }
 
     void EventLogEvent::renderText(const char* publisher_name) {
+        auto logger = LOG_THIS;
         if (text_buffer_ != nullptr)
             return;
         text_buffer_ = Globals::instance()->getMessageBuffer("text_buffer_");
@@ -84,7 +86,7 @@ namespace Syslog_agent {
             nullptr, 0, 0);
         if (!metadata_handle) {
             int status = GetLastError();
-            Logger::recoverable_error("EventPublisher::openMetadata()> EvtOpenPublisherMetadata "
+            logger->recoverable_error("EventPublisher::openMetadata()> EvtOpenPublisherMetadata "
                 "failed with %d for %s\n", status, publisher_name);
             Globals::instance()->releaseMessageBuffer(reinterpret_cast<char*>(text_buffer_w));
             return;
@@ -97,11 +99,11 @@ namespace Syslog_agent {
             auto err = GetLastError();
             // Check specifically for message not found
             if (err == 15029) {
-                Logger::debug("EventLogEvent::renderText()> Message template not found\n");
+                logger->debug("EventLogEvent::renderText()> Message template not found\n");
                 strcpy_s(text_buffer_, Globals::MESSAGE_BUFFER_SIZE, "(Message template unavailable)");
             }
             else {
-                Logger::recoverable_error("EventLogEvent::renderText()> Failed to format message: %d\n", err);
+                logger->recoverable_error("EventLogEvent::renderText()> Failed to format message: %d\n", err);
             }
             text_buffer_w[0] = L'\0';
             buffer_size_needed = 0;

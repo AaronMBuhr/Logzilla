@@ -42,7 +42,8 @@ SyslogSender::SyslogSender(
     , secondary_batcher_(std::move(secondary_batcher))
     , send_buffer_(new char[SEND_BUFFER_SIZE])
 {
-    Logger::debug2("SyslogSender constructor\n");
+    auto logger = LOG_THIS;
+    logger->debug2("SyslogSender constructor\n");
     using namespace std::placeholders;
     std::function<bool(size_t, MessageQueue::Message*, bool)> hook = 
         std::bind(&SyslogSender::enqueueHook, this, _1, _2, _3);
@@ -75,6 +76,7 @@ uint64_t SyslogSender::next_wait_time_ms(uint64_t longest_wait_time_ms) const {
 }
 
 bool SyslogSender::waitForBatch(MessageQueue* first_queue, MessageQueue* second_queue) const {
+    auto logger = LOG_THIS;
     std::unique_lock<std::mutex> lock(batch_mutex_);
     auto size_check = [this, first_queue, second_queue]() { 
         return (first_queue && first_queue->length() >= max_batch_size_) 
@@ -87,14 +89,17 @@ bool SyslogSender::waitForBatch(MessageQueue* first_queue, MessageQueue* second_
 	if (wait_time_ms == 0) {
 		return false;
 	}
-    //Logger::debug3("-------------------------------------------------------------------> SyslogSender::waitForBatch()> queue sizes: %d %d, wait time %lu\n", (first_queue ? first_queue->length() : 0),
-    //    (second_queue ? second_queue->length() : 0), wait_time_ms);
+    logger->debug3("-------------------------------------------------------------------> SyslogSender::waitForBatch()> queue sizes: %d %d, wait time %lu\n", 
+        (first_queue ? first_queue->length() : 0),
+        (second_queue ? second_queue->length() : 0), 
+        wait_time_ms);
     batch_cv_.wait_for(lock, std::chrono::milliseconds(wait_time_ms), size_check);
     return true;
 }
 
 void SyslogSender::run() const {
-    Logger::debug2("SyslogSender::run()> Starting sender thread\n");
+    auto logger = LOG_THIS;
+    logger->debug2("SyslogSender::run()> Starting sender thread\n");
     
     MessageQueue* primary_queue = (primary_network_client_ && primary_batcher_) ? primary_queue_.get() : nullptr;
     MessageQueue* secondary_queue = (secondary_network_client_ && secondary_batcher_) ? secondary_queue_.get() : nullptr;
@@ -107,7 +112,7 @@ void SyslogSender::run() const {
 
     while (!isStopRequested()) {
         try {
-            Logger::debug3("SyslogSender::run()> Queue lengths - Primary: %d, Secondary: %d\n",
+            logger->debug3("SyslogSender::run()> Queue lengths - Primary: %d, Secondary: %d\n",
                 primary_queue ? primary_queue->length() : 0,
                 secondary_queue ? secondary_queue->length() : 0);
                 
@@ -121,12 +126,12 @@ void SyslogSender::run() const {
 
             // Process primary queue if messages are available
             if (primary_queue) {
-                Logger::debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
+                logger->debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
                 size_t initial_queue_size = primary_queue->length();
                 
                 for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
                     auto batch_result = primary_batcher_->BatchEvents(primary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
-                    Logger::debug3("SyslogSender::run()> Primary batch result status: %d, messages: %d, bytes: %d\n",
+                    logger->debug3("SyslogSender::run()> Primary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
                     if (batch_result.status == MessageBatcher::BatchResult::Status::Success) {
                         batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
@@ -143,12 +148,12 @@ void SyslogSender::run() const {
 
             // Process secondary queue if messages are available
             if (secondary_queue) {
-                Logger::debug3("SyslogSender::run()> Attempting to batch secondary queue messages\n");
+                logger->debug3("SyslogSender::run()> Attempting to batch secondary queue messages\n");
                 size_t initial_queue_size = secondary_queue->length();
                 
                 for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
                     auto batch_result = secondary_batcher_->BatchEvents(secondary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
-                    Logger::debug3("SyslogSender::run()> Secondary batch result status: %d, messages: %d, bytes: %d\n",
+                    logger->debug3("SyslogSender::run()> Secondary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
                     if (batch_result.status == MessageBatcher::BatchResult::Status::Success) {
                         batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
@@ -164,12 +169,12 @@ void SyslogSender::run() const {
             }
         }
         catch (const std::exception& e) {
-            Logger::recoverable_error("SyslogSender::run()> Exception: %s\n", e.what());
+            logger->recoverable_error("SyslogSender::run()> Exception: %s\n", e.what());
             Sleep(max_batch_age_); // Wait a bit before retrying
         }
     }
 
-    Logger::debug2("SyslogSender::run()> Sender thread stopping\n");
+    logger->debug2("SyslogSender::run()> Sender thread stopping\n");
 }
 
 int SyslogSender::sendMessageBatch(
@@ -179,22 +184,23 @@ int SyslogSender::sendMessageBatch(
     char* batch_buf,
     uint32_t batch_buf_length) const
 {
+    auto logger = LOG_THIS;
     if (!network_client || !msg_queue || !batch_buf || batch_count == 0) {
-        Logger::critical("SyslogSender::sendMessageBatch()> Invalid parameters\n");
+        logger->critical("SyslogSender::sendMessageBatch()> Invalid parameters\n");
         return 0;
     }
 
     // Check if we're shutting down
     if (isShuttingDown() || msg_queue->isShuttingDown()) {
-        Logger::debug2("SyslogSender::sendMessageBatch()> Shutdown in progress, skipping batch send\n");
+        logger->debug2("SyslogSender::sendMessageBatch()> Shutdown in progress, skipping batch send\n");
         return 0;
     }
 
     try {
-        Logger::debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n",
+        logger->debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n",
             batch_count, batch_buf_length);
 
-        if (Logger::getLogLevel() == Logger::DEBUG3) {
+        if (logger->getLogLevel() == Logger::DEBUG3) {
             EventLogger::logNetworkSend(batch_buf, batch_buf_length);
         }
 
@@ -206,21 +212,21 @@ int SyslogSender::sendMessageBatch(
         if (result != INetworkClient::RESULT_SUCCESS) {
             // Don't log as critical during shutdown - it's expected to fail
             if (isShuttingDown() || msg_queue->isShuttingDown()) {
-                Logger::debug2("SyslogSender::sendMessageBatch()> Network send failed during shutdown\n");
+                logger->debug2("SyslogSender::sendMessageBatch()> Network send failed during shutdown\n");
             }
             else {
-                Logger::critical("SyslogSender::sendMessageBatch()> Failed to send batch, network error: %d\n", result);
+                logger->critical("SyslogSender::sendMessageBatch()> Failed to send batch, network error: %d\n", result);
             }
             return 0;
         }
 
-        Logger::debug3("SyslogSender::sendMessageBatch()> Network send successful\n");
+        logger->debug3("SyslogSender::sendMessageBatch()> Network send successful\n");
 
         // Only remove messages after successful send
         uint32_t messages_removed = 0;
         for (uint32_t i = 0; i < batch_count; i++) {
             if (!msg_queue->removeFront()) {
-                Logger::critical("SyslogSender::sendMessageBatch()> Failed to remove message %u of %u\n",
+                logger->critical("SyslogSender::sendMessageBatch()> Failed to remove message %u of %u\n",
                     i + 1, batch_count);
                 break;
             }
@@ -231,13 +237,13 @@ int SyslogSender::sendMessageBatch(
             messages_removed++;
         }
 
-        Logger::debug2("SyslogSender::sendMessageBatch()> Successfully sent and removed %u messages\n",
+        logger->debug2("SyslogSender::sendMessageBatch()> Successfully sent and removed %u messages\n",
             messages_removed);
 
         return static_cast<int>(messages_removed);
     }
     catch (const std::exception& e) {
-        Logger::critical("SyslogSender::sendMessageBatch()> Exception: %s\n", e.what());
+        logger->critical("SyslogSender::sendMessageBatch()> Exception: %s\n", e.what());
         return 0; // Return 0 to indicate no messages were processed
     }
 }

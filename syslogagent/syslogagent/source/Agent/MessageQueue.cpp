@@ -36,9 +36,10 @@ void MessageQueue::releaseMessageBuffers(Message& msg) {
 }
 
 MessageQueue::Message* MessageQueue::createMessage(const char* message_content, const uint32_t message_len, uint64_t timestamp) {
+    auto logger = LOG_THIS;
     Message* msg = messages_pool_->getAndMarkNextUnused();
     if (!msg) {
-        Logger::recoverable_error("MessageQueue::createMessage() : failed to allocate message\n");
+        logger->recoverable_error("MessageQueue::createMessage() : failed to allocate message\n");
         return nullptr;
     }
 
@@ -57,7 +58,7 @@ MessageQueue::Message* MessageQueue::createMessage(const char* message_content, 
         while (remaining > 0) {
             MessageBuffer* buffer = message_buffers_pool_->getAndMarkNextUnused();
             if (!buffer) {
-                Logger::recoverable_error("MessageQueue::createMessage() : failed to allocate message buffer\n");
+                logger->recoverable_error("MessageQueue::createMessage() : failed to allocate message buffer\n");
                 throw std::runtime_error("Buffer allocation failed");
             }
 
@@ -77,7 +78,7 @@ MessageQueue::Message* MessageQueue::createMessage(const char* message_content, 
             msg->buffer_count++;
 
             if (msg->buffer_count > MAX_BUFFERS_PER_MESSAGE) {
-                Logger::recoverable_error("MessageQueue::createMessage() : message requires more than MAX_BUFFERS_PER_MESSAGE\n");
+                logger->recoverable_error("MessageQueue::createMessage() : message requires more than MAX_BUFFERS_PER_MESSAGE\n");
                 throw std::runtime_error("Too many buffers required");
             }
         }
@@ -92,8 +93,9 @@ MessageQueue::Message* MessageQueue::createMessage(const char* message_content, 
 }
 
 bool MessageQueue::enqueue(const char* message_content, const uint32_t message_len) {
+    auto logger = LOG_THIS;
     if (!message_content || message_len == 0 || message_len >= MESSAGE_BUFFER_SIZE * MAX_BUFFERS_PER_MESSAGE) {
-        Logger::recoverable_error("MessageQueue::enqueue() : invalid parameters\n");
+        logger->recoverable_error("MessageQueue::enqueue() : invalid parameters\n");
         return false;
     }
 
@@ -131,8 +133,9 @@ bool MessageQueue::enqueue(const char* message_content, const uint32_t message_l
 }
 
 int MessageQueue::peek(Message* msg, char* message_content, const uint32_t max_len) const {
+    auto logger = LOG_THIS;
     if (!message_content || max_len == 0) {
-        Logger::recoverable_error("MessageQueue::peek() : invalid parameters\n");
+        logger->recoverable_error("MessageQueue::peek() : invalid parameters\n");
         return -1;
     }
 
@@ -141,19 +144,19 @@ int MessageQueue::peek(Message* msg, char* message_content, const uint32_t max_l
     if (msg == nullptr) {
         msg = first_message_;
         if (!msg) {
-            Logger::debug("MessageQueue::peek() : queue is empty\n");
+            logger->debug("MessageQueue::peek() : queue is empty\n");
             return -1;
         }
     }
 
     // Validate the message belongs to this queue
     if (!messages_pool_->belongs(msg)) {
-        Logger::recoverable_error("MessageQueue::peek() : invalid message pointer\n");
+        logger->recoverable_error("MessageQueue::peek() : invalid message pointer\n");
         return -1;
     }
 
     if (msg->data_length > max_len) {
-        Logger::recoverable_error("MessageQueue::peek() : message length %u exceeds buffer size %u\n", msg->data_length, max_len);
+        logger->recoverable_error("MessageQueue::peek() : message length %u exceeds buffer size %u\n", msg->data_length, max_len);
         return -1;
     }
 
@@ -164,13 +167,14 @@ int MessageQueue::peek(Message* msg, char* message_content, const uint32_t max_l
         copied += toCopy;
     }
 
-    Logger::debug2("MessageQueue::peek() Successfully peeked message with length %d\n", msg->data_length);
+    logger->debug2("MessageQueue::peek() Successfully peeked message with length %d\n", msg->data_length);
     return msg->data_length;
 }
 
 void MessageQueue::removeFrontInternal() {
+    auto logger = LOG_THIS;
     if (!first_message_) {
-        Logger::recoverable_error("MessageQueue::removeFrontInternal() : queue empty\n");
+        logger->recoverable_error("MessageQueue::removeFrontInternal() : queue empty\n");
         return;
     }
 
@@ -198,40 +202,47 @@ void MessageQueue::removeFrontInternal() {
 }
 
 int MessageQueue::dequeue(char* message_content, const uint32_t max_len) {
+    auto logger = LOG_THIS;
     if (!message_content || max_len == 0) {
+        logger->recoverable_error("MessageQueue::dequeue() : invalid parameters\n");
         return -1;
     }
 
-    // First acquire the semaphore to ensure message availability
-    items_sem_.acquire();
-    
-    // Then lock the mutex for the actual dequeue operation
-    std::lock_guard<std::mutex> lock(queue_mutex_);
-    
+    std::unique_lock<std::mutex> lock(queue_mutex_);
+
     if (!first_message_) {
-        Logger::recoverable_error("MessageQueue::dequeue() : queue empty after semaphore acquire\n");
-        items_sem_.release(); // Release the semaphore since we're not consuming a message
+        logger->debug("MessageQueue::dequeue() : queue is empty\n");
         return -1;
     }
 
-    int ret = peek(first_message_, message_content, max_len);
-    if (ret == -1) {
-        Logger::recoverable_error("MessageQueue::dequeue() : peek failed\n");
-        items_sem_.release(); // Release the semaphore since we're not consuming a message
+    if (first_message_->data_length > max_len) {
+        logger->recoverable_error("MessageQueue::dequeue() : message length %u exceeds buffer size %u\n", 
+            first_message_->data_length, max_len);
         return -1;
     }
 
+    int copied = 0;
+    for (MessageBuffer* buffer = first_message_->message_buffers; buffer != nullptr; buffer = buffer->next) {
+        uint32_t toCopy = (std::min)(first_message_->data_length - static_cast<uint32_t>(copied), 
+            static_cast<uint32_t>(MESSAGE_BUFFER_SIZE));
+        memcpy(message_content + copied, buffer->buffer, toCopy);
+        copied += toCopy;
+    }
+
+    int length = first_message_->data_length;
     removeFrontInternal();
-    return ret;
+
+    logger->debug2("MessageQueue::dequeue() Successfully dequeued message with length %d\n", length);
+    return length;
 }
 
 bool MessageQueue::removeFront() {
+    auto logger = LOG_THIS;
     items_sem_.acquire();
     std::lock_guard<std::mutex> lock(queue_mutex_);
     
     if (!first_message_) {
-        Logger::recoverable_error("MessageQueue::removeFront() : queue empty after semaphore acquire\n");
-        items_sem_.release(); // Release the semaphore since we're not consuming a message
+        logger->debug("MessageQueue::removeFront() : queue is empty\n");
         return false;
     }
 
@@ -239,31 +250,19 @@ bool MessageQueue::removeFront() {
     return true;
 }
 
-std::experimental::generator<MessageQueue::Message*> MessageQueue::traverseQueue(Message* first) {
-    Message* current;
-    {
-        std::lock_guard<std::mutex> lock(queue_mutex_);
-        current = first ? first : first_message_;
-        // Take a snapshot of the current message - we'll validate it belongs before yielding
-        if (current && !messages_pool_->belongs(current)) {
-            Logger::recoverable_error("MessageQueue::traverseQueue() : invalid message pointer\n");
-            current = nullptr;
-        }
-    }
+std::experimental::generator<MessageQueue::Message*> MessageQueue::traverseQueue(Message* first) const {
+    auto logger = LOG_THIS;
+    std::lock_guard<std::mutex> lock(queue_mutex_);
     
+    Message* current = first ? first : first_message_;
     while (current) {
-        co_yield current;
-        
-        Message* next;
-        {
-            std::lock_guard<std::mutex> lock(queue_mutex_);
-            next = current->next;
-            if (next && !messages_pool_->belongs(next)) {
-                Logger::recoverable_error("MessageQueue::traverseQueue() : invalid next message pointer\n");
-                next = nullptr;
-            }
+        if (!messages_pool_->belongs(current)) {
+            logger->recoverable_error("MessageQueue::traverseQueue() : invalid message pointer\n");
+            break;
         }
-        current = next;
+        co_yield current;
+        current = current->next;
     }
 }
+
 }

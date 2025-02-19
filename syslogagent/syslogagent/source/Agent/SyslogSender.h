@@ -59,11 +59,12 @@ protected:
     bool waitForBatch(MessageQueue* first_queue, MessageQueue* second_queue) const;
 
     bool shouldSendBatch(std::shared_ptr<MessageQueue> queue) const {
+        auto logger = LOG_THIS;
         if (!queue) return false;
         
         // Check queue length
         if (queue->length() >= max_batch_size_) {
-            Logger::debug2("SyslogSender::shouldSendBatch()> Queue length %zu exceeds max batch size %u\n",
+            logger->debug2("SyslogSender::shouldSendBatch()> Queue length %zu exceeds max batch size %u\n",
                 queue->length(), max_batch_size_);
             return true;
         }
@@ -76,7 +77,7 @@ protected:
             int64_t age = current_time - oldest_time;
             
             if (age >= max_batch_age_) {
-                Logger::debug2("SyslogSender::shouldSendBatch()> Oldest message age %lld ms >= max age %llu ms\n",
+                logger->debug2("SyslogSender::shouldSendBatch()> Oldest message age %lld ms >= max age %llu ms\n",
                     age, max_batch_age_);
                 return true;
             }

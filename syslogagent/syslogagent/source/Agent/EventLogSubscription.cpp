@@ -46,12 +46,13 @@ namespace Syslog_agent {
     }
 
     void EventLogSubscription::subscribe(const wstring& bookmark_xml, const bool only_while_running) {
+        auto logger = LOG_THIS;
         char channel_buf[1024];
         Util::wstr2str(channel_buf, sizeof(channel_buf), channel_.c_str());
-        Logger::debug("EventLogSubscription::subscribe()> Subscribing to %s\n", channel_buf);
+        logger->debug("EventLogSubscription::subscribe()> Subscribing to %s\n", channel_buf);
 
         if (subscription_active_) {
-            Logger::recoverable_error("EventLogSubscription::subscribe()> subscription already active\n");
+            logger->recoverable_error("EventLogSubscription::subscribe()> subscription already active\n");
             return;
         }
 
@@ -65,42 +66,39 @@ namespace Syslog_agent {
         EVT_SUBSCRIBE_FLAGS flags;
         EVT_HANDLE subscribe_bookmark = NULL;  // Separate bookmark for subscription
 
-        // Check if we're in catch-up mode (has bookmark or wants all past events)
-        // bool catchup_mode = (bookmark_xml_buffer_[0] != 0) || (query_.find(L"catch_up=true") != wstring::npos);
-
         if (!only_while_running) {
             if (bookmark_xml_buffer_[0] == 0) {
                 flags = EvtSubscribeStartAtOldestRecord;
                 bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
                 if (bookmark_ == NULL) {
                     auto error = GetLastError();
-                    Logger::recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
+                    logger->recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
                     return;
                 }
-                Logger::debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s\n", 
+                logger->debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s\n", 
                     bookmark_, channel_buf);
-                Logger::debug("EventLogSubscription::subscribe()> Catch-up mode: subscribing to all events from start for %s\n", 
+                logger->debug("EventLogSubscription::subscribe()> Catch-up mode: subscribing to all events from start for %s\n", 
                     channel_buf);
             } else {
                 flags = EvtSubscribeStartAfterBookmark;
                 bookmark_ = EvtCreateBookmark(bookmark_xml_buffer_);
                 if (bookmark_ == NULL) {
                     auto error = GetLastError();
-                    Logger::warning("EventLogSubscription::subscribe()> Failed to create bookmark for %s (error %d), falling back to all events from start\n",
+                    logger->warning("EventLogSubscription::subscribe()> Failed to create bookmark for %s (error %d), falling back to all events from start\n",
                         channel_buf, error);
                     flags = EvtSubscribeStartAtOldestRecord;
                     bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
                     if (bookmark_ == NULL) {
                         auto error = GetLastError();
-                        Logger::recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
+                        logger->recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
                         return;
                     }
-                    Logger::debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s after bookmark load failed\n", 
+                    logger->debug2("EventLogSubscription::subscribe()> Created new empty bookmark %p for %s after bookmark load failed\n", 
                         bookmark_, channel_buf);
                 } else {
-                    Logger::debug2("EventLogSubscription::subscribe()> Created bookmark %p from XML for %s\n", 
+                    logger->debug2("EventLogSubscription::subscribe()> Created bookmark %p from XML for %s\n", 
                         bookmark_, channel_buf);
-                    Logger::debug("EventLogSubscription::subscribe()> Catch-up mode: Using bookmark for %s\n", channel_buf);
+                    logger->debug("EventLogSubscription::subscribe()> Catch-up mode: Using bookmark for %s\n", channel_buf);
                     subscribe_bookmark = bookmark_;  // Use existing bookmark for subscription
                 }
             }
@@ -110,14 +108,14 @@ namespace Syslog_agent {
             bookmark_ = EvtCreateBookmark(NULL);  // Create new empty bookmark for tracking
             if (bookmark_ == NULL) {
                 auto error = GetLastError();
-                Logger::recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
+                logger->recoverable_error("EventLogSubscription::subscribe()> Failed to create empty bookmark (error %d)\n", error);
                 return;
             }
-            Logger::debug("EventLogSubscription::subscribe()> Future-only mode: subscribing to new events only for %s\n", 
+            logger->debug("EventLogSubscription::subscribe()> Future-only mode: subscribing to new events only for %s\n", 
                 channel_buf);
         }
 
-        Logger::debug2("EventLogSubscription::subscribe()> Attempting subscription to %s with flags %d and bookmark %p (tracking bookmark %p)\n", 
+        logger->debug2("EventLogSubscription::subscribe()> Attempting subscription to %s with flags %d and bookmark %p (tracking bookmark %p)\n", 
             channel_buf, flags, subscribe_bookmark, bookmark_);
 
         subscription_handle_ = EvtSubscribe(
@@ -133,21 +131,22 @@ namespace Syslog_agent {
 
         if (subscription_handle_ == NULL) {
             auto status = GetLastError();
-            Logger::critical("EventLogSubscription::subscribe()> could not subscribe to %s (error %d)\n",
+            logger->critical("EventLogSubscription::subscribe()> could not subscribe to %s (error %d)\n",
                 channel_buf, status);
             return;
         }
 
         subscription_active_ = true;
-        Logger::debug2("EventLogSubscription::subscribe()> Successfully subscribed to %s\n", channel_buf);
+        logger->debug2("EventLogSubscription::subscribe()> Successfully subscribed to %s\n", channel_buf);
     }
 
     void EventLogSubscription::cancelSubscription() {
+        auto logger = LOG_THIS;
         if (subscription_active_) {
             saveBookmark();
             if (subscription_handle_) {
                 if (!EvtClose(subscription_handle_)) {
-                    Logger::recoverable_error("EventLogSubscription::cancelSubscription()> "
+                    logger->recoverable_error("EventLogSubscription::cancelSubscription()> "
                         "Failed to close subscription handle (error %d)\n",
                         GetLastError());
                 }
@@ -162,10 +161,10 @@ namespace Syslog_agent {
         PVOID pContext,
         EVT_HANDLE hEvent)
     {
-
+        auto logger = LOG_THIS;
         auto subscription = reinterpret_cast<EventLogSubscription*>(pContext);
         if (!subscription) {
-            Logger::critical("EventLogSubscription::handleSubscriptionEvent()> Invalid subscription context\n");
+            logger->critical("EventLogSubscription::handleSubscriptionEvent()> Invalid subscription context\n");
             return ERROR_INVALID_PARAMETER;
         }
 
@@ -173,7 +172,7 @@ namespace Syslog_agent {
             switch (action) {
             case EvtSubscribeActionError:
                 if (hEvent && (DWORD_PTR)hEvent != ERROR_EVT_QUERY_RESULT_STALE) {
-                    Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Received error event, error code: %lu\n",
+                    logger->recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Received error event, error code: %lu\n",
                         (DWORD_PTR)hEvent);
                 }
                 break;
@@ -183,7 +182,7 @@ namespace Syslog_agent {
                     // Update the bookmark with the current event
                     if (subscription->bookmark_) {
                         if (!EvtUpdateBookmark(subscription->bookmark_, hEvent)) {
-                            Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Failed to update bookmark, error: %lu\n",
+                            logger->recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Failed to update bookmark, error: %lu\n",
                                 GetLastError());
                         } else {
                             subscription->bookmark_modified_ = true;
@@ -203,21 +202,22 @@ namespace Syslog_agent {
             return ERROR_SUCCESS;
         }
         catch (const std::exception& e) {
-            Logger::recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Exception: %s\n", e.what());
+            logger->recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Exception: %s\n", e.what());
             return ERROR_INVALID_DATA;
         }
     }
 
     bool EventLogSubscription::saveBookmark()
     {
+        auto logger = LOG_THIS;
         if (!bookmark_modified_) {
-            Logger::debug3("EventLogSubscription::saveBookmark()> No changes to save for %ls\n", channel_.c_str());
+            logger->debug3("EventLogSubscription::saveBookmark()> No changes to save for %ls\n", channel_.c_str());
             return true;
         }
 
         try {
             if (!bookmark_) {
-                Logger::debug3("EventLogSubscription::saveBookmark()> No bookmark to save for %ls\n", channel_.c_str());
+                logger->debug3("EventLogSubscription::saveBookmark()> No bookmark to save for %ls\n", channel_.c_str());
                 return false;
             }
 
@@ -227,7 +227,7 @@ namespace Syslog_agent {
             if (!EvtRender(NULL, bookmark_, EvtRenderBookmark, 0, NULL, &bufferSize, &propertyCount)) {
                 DWORD error = GetLastError();
                 if (error != ERROR_INSUFFICIENT_BUFFER) {  // This error is expected when getting buffer size
-                    Logger::recoverable_error("EventLogSubscription::saveBookmark()> Failed to get required buffer size, error: %lu\n",
+                    logger->recoverable_error("EventLogSubscription::saveBookmark()> Failed to get required buffer size, error: %lu\n",
                         error);
                     return false;
                 }
@@ -235,7 +235,7 @@ namespace Syslog_agent {
 
             // Typical bookmark XML is small, but let's be safe
             if (bufferSize > MAX_BOOKMARK_SIZE) {
-                Logger::recoverable_error("EventLogSubscription::saveBookmark()> Bookmark size %lu exceeds maximum %lu\n",
+                logger->recoverable_error("EventLogSubscription::saveBookmark()> Bookmark size %lu exceeds maximum %lu\n",
                     bufferSize, MAX_BOOKMARK_SIZE);
                 return false;
             }
@@ -255,7 +255,7 @@ namespace Syslog_agent {
                 bookmark_xml_buffer_, 
                 &bufferUsed, 
                 &propertyCount)) {
-                Logger::recoverable_error("EventLogSubscription::saveBookmark()> Failed to render bookmark, error: %lu\n",
+                logger->recoverable_error("EventLogSubscription::saveBookmark()> Failed to render bookmark, error: %lu\n",
                     GetLastError());
                 return false;
             }
@@ -266,16 +266,16 @@ namespace Syslog_agent {
                 bookmark_modified_ = false;
                 events_since_last_save_ = 0;
                 last_bookmark_save_ = time(nullptr);
-                Logger::debug2("EventLogSubscription::saveBookmark()> Saved bookmark for %ls\n", channel_.c_str());
+                logger->debug2("EventLogSubscription::saveBookmark()> Saved bookmark for %ls\n", channel_.c_str());
                 return true;
             }
             catch (const Result& r) {
-                Logger::recoverable_error("EventLogSubscription::saveBookmark()> Failed to save bookmark: %s\n", r.what());
+                logger->recoverable_error("EventLogSubscription::saveBookmark()> Failed to save bookmark: %s\n", r.what());
                 return false;
             }
         }
         catch (const std::exception& e) {
-            Logger::recoverable_error("EventLogSubscription::saveBookmark()> Exception: %s\n", e.what());
+            logger->recoverable_error("EventLogSubscription::saveBookmark()> Exception: %s\n", e.what());
             return false;
         }
     }

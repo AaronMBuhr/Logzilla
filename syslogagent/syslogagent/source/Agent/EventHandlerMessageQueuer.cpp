@@ -148,6 +148,7 @@ namespace Syslog_agent {
         const EventHandlerMessageQueuer::EventData& data, int logformat, char* json_buffer,
         size_t buflen)
     {
+        auto logger = LOG_THIS;
         // Use stack-based buffer for stream
         OStreamBuf ostream_buffer(json_buffer, buflen);
         std::ostream json_output(&ostream_buffer);
@@ -156,7 +157,7 @@ namespace Syslog_agent {
         auto checkBufferSpace = [&](const char* field_name, size_t needed_space) -> bool {
             size_t current_len = strlen(json_buffer);
             if (current_len + needed_space >= buflen) {
-                Logger::warning("Buffer overflow prevented: current %zu + needed %zu would exceed buffer size %zu while adding %s",
+                logger->warning("Buffer overflow prevented: current %zu + needed %zu would exceed buffer size %zu while adding %s",
                     current_len, needed_space, buflen, field_name);
                 return false;
             }
@@ -261,7 +262,7 @@ namespace Syslog_agent {
 
         size_t overhead = strlen(", \"message\":\"") + 2;
         if (remaining_space <= overhead) {
-            Logger::recoverable_error("No space left for message field - buffer position %zu/%zu\n",
+            logger->recoverable_error("No space left for message field - buffer position %zu/%zu\n",
                 current_pos, buflen);
             Globals::instance()->releaseMessageBuffer(msg_buf);
             return false;
@@ -286,10 +287,10 @@ namespace Syslog_agent {
                 Util::jsonEscapeString(temp_buf, msg_buf, Globals::MESSAGE_BUFFER_SIZE);
                 Globals::instance()->releaseMessageBuffer(temp_buf);
 
-                Logger::warning("Message truncated from %zu to %zu characters\n", msg_len, max_msg_len);
+                logger->warning("Message truncated from %zu to %zu characters\n", msg_len, max_msg_len);
             }
             else {
-                Logger::recoverable_error("No space left for message content - buffer position %zu/%zu\n",
+                logger->recoverable_error("No space left for message content - buffer position %zu/%zu\n",
                     current_pos, buflen);
                 Globals::instance()->releaseMessageBuffer(msg_buf);
                 return false;
@@ -299,11 +300,10 @@ namespace Syslog_agent {
         json_output << ", \"message\":\"" << msg_buf << "\"";
 
         if (logformat == SharedConstants::LOGFORMAT_HTTPPORT) {
-
-        // now put message outside extra_fields as well...
-        // i know, this sucks, it's just the way the lz appstore app is written
-        json_output << "}, \"message\":\"" << msg_buf << "\""; 
-        Globals::instance()->releaseMessageBuffer(msg_buf);
+            // now put message outside extra_fields as well...
+            // i know, this sucks, it's just the way the lz appstore app is written
+            json_output << "}, \"message\":\"" << msg_buf << "\""; 
+            Globals::instance()->releaseMessageBuffer(msg_buf);
         }
 
         // Close the JSON object
@@ -321,6 +321,7 @@ namespace Syslog_agent {
         primary_message_queue_(primary_message_queue),
         secondary_message_queue_(secondary_message_queue)
     {
+        auto logger = LOG_THIS;
         DWORD chars_written;
         size_t length = wcslen(log_name);
         if (length > INT_MAX) {
@@ -346,117 +347,97 @@ namespace Syslog_agent {
                 suffix_utf8_.resize(SharedConstants::MAX_SUFFIX_LENGTH + 1);
                 chars_written = Util::wstr2str_truncate(const_cast<char*>(suffix_utf8_.c_str()), suffix_utf8_.size(), suffix.c_str());
                 if (chars_written == 0) {
-                    throw std::runtime_error("Failed to convert suffix to UTF-8");
+                    suffix_utf8_ = string("\"error_suffix\": \"conversion failed\"");
                 }
-                suffix_utf8_.resize(chars_written);
+                else {
+                    suffix_utf8_.resize(chars_written);
+                }
             }
-        }
-        else {
-            suffix_utf8_.clear();
         }
     }
 
     Result EventHandlerMessageQueuer::handleEvent(
         const wchar_t* subscription_name, EventLogEvent& event)
     {
-        Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Processing event from subscription %S\n",
-            subscription_name);
-
-        event.renderEvent();
-        Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Event rendered\n");
-
-        char* json_buffer = Globals::instance()->getMessageBuffer("EventHandlerMessageQueuer::handleEvent()");
-        if (!json_buffer) {
-            Logger::recoverable_error("Failed to allocate JSON buffer for event from %S\n", subscription_name);
-            return Result(ERROR_OUTOFMEMORY);
-        }
-
-        Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Buffer allocated\n");
+        auto logger = LOG_THIS;
+        char* json_buffer = Globals::instance()->getMessageBuffer("eventHandlerMessageQueuer");
 
         try {
-            int primary_logformat = configuration_.getPrimaryLogformat();
-            Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Using primary format %d\n",
-                primary_logformat);
-            string eventJsonString = "Message: " + XMLToJSONConverter::escapeJSONString(string(event.getEventText())) + " (" + XMLToJSONConverter::convert(event.getEventXml()) + ")";
-            EventLogger::log(EventLogger::LogDestination::SubscribedEvents,
-                "Event from %S received: %s\n", subscription_name, eventJsonString.c_str());
-        
-            if (generateLogMessage(event, primary_logformat, json_buffer,
-                Globals::MESSAGE_BUFFER_SIZE)) {
-                EventLogger::log(EventLogger::LogDestination::GeneratedEvents,
-                    "Event from %S generated: %s\n", subscription_name, eventJsonString.c_str());
+            // Estimate message size and check buffer capacity
+            EventData data;
+            data.parseFrom(event, configuration_);
+            size_t estimated_size = estimateMessageSize(data, SharedConstants::LOGFORMAT_HTTPPORT);
 
-                Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Generated message: %s\n",
-                    json_buffer);
-                StatefulLogger::logEvent();
-
-                while (!primary_message_queue_->enqueue(json_buffer, static_cast<int>(strlen(json_buffer)))) {
-                    Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Primary queue full, removing front message\n");
-                    primary_message_queue_->removeFront();
-                }
-
-                EventLogger::enqueueEventForLogging(eventJsonString);
-                Globals::instance()->queued_count_++;
-                Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Message enqueued to primary queue\n");
-
-                if (secondary_message_queue_) {
-                    bool have_secondary_message = true;
-                    int secondary_logformat = configuration_.getSecondaryLogformat();
-                    Logger::debug3("EventHandlerMessageQueuer::handleEvent()> Using secondary format %d\n",
-                        secondary_logformat);
-
-                    if (primary_logformat != secondary_logformat) {
-                        have_secondary_message = generateLogMessage(event,
-                            secondary_logformat, json_buffer,
-                            Globals::MESSAGE_BUFFER_SIZE);
-                    }
-
-                    if (have_secondary_message) {
-                        while (!secondary_message_queue_->enqueue(json_buffer, static_cast<int>(strlen(json_buffer)))) {
-                            Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Secondary queue full, removing front message\n");
-                            secondary_message_queue_->removeFront();
-                        }
-                        Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Message enqueued to secondary queue\n");
-                    } else {
-                        Logger::warning("EventHandlerMessageQueuer::handleEvent()> Secondary message generation failed for event from %S\n",
-                            subscription_name);
-                    }
-                }
-            } else {
-                Logger::warning("EventHandlerMessageQueuer::handleEvent()> Primary message generation failed for event from %S\n",
-                    subscription_name);
+            if (estimated_size > Globals::MESSAGE_BUFFER_SIZE) {
+                logger->recoverable_error("Estimated message size %zu exceeds buffer size %zu\n",
+                    estimated_size, Globals::MESSAGE_BUFFER_SIZE);
+                Globals::instance()->releaseMessageBuffer(json_buffer);
+                return Result(ERROR_INSUFFICIENT_BUFFER, "handleEvent()", "Buffer too small");
             }
-        } catch (const std::exception& e) {
-            Logger::critical("Exception in handleEvent for %S: %s\n", subscription_name, e.what());
-            Globals::instance()->releaseMessageBuffer(json_buffer);
-            return Result(ERROR_INVALID_DATA);
-        }
 
-        Globals::instance()->releaseMessageBuffer(json_buffer);
-        Logger::debug2("EventHandlerMessageQueuer::handleEvent()> Successfully processed event from %S\n",
-            subscription_name);
-        return Result();
+            // Generate JSON for primary queue
+            bool success = generateJson(data, configuration_.getPrimaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
+            if (!success) {
+                logger->recoverable_error("Failed to generate JSON for primary queue\n");
+                Globals::instance()->releaseMessageBuffer(json_buffer);
+                return Result(ERROR_INVALID_DATA, "handleEvent()", "Failed to generate JSON");
+            }
+
+            // Queue message for primary server
+            primary_message_queue_->enqueue(json_buffer, strlen(json_buffer));
+
+            // Handle secondary server if configured
+            if (configuration_.hasSecondaryHost()) {
+                // Generate JSON for secondary queue
+                success = generateJson(data, configuration_.getSecondaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
+                if (!success) {
+                    logger->recoverable_error("Failed to generate JSON for secondary queue\n");
+                    Globals::instance()->releaseMessageBuffer(json_buffer);
+                    return Result(ERROR_INVALID_DATA, "handleEvent()", "Failed to generate JSON");
+                }
+
+                // Queue message for secondary server
+                secondary_message_queue_->enqueue(json_buffer, strlen(json_buffer));
+            }
+
+            Globals::instance()->releaseMessageBuffer(json_buffer);
+            return Result();
+        }
+        catch (const std::exception& e) {
+            logger->recoverable_error("Exception in handleEvent: %s\n", e.what());
+            Globals::instance()->releaseMessageBuffer(json_buffer);
+            return Result(ERROR_INVALID_DATA, "handleEvent()", e.what());
+        }
     }
 
     unsigned char EventHandlerMessageQueuer::unixSeverityFromWindowsSeverity(
-        char windows_severity_num) {
+        char windows_severity_num)
+    {
+        auto logger = LOG_THIS;
+        unsigned char severity;
 
         switch (windows_severity_num) {
-        case '0': // "LogAlways"
-            return SharedConstants::Severities::NOTICE;
-        case '1': // "Critical"
-            return SharedConstants::Severities::CRITICAL;
-        case '2': // "Error"
-            return SharedConstants::Severities::ERR;
-        case '3': // "Warning"
-            return SharedConstants::Severities::WARNING;
-        case '4': // "Informational"
-            return SharedConstants::Severities::INFORMATIONAL;
-        case '5': // "Verbose"
-            return SharedConstants::Severities::DEBUG;
+        case '1':
+            severity = SharedConstants::Severities::CRITICAL;
+            break;
+        case '2':
+            severity = SharedConstants::Severities::ERR;
+            break;
+        case '3':
+            severity = SharedConstants::Severities::WARNING;
+            break;
+        case '4':
+            severity = SharedConstants::Severities::NOTICE;
+            break;
+        case '5':
+            severity = SharedConstants::Severities::DEBUG;
+            break;
         default:
-            return SharedConstants::Severities::NOTICE;
+            logger->warning("Unknown Windows severity level: %c, defaulting to NOTICE\n", windows_severity_num);
+            severity = SharedConstants::Severities::NOTICE;
         }
+
+        return severity;
     }
 
 } // namespace Syslog_agent

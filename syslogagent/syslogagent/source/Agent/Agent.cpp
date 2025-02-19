@@ -33,6 +33,8 @@ static int run_as_console();
 
 int wmain(int argc, wchar_t *argv[]) {
 
+    auto logger = LOG_THIS;
+
     // Cast argv to const wchar_t* const* since we won't modify the strings
     Options options(argc, const_cast<const wchar_t* const*>(argv));
 
@@ -57,18 +59,18 @@ int wmain(int argc, wchar_t *argv[]) {
     Service::loadConfiguration(!running_as_service, override_log_level, override_log_level_setting);
 
     if (options.has(L"-tofile")) {
-        Logger::setLogDestination(Logger::DEST_CONSOLE_AND_FILE);
+        logger->setLogDestination(Logger::DEST_CONSOLE_AND_FILE);
         const wchar_t* destination = options.getArgument(L"-tofile");
         if (destination != nullptr) {
             std::wstring destination_ws(destination);
             if (destination_ws[0] != L'-') {
-                Logger::setLogFile(destination_ws);
+                logger->setLogFileW(destination_ws);
             }
         }
     }
 
     if (options.has(L"-eventstofile")) {
-        Logger::setLogEventsToFile();
+        logger->setLogEventsToFile(true);
     }
 
     if (options.has(L"-version")) {
@@ -87,11 +89,11 @@ int wmain(int argc, wchar_t *argv[]) {
 
 
     if (!running_as_service) {
-        Logger::always("%s starting on console. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
+        logger->always("%s starting on console. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
         return run_as_console();
     }
     else {
-        Logger::always("%s starting as service. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
+        logger->always("%s starting as service. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
     }
 
     // Create a non-const buffer for the service name since Windows API requires LPWSTR
@@ -114,11 +116,12 @@ int wmain(int argc, wchar_t *argv[]) {
 }
 
 static int run_as_console() {
+    auto logger = LOG_THIS;
     try {
         Service::run(true);
     }
     catch (std::exception& exception) {
-        Logger::log(Logger::CRITICAL, "%s\n", exception.what());
+        logger->log(Logger::CRITICAL, "%s\n", exception.what());
         return 1;
     }
     return 0;
@@ -129,6 +132,7 @@ static int run_as_console() {
 *----------------------------------------------------------------------------*/
 static void service_install()
 {
+    auto logger = LOG_THIS;
     SC_HANDLE   service;
     SC_HANDLE   manager;
     wchar_t		path[NTSL_PATH_LEN];
@@ -140,7 +144,7 @@ static void service_install()
     if (GetModuleFileName(NULL, path + 1, NTSL_PATH_LEN - 1) == 0)
     {
         Result::logLastError("service_install()", "GetModuleFileName");
-        Logger::log(Logger::CRITICAL, "Unable to install %ls\n", SERVICE_NAME);
+        logger->log(Logger::CRITICAL, "Unable to install %ls\n", SERVICE_NAME);
         return;
     }
 
@@ -171,7 +175,7 @@ static void service_install()
 
         if (service)
         {
-            Logger::log(Logger::INFO, "%ls installed\n", SERVICE_NAME);
+            logger->log(Logger::INFO, "%ls installed\n", SERVICE_NAME);
             CloseServiceHandle(service);
         }
         else
@@ -212,6 +216,7 @@ static void service_install()
 *----------------------------------------------------------------------------*/
 static void service_remove()
 {
+    auto logger = LOG_THIS;
     SC_HANDLE   service;
     SC_HANDLE   manager;
 
@@ -226,7 +231,7 @@ static void service_remove()
             // try to stop the service
             if (ControlService(service, SERVICE_CONTROL_STOP, &service_status))
             {
-                Logger::log(Logger::INFO, "Stopping %ls\n", SERVICE_NAME);
+                logger->log(Logger::INFO, "Stopping %ls\n", SERVICE_NAME);
                 Sleep(1000);
 
                 while (QueryServiceStatus(service, &service_status))
@@ -241,14 +246,14 @@ static void service_remove()
                 }
 
                 if (service_status.dwCurrentState == SERVICE_STOPPED)
-                    Logger::log(Logger::INFO, "%ls stopped.\n", SERVICE_NAME);
+                    logger->log(Logger::INFO, "%ls stopped.\n", SERVICE_NAME);
                 else
-                    Logger::log(Logger::CRITICAL, "%ls failed to stop\n", SERVICE_NAME);
+                    logger->log(Logger::CRITICAL, "%ls failed to stop\n", SERVICE_NAME);
             }
 
             // now remove the service
             if (DeleteService(service))
-                Logger::log(Logger::INFO, "%ls removed\n", SERVICE_NAME);
+                logger->log(Logger::INFO, "%ls removed\n", SERVICE_NAME);
             else
                 Result::logLastError("service_remove()", "DeleteService");
 
@@ -276,7 +281,8 @@ static void service_remove()
 *----------------------------------------------------------------------------*/
 static void WINAPI service_main(DWORD argc, const wchar_t* const* argv) {
 
-    Logger::info("Start service %s Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
+    auto logger = LOG_THIS;
+    logger->info("Start service %s Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
 
     service_status_handle = RegisterServiceCtrlHandler(SERVICE_NAME, service_ctrl);
 
@@ -297,7 +303,7 @@ static void WINAPI service_main(DWORD argc, const wchar_t* const* argv) {
 
     // try to report the stopped status to the service control manager.
     if (service_status_handle) {
-        Logger::log(Logger::DEBUG, "Leaving service_main, and reporting service stopped.\n");
+        logger->log(Logger::DEBUG, "Leaving service_main, and reporting service stopped.\n");
         service_report_status(SERVICE_STOPPED, service_error, 0);
     }
 }
@@ -313,7 +319,8 @@ static void WINAPI service_main(DWORD argc, const wchar_t* const* argv) {
 *----------------------------------------------------------------------------*/
 void WINAPI service_ctrl(DWORD ctrlCode) {
 
-    Logger::log(Logger::DEBUG, "Service_ctrl received code %u.\n", ctrlCode);
+    auto logger = LOG_THIS;
+    logger->log(Logger::DEBUG, "Service_ctrl received code %u.\n", ctrlCode);
 
     switch (ctrlCode) {
         // stop the service.
@@ -347,9 +354,10 @@ void WINAPI service_ctrl(DWORD ctrlCode) {
 *----------------------------------------------------------------------------*/
 void service_start(DWORD argc, const wchar_t* const* argv) {
 
+    auto logger = LOG_THIS;
     // report the status to the service control manager.
     if (!service_report_status(SERVICE_START_PENDING, NO_ERROR, 3000)) {
-        Logger::log(Logger::ALWAYS, "Failed to report start pending to service handler from service_start.\n");
+        logger->log(Logger::ALWAYS, "Failed to report start pending to service handler from service_start.\n");
         return;
     }
 
@@ -369,7 +377,7 @@ void service_start(DWORD argc, const wchar_t* const* argv) {
     }
     catch (std::exception& exception) {
         service_report_status(SERVICE_STOPPED, 1, 0);
-        Logger::log(Logger::ALWAYS, "%s\n", exception.what());
+        logger->log(Logger::ALWAYS, "%s\n", exception.what());
     }
 
 }
@@ -383,7 +391,8 @@ void service_start(DWORD argc, const wchar_t* const* argv) {
 *----------------------------------------------------------------------------*/
 void service_stop()
 {
-    Logger::log(Logger::DEBUG, "Registered service_stop_event\n");
+    auto logger = LOG_THIS;
+    logger->log(Logger::DEBUG, "Registered service_stop_event\n");
     service_report_status(SERVICE_STOP_PENDING, NO_ERROR, 2500);
     Service::shutdown();
 }
@@ -429,6 +438,7 @@ static bool service_report_status(DWORD currentState, DWORD exitCode, DWORD wait
 
 void service_addEventSource(const wchar_t* path)
 {
+    auto logger = LOG_THIS;
     HKEY hk;
     DWORD dwData;
 
@@ -448,8 +458,8 @@ void service_addEventSource(const wchar_t* path)
         L"EventMessageFile",       // value name 
         0,                        // must be zero 
         REG_EXPAND_SZ,            // value type 
-        reinterpret_cast<const BYTE*>(path),           // pointer to value data 
-        static_cast<DWORD>(wcslen(path) * sizeof(wchar_t)))) {       // length of value data 
+        (LPBYTE)path,           // pointer to value data 
+        (DWORD)(wcslen(path) + 1) * sizeof(wchar_t))) {       // length of value data 
         Result::logLastError("service_addEventSource()", "RegSetValueEx");
         RegCloseKey(hk);
         return;
@@ -470,4 +480,5 @@ void service_addEventSource(const wchar_t* path)
     }
 
     RegCloseKey(hk);
+    logger->log(Logger::DEBUG, "Added event source\n");
 }

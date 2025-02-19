@@ -58,6 +58,7 @@ FileWatcher::FileWatcher(
 }
 
 HANDLE FileWatcher::openLogFile() {
+	auto logger = LOG_THIS;
 	HANDLE file_handle = CreateFileA(
 		filename_multibyte_,
 		GENERIC_READ,
@@ -74,14 +75,14 @@ HANDLE FileWatcher::openLogFile() {
 }
 
 Result FileWatcher::readToLastLine() {
-
+	auto logger = LOG_THIS;
 	HANDLE file_handle;
 	try {
 		file_handle = openLogFile();
 	}
 	catch (Result result) {
 		// if we couldn't open the file then there's no last line to read to, which is fine
-		Logger::debug2("FileWatcher::readToLastLine() could not open file %s\n", filename_multibyte_);
+		logger->debug2("FileWatcher::readToLastLine() could not open file %s\n", filename_multibyte_);
 		return Result(ResultCodes::Success);
 	}
 	// get new file size & position
@@ -192,107 +193,107 @@ void FileWatcher::processLine(const char* line_cstr) {
 
 
 Result FileWatcher::process() {
+    auto logger = LOG_THIS;
+    int lines_processed = 0;
+    HANDLE file_handle;
+    try {
+        file_handle = openLogFile();
+    }
+    catch (Result result) {
+        return result;
+    }
 
-	int lines_processed = 0;
-	HANDLE file_handle;
-	try {
-		file_handle = openLogFile();
-	}
-	catch (Result result) {
-		return result;
-	}
+    LARGE_INTEGER current_file_size;
+    if (0 == GetFileSizeEx(file_handle, &current_file_size)) {
+        char filename_buf[1024];
+        Util::wstr2str(filename_buf, sizeof(filename_buf), filename_.c_str());
+        CloseHandle(file_handle);
+        return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s", filename_buf);
+    }
 
-	LARGE_INTEGER current_file_size;
-	if (0 == GetFileSizeEx(file_handle, &current_file_size)) {
-		char filename_buf[1024];
-		Util::wstr2str(filename_buf, sizeof(filename_buf), filename_.c_str());
-		CloseHandle(file_handle);
-		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s", filename_buf);
-	}
+    if (current_file_size.QuadPart == last_file_size_) {
+        // assume file hasn't changed
+        CloseHandle(file_handle);
+        return Result(ResultCodes::NoNewData);
+    }
 
-	if (current_file_size.QuadPart == last_file_size_) {
-		// assume file hasn't changed
-		CloseHandle(file_handle);
-		return Result(ResultCodes::NoNewData);
-	}
+    // file must have changed
 
-	// file must have changed
+    LARGE_INTEGER file_pos;
+    if (last_file_position_ > 0) {
+        file_pos.QuadPart = last_file_position_;
+        SetFilePointerEx(file_handle, file_pos, NULL, FILE_BEGIN);
+    }
 
-	LARGE_INTEGER file_pos;
-	if (last_file_position_ > 0) {
-		file_pos.QuadPart = last_file_position_;
-		SetFilePointerEx(file_handle, file_pos, NULL, FILE_BEGIN);
-	}
+    DWORD num_bytes_read = 0;
+    char* buffer_start = read_buffer_.data();
 
-	DWORD num_bytes_read = 0;
-	char* buffer_start = read_buffer_.data();
+    int current_line_offset = max_line_length_ - num_prebuffer_chars_;
 
-	int current_line_offset = max_line_length_ - num_prebuffer_chars_;
+    while (true) {
+        BOOL readfile_result = ReadFile((HANDLE)file_handle, buffer_write_start_, READ_BUF_SIZE, &num_bytes_read, NULL);
 
-	while (true) {
-		BOOL readfile_result = ReadFile((HANDLE)file_handle, buffer_write_start_, READ_BUF_SIZE, &num_bytes_read, NULL);
+        if (!readfile_result || num_bytes_read < 1) break;
 
-		if (!readfile_result || num_bytes_read < 1) break;
+        uint32_t p;
+        for (p = current_line_offset; p < max_line_length_ + num_bytes_read; ++p) {
+            char cur_char = *(buffer_start + p);
+            // if we had CR LF, or LF CR, this must have happened at the start of a line
+            // (since we ended the last line at either)
+            // so push the line start forward one and continue
+            if (
+                (cur_char == CARRIAGERETURN && last_char_read_ == LINEBREAK)
+                || (cur_char == LINEBREAK && last_char_read_ == CARRIAGERETURN)
+                )
+            {
+                current_line_offset++;
+                last_char_read_ = cur_char;
+            }
+            else if (cur_char == LINEBREAK || cur_char == CARRIAGERETURN) {
+                last_char_read_ = cur_char;
+                *(buffer_start + p) = 0;
 
-		uint32_t p;
-		for (p = current_line_offset; p < max_line_length_ + num_bytes_read; ++p) {
-			char cur_char = *(buffer_start + p);
-			// if we had CR LF, or LF CR, this must have happened at the start of a line
-			// (since we ended the last line at either)
-			// so push the line start forward one and continue
-			if (
-				(cur_char == CARRIAGERETURN && last_char_read_ == LINEBREAK)
-				|| (cur_char == LINEBREAK && last_char_read_ == CARRIAGERETURN)
-				)
-			{
-				current_line_offset++;
-				last_char_read_ = cur_char;
-			}
-			else if (cur_char == LINEBREAK || cur_char == CARRIAGERETURN) {
-				last_char_read_ = cur_char;
-				*(buffer_start + p) = 0;
+                ++lines_processed;
+                processLine(buffer_start + current_line_offset);
+                current_line_offset = p + 1;
+                num_prebuffer_chars_ = 0;
+            }
+            else {
+                last_char_read_ = cur_char;
+            }
+        }
+        if (
+            (p >= max_line_length_ + num_bytes_read)
+            && (last_char_read_ != LINEBREAK)
+            && (last_char_read_ != CARRIAGERETURN)
+            )
+        {
+            // we reached end of read buffer while still in the middle of a line
+            // copy this partial line to the beginning so that we can
+            // read in the next block from the file and parse both this
+            // partial line and the new block
+            num_prebuffer_chars_ = p - current_line_offset;
+            int next_parse_offset = max_line_length_ - num_prebuffer_chars_;
+            memmove(buffer_start + next_parse_offset, buffer_start + current_line_offset, num_prebuffer_chars_);
+            current_line_offset = next_parse_offset;
+        }
+    }
 
-				++lines_processed;
-				processLine(buffer_start + current_line_offset);
-				current_line_offset = p + 1;
-				num_prebuffer_chars_ = 0;
-			}
-			else {
-				last_char_read_ = cur_char;
-			}
-		}
-		if (
-			(p >= max_line_length_ + num_bytes_read)
-			&& (last_char_read_ != LINEBREAK)
-			&& (last_char_read_ != CARRIAGERETURN)
-			)
-		{
-			// we reached end of read buffer while still in the middle of a line
-			// copy this partial line to the beginning so that we can
-			// read in the next block from the file and parse both this
-			// partial line and the new block
-			num_prebuffer_chars_ = p - current_line_offset;
-			int next_parse_offset = max_line_length_ - num_prebuffer_chars_;
-			memmove(buffer_start + next_parse_offset, buffer_start + current_line_offset, num_prebuffer_chars_);
-			current_line_offset = next_parse_offset;
-		}
-	}
+    file_pos.QuadPart = 0;
+    LARGE_INTEGER new_file_pos;
+    SetFilePointerEx(file_handle, file_pos, &new_file_pos, FILE_CURRENT);
+    last_file_position_ = new_file_pos.LowPart;
 
-	file_pos.QuadPart = 0;
-	LARGE_INTEGER new_file_pos;
-	SetFilePointerEx(file_handle, file_pos, &new_file_pos, FILE_CURRENT);
-	last_file_position_ = new_file_pos.LowPart;
+    if (0 == GetFileSizeEx(file_handle, &current_file_size)) {
+        char filename_buf[1024];
+        Util::wstr2str(filename_buf, sizeof(filename_buf), filename_.c_str());
+        CloseHandle(file_handle);
+        return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s", filename_buf);
+    }
+    last_file_size_ = current_file_size.LowPart;
 
-	if (0 == GetFileSizeEx(file_handle, &current_file_size)) {
-		char filename_buf[1024];
-		Util::wstr2str(filename_buf, sizeof(filename_buf), filename_.c_str());
-		CloseHandle(file_handle);
-		return Result::ResultLog(ResultCodes::FailOpenFile, Logger::DEBUG2, "could not check file size %s", filename_buf);
-	}
-	last_file_size_ = current_file_size.LowPart;
+    CloseHandle(file_handle);
 
-	CloseHandle(file_handle);
-
-	Logger::debug2("FileWatcher::process() success, file %s, %d lines processed\n", filename_multibyte_, lines_processed);
-	return Result(ResultCodes::Success);
+    logger->debug2("FileWatcher::process() success, file %s, %d lines processed\n", filename_multibyte_, lines_processed);
+    return Result(ResultCodes::Success);
 }

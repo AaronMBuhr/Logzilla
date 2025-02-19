@@ -21,12 +21,14 @@ Globals::Globals(int buffer_chunk_size, int percent_slack) {
 }
 
 void Globals::Initialize() {
+    auto logger = LOG_THIS;
     std::call_once(init_flag_, []() {
         try {
             instance_.reset(new Globals(BUFFER_CHUNK_SIZE, PERCENT_SLACK));
         }
         catch (const std::exception& e) {
-            Logger::fatal("Failed to initialize Globals: %s\n", e.what());
+            auto init_logger = LOG_THIS;
+            init_logger->fatal("Failed to initialize Globals: %s\n", e.what());
             throw; // Re-throw to prevent use of uninitialized instance
         }
     });
@@ -38,13 +40,14 @@ Globals* Globals::instance() {
 }
 
 char* Globals::getMessageBuffer(const char* debug_identifier) {
+    auto logger = LOG_THIS;
     std::lock_guard<std::mutex> lock(buffer_mutex_);
     auto* buffer = message_buffers_->getAndMarkNextUnused();
     if (!buffer) {
         if (debug_identifier) {
-            Logger::recoverable_error("Failed to allocate message buffer for %s\n", debug_identifier);
+            logger->recoverable_error("Failed to allocate message buffer for %s\n", debug_identifier);
         } else {
-            Logger::recoverable_error("Failed to allocate message buffer\n");
+            logger->recoverable_error("Failed to allocate message buffer\n");
         }
         return nullptr;
     }

@@ -16,12 +16,6 @@ namespace Syslog_agent {
 std::mutex EventLogger::logger_lock_;
 std::unique_ptr<EventLogger, std::default_delete<EventLogger>> EventLogger::instance_;
 
-// Static file name definitions
-const wstring EventLogger::SUBSCRIBED_EVENTS_FILENAME = L"subscribed_events.txt";
-const wstring EventLogger::GENERATED_EVENTS_FILENAME = L"generated_events.txt";
-const wstring EventLogger::SENT_EVENTS_FILENAME = L"sent_events.txt";
-const wstring EventLogger::SENT_DATA_FILENAME = L"sent_data.md";
-
 EventLogger& EventLogger::singleton() {
     std::lock_guard<std::mutex> lock(logger_lock_);
     if (!instance_) {
@@ -40,19 +34,18 @@ EventLogger::~EventLogger() {
     }
 }
 
-const wstring& EventLogger::getFilenameForDestination(const LogDestination dest) {
+const wchar_t* EventLogger::getFilenameForDestination(const LogDestination dest) {
     switch (dest) {
-        case LogDestination::SentData:
-            return SENT_DATA_FILENAME;
         case LogDestination::SubscribedEvents:
             return SUBSCRIBED_EVENTS_FILENAME;
         case LogDestination::GeneratedEvents:
             return GENERATED_EVENTS_FILENAME;
         case LogDestination::SentEvents:
             return SENT_EVENTS_FILENAME;
+        case LogDestination::SentData:
+            return SENT_DATA_FILENAME;
         default:
-            static const wstring empty;
-            return empty;
+            return nullptr;
     }
 }
 
@@ -62,35 +55,59 @@ void EventLogger::writeToFile(const LogDestination dest, const char* message) {
 }
 
 void EventLogger::writeToFile(const LogDestination dest, const char* message, size_t length) {
+    auto logger = LOG_THIS;
     if (!message || length == 0) return;
 
-    const wstring& filename = getFilenameForDestination(dest);
-    if (filename.empty()) {
-        Logger::recoverable_error("EventLogger::writeToFile()> Invalid destination\n");
+    const wchar_t* filename = getFilenameForDestination(dest);
+    if (!filename) {
+        logger->recoverable_error("EventLogger::writeToFile()> Invalid destination\n");
         return;
     }
 
-    wstring full_path = Util::getThisPath(true) + filename;
+    wchar_t path_buffer[MAX_PATH];
+    if (!Util::getThisPath(path_buffer, MAX_PATH)) {
+        logger->recoverable_error("EventLogger::writeToFile()> Failed to get path\n");
+        return;
+    }
+    
+    if (wcslen(path_buffer) + wcslen(filename) >= MAX_PATH) {
+        logger->recoverable_error("EventLogger::writeToFile()> Path too long\n");
+        return;
+    }
+    wcscat_s(path_buffer, MAX_PATH, filename);
+    
     FILE* file = nullptr;
-    if (_wfopen_s(&file, full_path.c_str(), L"ab") != 0 || !file) {
-        Logger::recoverable_error("EventLogger::writeToFile()> Failed to open file %S\n", full_path.c_str());
+    if (_wfopen_s(&file, path_buffer, L"ab") != 0 || !file) {
+        logger->recoverable_error("EventLogger::writeToFile()> Failed to open file %S\n", path_buffer);
         return;
     }
 
     // Write the message
     if (fwrite(message, 1, length, file) != length) {
-        Logger::recoverable_error("EventLogger::writeToFile()> Failed to write to file %S\n", full_path.c_str());
+        logger->recoverable_error("EventLogger::writeToFile()> Failed to write to file %S\n", path_buffer);
     }
     fclose(file);
 }
 
 void EventLogger::writeSentData(const char* data, size_t length) {
+    auto logger = LOG_THIS;
     if (!data || length == 0) return;
 
-    wstring full_path = Util::getThisPath(true) + SENT_DATA_FILENAME;
+    wchar_t path_buffer[MAX_PATH];
+    if (!Util::getThisPath(path_buffer, MAX_PATH)) {
+        logger->recoverable_error("EventLogger::writeSentData()> Failed to get path\n");
+        return;
+    }
+    
+    if (wcslen(path_buffer) + wcslen(SENT_DATA_FILENAME) >= MAX_PATH) {
+        logger->recoverable_error("EventLogger::writeSentData()> Path too long\n");
+        return;
+    }
+    wcscat_s(path_buffer, MAX_PATH, SENT_DATA_FILENAME);
+    
     FILE* file = nullptr;
-    if (_wfopen_s(&file, full_path.c_str(), L"ab") != 0 || !file) {
-        Logger::recoverable_error("EventLogger::writeSentData()> Failed to open file %S\n", full_path.c_str());
+    if (_wfopen_s(&file, path_buffer, L"ab") != 0 || !file) {
+        logger->recoverable_error("EventLogger::writeSentData()> Failed to open file %S\n", path_buffer);
         return;
     }
 
@@ -118,6 +135,7 @@ void EventLogger::writeSentData(const char* data, size_t length) {
 }
 
 bool EventLogger::log(const LogDestination dest, const char* format, ...) {
+    auto logger = LOG_THIS;
     try {
         char buffer[2048];
         va_list args;
@@ -131,13 +149,15 @@ bool EventLogger::log(const LogDestination dest, const char* format, ...) {
         return true;
     }
     catch (const std::exception& e) {
-        Logger::recoverable_error("EventLogger::log()> %s\n", e.what());
+        logger->recoverable_error("EventLogger::log()> %s\n", e.what());
         return false;
     }
 }
 
-void EventLogger::enqueueEventForLogging(const string& event) {
-    if (event.empty()) {
+
+void EventLogger::enqueueEventForLogging(const char* event) {
+    auto logger = LOG_THIS;
+    if (!event) {
         return;
     }
     EventLogger& instance = singleton();
@@ -146,12 +166,12 @@ void EventLogger::enqueueEventForLogging(const string& event) {
     LoggedEvent event_struct;
     event_struct.message_buffer = Globals::instance()->getMessageBuffer("EventLogger::enqueueEventForLogging()");
     if (!event_struct.message_buffer) {
-        Logger::recoverable_error("EventLogger::enqueueEventForLogging()> Failed to get message buffer\n");
+        logger->recoverable_error("EventLogger::enqueueEventForLogging()> Failed to get message buffer\n");
         return;
     }
 
-    event_struct.data_length = static_cast<uint32_t>(event.length());
-    memcpy(event_struct.message_buffer, event.c_str(), event_struct.data_length);
+    event_struct.data_length = static_cast<uint32_t>(strlen(event));
+    memcpy(event_struct.message_buffer, event, event_struct.data_length);
     event_struct.timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now().time_since_epoch()).count();
 
@@ -180,6 +200,7 @@ bool EventLogger::isQueueEmpty() {
 }
 
 bool EventLogger::logNetworkSend(const char* buf, size_t length) {
+    auto logger = LOG_THIS;
     if (!buf || length == 0) {
         return false;
     }
@@ -193,33 +214,41 @@ bool EventLogger::logNetworkSend(const char* buf, size_t length) {
 
         // Write header with timestamp
         FILE* file = nullptr;
-        wstring full_path = Util::getThisPath(true) + SENT_DATA_FILENAME;
-        if (_wfopen_s(&file, full_path.c_str(), L"ab") != 0 || !file) {
-            Logger::recoverable_error("EventLogger::logNetworkSend()> Failed to open file %S\n", full_path.c_str());
+        wchar_t path_buffer[MAX_PATH];
+        if (!Util::getThisPath(path_buffer, MAX_PATH)) {
+            logger->recoverable_error("EventLogger::logNetworkSend()> Failed to get path\n");
+            return false;
+        }
+        
+        if (wcslen(path_buffer) + wcslen(SENT_DATA_FILENAME) >= MAX_PATH) {
+            logger->recoverable_error("EventLogger::logNetworkSend()> Path too long\n");
+            return false;
+        }
+        wcscat_s(path_buffer, MAX_PATH, SENT_DATA_FILENAME);
+        
+        if (_wfopen_s(&file, path_buffer, L"ab") != 0 || !file) {
+            logger->recoverable_error("EventLogger::logNetworkSend()> Failed to open file %S\n", path_buffer);
             return false;
         }
 
-        // Write header
-        fprintf(file, "## [%s] LogZilla Windows Agent network sent (%zu bytes):\n", timestamp, length);
-        
-        // Write code block with data
+        fprintf(file, "## [%s] LogZilla Windows Agent: sending %zu bytes\n", timestamp, length);
         fputs("```\n", file);
         fwrite(buf, 1, length, file);
         if (length > 0 && buf[length - 1] != '\n') {
             fputc('\n', file);
         }
         fputs("```\n\n", file);
-
         fclose(file);
         return true;
     }
     catch (const std::exception& e) {
-        Logger::recoverable_error("EventLogger::logNetworkSend()> %s\n", e.what());
+        logger->recoverable_error("EventLogger::logNetworkSend()> %s\n", e.what());
         return false;
     }
 }
 
 bool EventLogger::logNetworkReceive(const char* result, size_t result_length) {
+    auto logger = LOG_THIS;
     if (!result || result_length == 0) {
         return false;
     }
@@ -233,9 +262,20 @@ bool EventLogger::logNetworkReceive(const char* result, size_t result_length) {
 
         // Write header with timestamp
         FILE* file = nullptr;
-        wstring full_path = Util::getThisPath(true) + SENT_DATA_FILENAME;
-        if (_wfopen_s(&file, full_path.c_str(), L"ab") != 0 || !file) {
-            Logger::recoverable_error("EventLogger::logNetworkReceive()> Failed to open file %S\n", full_path.c_str());
+        wchar_t path_buffer[MAX_PATH];
+        if (!Util::getThisPath(path_buffer, MAX_PATH)) {
+            logger->recoverable_error("EventLogger::logNetworkReceive()> Failed to get path\n");
+            return false;
+        }
+        
+        if (wcslen(path_buffer) + wcslen(SENT_DATA_FILENAME) >= MAX_PATH) {
+            logger->recoverable_error("EventLogger::logNetworkReceive()> Path too long\n");
+            return false;
+        }
+        wcscat_s(path_buffer, MAX_PATH, SENT_DATA_FILENAME);
+        
+        if (_wfopen_s(&file, path_buffer, L"ab") != 0 || !file) {
+            logger->recoverable_error("EventLogger::logNetworkReceive()> Failed to open file %S\n", path_buffer);
             return false;
         }
 
@@ -264,7 +304,7 @@ bool EventLogger::logNetworkReceive(const char* result, size_t result_length) {
         return true;
     }
     catch (const std::exception& e) {
-        Logger::recoverable_error("EventLogger::logNetworkReceive()> %s\n", e.what());
+        logger->recoverable_error("EventLogger::logNetworkReceive()> %s\n", e.what());
         return false;
     }
 }

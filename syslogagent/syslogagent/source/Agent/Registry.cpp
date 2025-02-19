@@ -187,6 +187,7 @@ std::vector<std::wstring> Registry::readChannels() const {
 
 
 std::wstring Registry::readBookmark(const wchar_t* channel) {
+    auto logger = LOG_THIS;
     HKEY channel_key;
     DWORD status = ERROR_SUCCESS;
     wchar_t tempbuf[4096];
@@ -197,154 +198,122 @@ std::wstring Registry::readBookmark(const wchar_t* channel) {
     if (status != ERROR_SUCCESS) {
         DWORD error = GetLastError();
         Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
-        Logger::recoverable_error("Registry::readBookmark()> error %d,"
+        logger->recoverable_error("Registry::readBookmark()> error %d,"
             " could not open channel %s\n", error, reinterpret_cast<char*>(tempbuf));
-        return wstring();
+        return std::wstring();
     }
 
-    // Check if value exists first
-    DWORD xml_size = 0;
-    status = RegQueryValueEx(channel_key,
-        SharedConstants::RegistryKey::CHANNEL_BOOKMARK, nullptr, nullptr,
-        nullptr, &xml_size);
-
-    if (status == ERROR_FILE_NOT_FOUND) {
-        // Value doesn't exist - this might be normal
-        RegCloseKey(channel_key);
-        return wstring();
-    }
-
-    if (status == ERROR_SUCCESS && xml_size > sizeof(tempbuf)) {
-        Logger::warning("Registry::readBookmark()> bookmark for channel %s too large\n", channel);
-        RegCloseKey(channel_key);
-        return wstring();
-    }
-
-    status = RegQueryValueEx(channel_key,
-        SharedConstants::RegistryKey::CHANNEL_BOOKMARK, nullptr, nullptr,
-        (LPBYTE)&tempbuf, &xml_size);
-
-    if (status != ERROR_SUCCESS) {
-        DWORD error = GetLastError();
-        char warnbuf[1024];
-        Util::toPrintableAscii(warnbuf, sizeof(warnbuf), channel, ' ');
-        Logger::warning("Registry::readBookmark()> error %d, could not read"
-            " bookmark for %s\n", error, warnbuf);
-        tempbuf[0] = 0;
-    }
-
+    wchar_t bookmark[4096];
+    DWORD bookmark_size = sizeof bookmark;
+    status = RegQueryValueEx(channel_key, SharedConstants::RegistryKey::CHANNEL_BOOKMARK,
+        nullptr, nullptr, (LPBYTE)bookmark, &bookmark_size);
     RegCloseKey(channel_key);
-    return wstring(tempbuf);
+    if (status != ERROR_SUCCESS) {
+        if (status == ERROR_FILE_NOT_FOUND) {
+            Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
+            logger->debug("Registry::readBookmark()> no bookmark found for channel %s\n",
+                reinterpret_cast<char*>(tempbuf));
+            return std::wstring();
+        }
+        DWORD error = GetLastError();
+        Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
+        logger->recoverable_error("Registry::readBookmark()> error %d,"
+            " could not read bookmark for channel %s\n", error, reinterpret_cast<char*>(tempbuf));
+        return std::wstring();
+    }
+    return std::wstring(bookmark);
 }
 
 
 void Registry::writeBookmark(const wchar_t* channel, const wchar_t* bookmark_buffer, DWORD buffer_size) {
+    auto logger = LOG_THIS;
     HKEY channel_key;
     DWORD status = ERROR_SUCCESS;
-    wchar_t full_channel_path[4096];
-    swprintf_s(full_channel_path, 4096, L"%s\\%s", 
+    wchar_t tempbuf[4096];
+    swprintf_s(tempbuf, 4096, L"%s\\%s",
         SharedConstants::RegistryKey::CHANNELS_KEY, channel);
-    
-    // Create or open the channel key
-    DWORD disposition;
-    status = RegCreateKeyExW(HKEY_LOCAL_MACHINE, full_channel_path, 0, NULL,
-        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &channel_key, &disposition);
+    status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tempbuf, 0,
+        KEY_WRITE, &channel_key);
     if (status != ERROR_SUCCESS) {
-        throw Result(status, "Registry::writeBookmark()", "could not create/open channel key");
+        DWORD error = GetLastError();
+        Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
+        logger->recoverable_error("Registry::writeBookmark()> error %d,"
+            " could not open channel %s\n", error, reinterpret_cast<char*>(tempbuf));
+        return;
     }
 
-    // Write the bookmark data
-    status = RegSetValueExW(channel_key, SharedConstants::RegistryKey::CHANNEL_BOOKMARK, 
-        0, REG_SZ, reinterpret_cast<const BYTE*>(bookmark_buffer), buffer_size);
-    if (status != ERROR_SUCCESS) {
-        RegCloseKey(channel_key);
-        throw Result(status, "Registry::writeBookmark()", "could not write bookmark");
-    }
-
+    status = RegSetValueEx(channel_key, SharedConstants::RegistryKey::CHANNEL_BOOKMARK,
+        0, REG_SZ, (LPBYTE)bookmark_buffer, buffer_size);
     RegCloseKey(channel_key);
+    if (status != ERROR_SUCCESS) {
+        DWORD error = GetLastError();
+        Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
+        logger->recoverable_error("Registry::writeBookmark()> error %d,"
+            " could not write bookmark for channel %s\n", error, reinterpret_cast<char*>(tempbuf));
+    }
 }
 
 
 void Registry::loadSetupFile() {
-    HKEY main_key;
-    LSTATUS status;
-    DWORD size;
+    auto logger = LOG_THIS;
+    HKEY key;
+    DWORD status = ERROR_SUCCESS;
+    wchar_t tempbuf[4096];
+    swprintf_s(tempbuf, 4096, L"%s",
+        SharedConstants::RegistryKey::MAIN_KEY);
 
-    status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, SharedConstants::RegistryKey::MAIN_KEY, 
-        0, KEY_READ | KEY_WRITE, &main_key);
+    // Create or open the main key
+    DWORD disposition;
+    status = RegCreateKeyExW(HKEY_LOCAL_MACHINE, tempbuf, 0, NULL,
+        REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &key, &disposition);
     if (status != ERROR_SUCCESS) {
-        // can't open registry key, just return
+        logger->recoverable_error("Registry::loadSetupFile()> error %d,"
+            " could not create/open main key\n", GetLastError());
         return;
     }
 
-    wchar_t setup_filename[1024];
-    size = sizeof setup_filename;
-    status = RegQueryValueEx(main_key, SharedConstants::RegistryKey::INITIAL_SETUP_FILE,
-        nullptr, nullptr, (LPBYTE)&setup_filename, &size);
-    RegCloseKey(main_key);
-    if (status != ERROR_SUCCESS) {
-        // can't read setup filename, just return
+    // Read the setup file
+    std::wifstream setup_file(L"setup.txt");
+    if (!setup_file.is_open()) {
+        logger->debug("Registry::loadSetupFile()> setup.txt not found\n");
+        RegCloseKey(key);
         return;
     }
 
-
-    // Acquiring required privileges	
-    HANDLE hToken;
-    if (OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES, &hToken))
-    {
-        PTOKEN_PRIVILEGES ns = (PTOKEN_PRIVILEGES)new BYTE[sizeof(DWORD) 
-            + sizeof(LUID_AND_ATTRIBUTES) + 2];
-        if (LookupPrivilegeValue(NULL, SE_BACKUP_NAME, &(ns->Privileges[0].Luid)))
-        {
-            ns->PrivilegeCount = 1;
-            ns->Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-            if (!AdjustTokenPrivileges(hToken, FALSE, ns, 0, NULL, NULL))
-            {
-				Logger::fatal("Registry::loadSetupFile()> error %d, could not enable"
-					" SE_BACKUP_NAME privilege\n", GetLastError());
-            }
+    std::wstring line;
+    while (std::getline(setup_file, line)) {
+        // Skip empty lines and comments
+        if (line.empty() || line[0] == L'#' || line[0] == L';') {
+            continue;
         }
-        if (LookupPrivilegeValue(NULL, SE_RESTORE_NAME, &(ns->Privileges[0].Luid)))
-        {
-            ns->PrivilegeCount = 1;
-            ns->Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-            if (!AdjustTokenPrivileges(hToken, FALSE, ns, 0, NULL, NULL))
-            {
-				Logger::fatal("Registry::loadSetupFile()> error %d, could not enable"
-					" SE_RESTORE_NAME privilege\n", GetLastError());
-            }
 
+        // Split line into key and value
+        size_t pos = line.find(L'=');
+        if (pos == std::wstring::npos) {
+            logger->warning("Registry::loadSetupFile()> invalid line format: %ls\n", line.c_str());
+            continue;
         }
-        delete[](BYTE*)ns;
-        CloseHandle(hToken);
+
+        std::wstring reg_key = line.substr(0, pos);
+        std::wstring reg_value = line.substr(pos + 1);
+
+        // Trim whitespace
+        reg_key.erase(0, reg_key.find_first_not_of(L" \t"));
+        reg_key.erase(reg_key.find_last_not_of(L" \t") + 1);
+        reg_value.erase(0, reg_value.find_first_not_of(L" \t"));
+        reg_value.erase(reg_value.find_last_not_of(L" \t") + 1);
+
+        // Write to registry
+        status = RegSetValueExW(key, reg_key.c_str(), 0, REG_SZ,
+            reinterpret_cast<const BYTE*>(reg_value.c_str()),
+            static_cast<DWORD>((reg_value.length() + 1) * sizeof(wchar_t)));
+        if (status != ERROR_SUCCESS) {
+            logger->recoverable_error("Registry::loadSetupFile()> error %d,"
+                " could not write key %ls\n", GetLastError(), reg_key.c_str());
+        }
     }
 
-    status = RegRestoreKey(HKEY_LOCAL_MACHINE, setup_filename, 0);
-
-
-    // load cert files
-    wchar_t cert_filename[1024];
-    size = sizeof cert_filename;
-    status = RegQueryValueEx(main_key, SharedConstants::RegistryKey::PRIMARY_TLS_FILENAME, 
-        nullptr, nullptr, (LPBYTE)&cert_filename, &size);
-    if (status == ERROR_SUCCESS) {
-        wstring primary_cert_path = Util::getThisPath(true) + SharedConstants::CERT_FILE_PRIMARY;
-        Util::copyFile(cert_filename, primary_cert_path.c_str()); // if this fails, just ignore
-    }
-
-    status = RegQueryValueEx(main_key, SharedConstants::RegistryKey::SECONDARY_TLS_FILENAME, 
-        nullptr, nullptr, (LPBYTE)&cert_filename, &size);
-    if (status == ERROR_SUCCESS) {
-        wstring secondary_cert_path = Util::getThisPath(true) 
-            + SharedConstants::CERT_FILE_SECONDARY;
-        Util::copyFile(cert_filename, secondary_cert_path.c_str()); // if this fails, just ignore
-    }
-
-    RegCloseKey(main_key);
-
-    // delete setup regkey
-    wchar_t keyname_buf[1024];
-    swprintf_s(keyname_buf, _countof(keyname_buf), L"%s\\%s", 
-        SharedConstants::RegistryKey::MAIN_KEY, SharedConstants::RegistryKey::INITIAL_SETUP_FILE);
-    status = RegDeleteKey(HKEY_LOCAL_MACHINE, keyname_buf);
+    setup_file.close();
+    RegCloseKey(key);
+    logger->info("Registry::loadSetupFile()> setup.txt loaded successfully\n");
 }

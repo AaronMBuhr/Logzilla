@@ -1,7 +1,4 @@
-/*
-SyslogAgent: a syslog agent for Windows
-Copyright 2021 Logzilla Corp.
-*/
+/* Copyright 2025 Logzilla Corp. */
 
 #pragma once
 #include "Bitmap.h"
@@ -22,7 +19,7 @@ public:
                 chunk is entirely unused before getting rid of ones above it. -1
                 percent_slack means never free up chunks, keep them reserved forever. */
 
-    BitmappedObjectPool(const int chunk_size, const int percent_slack) 
+    BitmappedObjectPool(const int chunk_size, const int percent_slack)
         : chunk_size_(chunk_size), percent_slack_(percent_slack) {
     }
 
@@ -96,7 +93,7 @@ public:
                                 // Use int64_t to prevent overflow and maintain precision
                                 int64_t number_of_zeroes = usage_bitmaps_[i]->countZeroes();
                                 int64_t slack_ratio = (number_of_zeroes * 100LL) / static_cast<int64_t>(chunk_size_);
-                                
+
                                 if (slack_ratio >= percent_slack_) {
                                     // if empty above us and we have enough slack, 
                                     // get rid of extra chunk(s) atomically
@@ -117,7 +114,7 @@ public:
 
     bool belongs(const T* item) const {
         if (!item) return false;
-        
+
         for (size_t i = 0; i < data_elements_.size(); ++i) {
             T* start = getPoolStart(i);
             T* end = getPoolEnd(i);
@@ -132,7 +129,7 @@ public:
         if (!item || !belongs(item)) {
             return false;
         }
-        
+
         std::lock_guard<std::mutex> lock(in_use_);
         // Find which chunk this item belongs to
         for (size_t i = 0; i < data_elements_.size(); ++i) {
@@ -196,3 +193,4 @@ private:
     int chunk_size_;
     int percent_slack_;
 };
+#pragma once

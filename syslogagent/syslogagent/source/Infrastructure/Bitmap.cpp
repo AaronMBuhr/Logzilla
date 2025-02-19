@@ -1,9 +1,6 @@
-/*
-SyslogAgent: a syslog agent for Windows
-Copyright 2021 Logzilla Corp.
-*/
+/* Copyright 2025 Logzilla Corp. */
 
-#include "stdafx.h"
+#include "pch.h"
 #include "Bitmap.h"
 #include <algorithm>
 #include <mutex>
@@ -47,22 +44,22 @@ int Bitmap::getAndOptionallyClearFirstOne(bool do_clear) const {
     lock_guard<mutex> lock(in_use_);
     size_t result = INVALID_BIT_NUMBER;
     const size_t bits_per_word = sizeof(size_t) * BITS_PER_BYTE;
-    
+
     for (int word_num = 0; word_num < number_of_words_; ++word_num) {
         size_t check_word = bitmap_[word_num];
         if (check_word != 0) {
             // Calculate base bit offset safely
             size_t base_offset = static_cast<size_t>(word_num) * bits_per_word;
-            
+
             // Check if we're already past the end
             if (base_offset >= static_cast<size_t>(number_of_bits_)) {
                 break;
             }
-            
+
             // Calculate how many bits to check in this word
             size_t bits_remaining = number_of_bits_ - base_offset;
             size_t bits_to_check = std::min<size_t>(bits_per_word, bits_remaining);
-            
+
             for (size_t bit_num = 0; bit_num < bits_to_check; ++bit_num) {
                 size_t check_bit = (static_cast<size_t>(1)) << bit_num;
                 if (check_bit & check_word) {
@@ -95,22 +92,22 @@ int Bitmap::getAndOptionallySetFirstZero(bool do_set) {
     std::lock_guard<std::mutex> lock(in_use_);
     size_t result = INVALID_BIT_NUMBER;
     const size_t bits_per_word = sizeof(size_t) * BITS_PER_BYTE;
-    
+
     for (int word_num = 0; word_num < number_of_words_; ++word_num) {
         size_t check_word = bitmap_[word_num];
         if (check_word != (size_t)~0) {
             // Calculate base bit offset safely
             size_t base_offset = static_cast<size_t>(word_num) * bits_per_word;
-            
+
             // Check if we're already past the end
             if (base_offset >= static_cast<size_t>(number_of_bits_)) {
                 break;
             }
-            
+
             // Calculate how many bits to check in this word
             size_t bits_remaining = number_of_bits_ - base_offset;
             size_t bits_to_check = std::min<size_t>(bits_per_word, bits_remaining);
-            
+
             for (size_t bit_num = 0; bit_num < bits_to_check; ++bit_num) {
                 size_t check_bit = (static_cast<size_t>(1)) << bit_num;
                 if ((check_bit & check_word) == 0) {
@@ -163,11 +160,11 @@ int Bitmap::countOnes() {
     for (int word_num = 0; word_num < number_of_words_; ++word_num) {
         size_t check_word = bitmap_[word_num];
         size_t base_offset = static_cast<size_t>(word_num) * bits_per_word;
-            
+
         if (base_offset >= static_cast<size_t>(number_of_bits_)) {
             break;
         }
-            
+
         size_t bits_remaining = number_of_bits_ - base_offset;
         size_t bits_to_check = std::min<size_t>(bits_per_word, bits_remaining);
 
@@ -188,7 +185,7 @@ int Bitmap::countZeroes() {
 string Bitmap::asHexString() const {
     string result;
     char format[10];
-    sprintf_s(format, "%%0%dx", (int) sizeof(size_t));
+    sprintf_s(format, "%%0%dx", (int)sizeof(size_t));
     for (int i = 0; i < number_of_words_; ++i) {
         char buf[32];
         sprintf_s(buf, format, bitmap_[i]);

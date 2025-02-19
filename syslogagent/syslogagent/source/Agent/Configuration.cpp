@@ -16,7 +16,7 @@ using namespace Syslog_agent;
 
 #define REG_BUFFER_LEN 2048
 
-int Configuration::debug_level_setting_ = Logger::NOLOG;
+int Configuration::debug_level_setting_ = Logger::NONE;
 int Configuration::event_log_poll_interval_ = SharedConstants::Defaults::POLL_INTERVAL_SEC;
 
 Configuration::Configuration() {
@@ -31,6 +31,7 @@ bool Configuration::hasSecondaryHost() const {
 
 void Configuration::loadFromRegistry(bool running_from_console, bool override_log_level, 
     Logger::LogLevel override_log_level_setting) {
+    auto logger = LOG_THIS;
     // Use unique_lock for write operations
     unique_lock lock(mutex_);
 
@@ -45,20 +46,20 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     }
     
     debug_log_file_ = registry.readString(SharedConstants::RegistryKey::DEBUG_LOG_FILE, L"");
-    Logger::setLogFile(debug_log_file_);
+    logger->setLogFileW(debug_log_file_);
     
-    if (debug_level_setting_ != (int)Logger::NOLOG) {
+    if (debug_level_setting_ != (int)Logger::NONE) {
         if (debug_log_file_.length() > 0) {
-            Logger::setLogDestination(running_from_console ? 
+            logger->setLogDestination(running_from_console ? 
                 Logger::DEST_CONSOLE_AND_FILE : Logger::DEST_FILE);
         }
         else {
-            Logger::setLogDestination(Logger::DEST_CONSOLE);
+            logger->setLogDestination(Logger::DEST_CONSOLE);
         }
-        Logger::setLogLevel((Logger::LogLevel)debug_level_setting_);
+        logger->setLogLevel((Logger::LogLevel)debug_level_setting_);
     }
     else {
-        Logger::setLogLevel(Logger::NOLOG);
+        logger->setLogLevel(Logger::NONE);
     }
     // Handle legacy only_while_running_ string conversion
     try {
@@ -88,13 +89,13 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
 
     primary_host_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_HOST, L"localhost");
     primary_api_key_ = registry.readString(SharedConstants::RegistryKey::PRIMARY_API_KEY, L"");
-    Logger::debug2("Configuration::loadFromRegistry() primary api key: %ls\n", primary_api_key_.c_str());
+    logger->debug2("Configuration::loadFromRegistry() primary api key: %ls\n", primary_api_key_.c_str());
 
     // Try to read primary port from registry
     try {
         primary_port_ = registry.readInt(SharedConstants::RegistryKey::PRIMARY_PORT, 0);
         if (primary_port_ > 0) {
-            Logger::debug2("Configuration::loadFromRegistry() primary port from registry: %d\n", primary_port_);
+            logger->debug2("Configuration::loadFromRegistry() primary port from registry: %d\n", primary_port_);
         }
     }
     catch (const std::exception&) {
@@ -105,7 +106,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     try {
         secondary_port_ = registry.readInt(SharedConstants::RegistryKey::SECONDARY_PORT, 0);
         if (secondary_port_ > 0) {
-            Logger::debug2("Configuration::loadFromRegistry() secondary port from registry: %d\n", secondary_port_);
+            logger->debug2("Configuration::loadFromRegistry() secondary port from registry: %d\n", secondary_port_);
         }
     }
     catch (const std::exception&) {
@@ -114,7 +115,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
 
     secondary_host_ = registry.readString(SharedConstants::RegistryKey::SECONDARY_HOST, L"");
     secondary_api_key_ = registry.readString(SharedConstants::RegistryKey::SECONDARY_API_KEY, L"");
-    Logger::debug2("Configuration::loadFromRegistry() secondary api key: %ls\n", secondary_api_key_.c_str());
+    logger->debug2("Configuration::loadFromRegistry() secondary api key: %ls\n", secondary_api_key_.c_str());
     
     suffix_ = registry.readString(SharedConstants::RegistryKey::SUFFIX, L"");
     forward_to_secondary_ = registry.readBool(SharedConstants::RegistryKey::FORWARD_TO_SECONDARY, false);
@@ -127,7 +128,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     tail_filename_ = registry.readString(SharedConstants::RegistryKey::TAIL_FILENAME, L"");
     char tail_file_buf[1024];
     Util::wstr2str(tail_file_buf, sizeof(tail_file_buf), tail_filename_.c_str());
-    Logger::debug("Tail requested for file %s\n", tail_file_buf);
+    logger->debug("Tail requested for file %s\n", tail_file_buf);
     
     tail_program_name_ = registry.readString(SharedConstants::RegistryKey::TAIL_PROGRAM_NAME, L"");
     include_vs_ignore_eventids_ = registry.readBool(SharedConstants::RegistryKey::INCLUDE_VS_IGNORE_EVENT_IDS, false);
@@ -152,12 +153,12 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
         Util::wstr2str(channel_buf, sizeof(channel_buf), channel.c_str());
         logs_.back().nname_ = channel_buf;
         logs_.back().loadFromRegistry(registry);
-        Logger::debug("Configuration::loadFromRegistry() event log %ls\n", channel.c_str());
+        logger->debug("Configuration::loadFromRegistry() event log %ls\n", channel.c_str());
     }
 
     registry.close();
 
-    Logger::debug("Loaded configuration from registry (from console: %s)\n", 
+    logger->debug("Loaded configuration from registry (from console: %s)\n", 
         (running_from_console ? "true" : "false"));
 }
 
@@ -175,6 +176,7 @@ void Configuration::saveToRegistry() const {
 }
 
 void Configuration::loadFilterIds(wstring value) {
+    auto logger = LOG_THIS;
     if (value.empty()) return;
 
     set<DWORD> new_filter;
@@ -184,7 +186,7 @@ void Configuration::loadFilterIds(wstring value) {
     for (size_t i = 0; i < input.size(); i++) {
         if (input[i] == L',') {
             if (id > 0) {
-                Logger::debug2("Configuration::loadFilterIds() adding event filter id for %u\n", id);
+                logger->debug2("Configuration::loadFilterIds() adding event filter id for %u\n", id);
                 new_filter.insert(id);
             }
             id = 0;
@@ -206,6 +208,7 @@ void Configuration::getTimeZoneOffset() {
 }
 
 void Configuration::setHostName() {
+    auto logger = LOG_THIS;
     static constexpr size_t HOSTNAME_BUFFER_SIZE = MAX_COMPUTERNAME_LENGTH + 1;
     WCHAR computerName[HOSTNAME_BUFFER_SIZE];
     DWORD size = HOSTNAME_BUFFER_SIZE;
@@ -215,7 +218,7 @@ void Configuration::setHostName() {
         Util::wstr2str(computer_name_buf, sizeof(computer_name_buf), computerName);
         host_name_ = string(computer_name_buf);
     } else {
-        Logger::warning("Configuration::setHostName() GetComputerNameW() failed: %u\n", GetLastError());
+        logger->warning("Configuration::setHostName() GetComputerNameW() failed: %u\n", GetLastError());
         host_name_ = string("unknown");
     }
 }

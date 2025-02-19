@@ -9,25 +9,29 @@ Copyright c 2021 Logzilla Corp.
 
 using namespace std;
 
-class StatefulLogger
-{
-public:
-    static constexpr size_t MAX_EVENT_ID_LENGTH = 256;
-    static constexpr size_t MAX_EVENT_LOG_LENGTH = 1024;
-    static constexpr size_t MAX_EVENT_DATETIME_LENGTH = 64;
+namespace Syslog_agent {
 
-    static void setEventId(const char* eventId);
-    static void setEventLog(const char* eventLog);
-    static void setEventDatetime(const char* eventDatetime);
-    static void logEvent();
-    static StatefulLogger* singleton();
+    class StatefulLogger
+    {
+    public:
+        static constexpr size_t MAX_EVENT_ID_LENGTH = 256;
+        static constexpr size_t MAX_EVENT_LOG_LENGTH = 1024;
+        static constexpr size_t MAX_EVENT_DATETIME_LENGTH = 64;
 
-private:
-    StatefulLogger() = default;  // Private constructor
-    StatefulLogger(const StatefulLogger&) = delete;  // Prevent copying
-    StatefulLogger& operator=(const StatefulLogger&) = delete;
+        static void setEventId(const char* eventId);
+        static void setEventLog(const char* eventLog);
+        static void setEventDatetime(const char* eventDatetime);
+        static void logEvent();
+        static StatefulLogger* singleton();
 
-    char current_event_id_[MAX_EVENT_ID_LENGTH] = {};
-    char current_event_log_[MAX_EVENT_LOG_LENGTH] = {};
-    char current_event_datetime_[MAX_EVENT_DATETIME_LENGTH] = {};
-};
+    private:
+        StatefulLogger() = default;  // Private constructor
+        StatefulLogger(const StatefulLogger&) = delete;  // Prevent copying
+        StatefulLogger& operator=(const StatefulLogger&) = delete;
+
+        char current_event_id_[MAX_EVENT_ID_LENGTH] = {};
+        char current_event_log_[MAX_EVENT_LOG_LENGTH] = {};
+        char current_event_datetime_[MAX_EVENT_DATETIME_LENGTH] = {};
+    };
+
+} // namespace Syslog_agent

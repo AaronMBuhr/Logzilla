@@ -121,7 +121,8 @@ public:
             return 0;
         }
         if (!messages_pool_->isValidObject(first_message_)) {
-            Logger::recoverable_error("MessageQueue::getOldestMessageTimestamp() : first_message_ points to invalid object\n");
+            auto logger = LOG_THIS;
+            logger->recoverable_error("MessageQueue::getOldestMessageTimestamp() : first_message_ points to invalid object\n");
             return 0;
         }
         return first_message_->timestamp;
@@ -130,7 +131,7 @@ public:
     // Traverse the queue starting from the given message or from the front if null.
     // Thread-safe: Yes
     // Note: This is primarily intended for use by MessageBatcher for efficient batch processing.
-    std::experimental::generator<Message*> traverseQueue(Message* first = nullptr);
+    std::experimental::generator<Message*> traverseQueue(Message* first = nullptr) const;
 
     // Set a hook function to be called before/after each enqueue operation.
     // The hook function should return true to proceed with the enqueue, or false to cancel it.

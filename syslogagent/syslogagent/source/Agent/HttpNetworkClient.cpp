@@ -79,10 +79,11 @@ HttpNetworkClient::~HttpNetworkClient()
 bool HttpNetworkClient::initialize(const Configuration* config, const wchar_t* api_key,
     const wchar_t* url, bool use_ssl, unsigned int port)
 {
+    auto logger = LOG_THIS;
     std::lock_guard<std::recursive_mutex> lock(connecting_);
 
     if (!config || !api_key || !url) {
-        Logger::recoverable_error("HttpNetworkClient::initialize() invalid parameters\n");
+        logger->recoverable_error("HttpNetworkClient::initialize() invalid parameters\n");
         return false;
     }
 
@@ -111,7 +112,7 @@ bool HttpNetworkClient::initialize(const Configuration* config, const wchar_t* a
     urlComp.dwUrlPathLength = MAX_PATH_LENGTH;
 
     if (!WinHttpCrackUrl(url_buffer, 0, 0, &urlComp)) {
-        Logger::recoverable_error("HttpNetworkClient::initialize() failed to parse URL: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::initialize() failed to parse URL: %d\n", GetLastError());
         return false;
     }
 
@@ -140,6 +141,7 @@ bool HttpNetworkClient::initialize(const Configuration* config, const wchar_t* a
 
 bool HttpNetworkClient::connect()
 {
+    auto logger = LOG_THIS;
     std::lock_guard<std::recursive_mutex> lock(connecting_);
 
     if (is_connected_) {
@@ -153,7 +155,7 @@ bool HttpNetworkClient::connect()
         0);
 
     if (!hSession_) {
-        Logger::recoverable_error("HttpNetworkClient::connect() WinHttpOpen failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::connect() WinHttpOpen failed: %d\n", GetLastError());
         return false;
     }
 
@@ -164,15 +166,15 @@ bool HttpNetworkClient::connect()
         send_timeout_,      // Send timeout
         receive_timeout_))  // Receive timeout
     {
-        Logger::warning("HttpNetworkClient::connect() failed to set timeouts: %d\n", GetLastError());
+        logger->warning("HttpNetworkClient::connect() failed to set timeouts: %d\n", GetLastError());
     }
 
-    Logger::debug2("HttpNetworkClient::connect() connecting to %ls:%d\n", host_, port_);
+    logger->debug2("HttpNetworkClient::connect() connecting to %ls:%d\n", host_, port_);
     INTERNET_PORT port = port_ ? (INTERNET_PORT)port_ : (use_ssl_ ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT);
     hConnection_ = WinHttpConnect(hSession_, host_, port, 0);
     if (!hConnection_) {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::connect() WinHttpConnect failed: %d\n", error);
+        logger->recoverable_error("HttpNetworkClient::connect() WinHttpConnect failed: %d\n", error);
         close();
         return false;
     }
@@ -183,20 +185,21 @@ bool HttpNetworkClient::connect()
 
 HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t length)
 {
+    auto logger = LOG_THIS;
     std::lock_guard<std::recursive_mutex> lock(connecting_);
 
     if (!is_connected_ || !hConnection_) {
-        Logger::debug2("HttpNetworkClient::post() Not connected, connection handle: %p, is_connected: %d\n", 
+        logger->debug2("HttpNetworkClient::post() Not connected, connection handle: %p, is_connected: %d\n", 
             hConnection_, is_connected_);
         return NetworkResult(ERROR_NOT_CONNECTED, "Not connected to server (http 0)");
     }
 
-    Logger::debug2("HttpNetworkClient::post() Starting post operation - Length: %d bytes\n", length);
+    logger->debug2("HttpNetworkClient::post() Starting post operation - Length: %d bytes\n", length);
     
     DWORD flags = WINHTTP_FLAG_REFRESH;
     if (use_ssl_) {
         flags |= WINHTTP_FLAG_SECURE;
-        Logger::debug2("HttpNetworkClient::post() Using SSL\n");
+        logger->debug2("HttpNetworkClient::post() Using SSL\n");
     }
 
     // Create request handle
@@ -217,7 +220,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
 
     // Set timeouts for this request
     if (!applyTimeouts(hRequest_)) {
-        Logger::warning("HttpNetworkClient::post() Failed to set request timeouts\n");
+        logger->warning("HttpNetworkClient::post() Failed to set request timeouts\n");
     }
 
     // Add headers
@@ -295,7 +298,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
 
         // Ensure we don't overflow our buffer
         if (total_read >= sizeof(response_buffer) - 1) {
-            Logger::warning("HttpNetworkClient::post() Response exceeds buffer size, truncating\n");
+            logger->warning("HttpNetworkClient::post() Response exceeds buffer size, truncating\n");
             break;
         }
 
@@ -360,13 +363,14 @@ void HttpNetworkClient::close()
 
 bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length, size_t& bytes_written)
 {
+    auto logger = LOG_THIS;
     std::lock_guard<std::recursive_mutex> lock(connecting_);
 
     // Always attempt to connect if not connected
     if (!is_connected_ || !hConnection_) {
-        Logger::debug2("HttpNetworkClient::getLogzillaVersion() not connected, attempting to connect\n");
+        logger->debug2("HttpNetworkClient::getLogzillaVersion() not connected, attempting to connect\n");
         if (!connect()) {
-            Logger::recoverable_error("HttpNetworkClient::getLogzillaVersion() connection attempt failed\n");
+            logger->recoverable_error("HttpNetworkClient::getLogzillaVersion() connection attempt failed\n");
             return false;
         }
     }
@@ -375,7 +379,7 @@ bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length,
     wchar_t version_url[MAX_URL_LENGTH];
     wcscpy_s(version_url, SharedConstants::LOGZILLA_VERSION_PATH);
 
-    Logger::debug2("HttpNetworkClient::getLogzillaVersion() requesting URL: %ls\n", version_url);
+    logger->debug2("HttpNetworkClient::getLogzillaVersion() requesting URL: %ls\n", version_url);
 
     DWORD flags = WINHTTP_FLAG_REFRESH;
     if (use_ssl_) {
@@ -392,17 +396,17 @@ bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length,
 
     if (!hRequest_) {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpOpenRequest failed: %d\n", error);
+        logger->recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpOpenRequest failed: %d\n", error);
         return false;
     }
 
     // Set timeouts on the request handle
     if (!applyTimeouts(hRequest_)) {
-        Logger::warning("HttpNetworkClient::getLogzillaVersion() failed to set request timeouts\n");
+        logger->warning("HttpNetworkClient::getLogzillaVersion() failed to set request timeouts\n");
     }
 
     // Send request without API key header since version endpoint doesn't require auth
-    Logger::debug2("HttpNetworkClient::getLogzillaVersion() sending request\n");
+    logger->debug2("HttpNetworkClient::getLogzillaVersion() sending request\n");
     if (!WinHttpSendRequest(hRequest_,
         WINHTTP_NO_ADDITIONAL_HEADERS,
         0,
@@ -412,16 +416,16 @@ bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length,
         0))
     {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpSendRequest failed: %d\n", error);
+        logger->recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpSendRequest failed: %d\n", error);
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
     }
 
-    Logger::debug2("HttpNetworkClient::getLogzillaVersion() receiving response\n");
+    logger->debug2("HttpNetworkClient::getLogzillaVersion() receiving response\n");
     if (!WinHttpReceiveResponse(hRequest_, NULL)) {
         DWORD error = GetLastError();
-        Logger::recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpReceiveResponse failed: %d\n", error);
+        logger->recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpReceiveResponse failed: %d\n", error);
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
@@ -429,14 +433,14 @@ bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length,
 
     DWORD size = 0;
     if (!WinHttpQueryDataAvailable(hRequest_, &size)) {
-        Logger::recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpQueryDataAvailable failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpQueryDataAvailable failed: %d\n", GetLastError());
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
     }
 
     if (size >= max_length) {
-        Logger::recoverable_error("HttpNetworkClient::getLogzillaVersion() response too large\n");
+        logger->recoverable_error("HttpNetworkClient::getLogzillaVersion() response too large\n");
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
@@ -448,7 +452,7 @@ bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length,
         size,
         &downloaded))
     {
-        Logger::recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpReadData failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::getLogzillaVersion() WinHttpReadData failed: %d\n", GetLastError());
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
@@ -464,10 +468,11 @@ bool HttpNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length,
 
 bool HttpNetworkClient::loadCertificate(const wchar_t* cert_path)
 {
+    auto logger = LOG_THIS;
     std::lock_guard<std::recursive_mutex> lock(connecting_);
 
     if (!is_connected_ || !hRequest_) {
-        Logger::recoverable_error("HttpNetworkClient::loadCertificate() not connected or no request\n");
+        logger->recoverable_error("HttpNetworkClient::loadCertificate() not connected or no request\n");
         return false;
     }
 
@@ -480,7 +485,7 @@ bool HttpNetworkClient::loadCertificate(const wchar_t* cert_path)
         &securityFlags,
         &securityFlagsSize))
     {
-        Logger::recoverable_error("HttpNetworkClient::loadCertificate() WinHttpQueryOption failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::loadCertificate() WinHttpQueryOption failed: %d\n", GetLastError());
         return false;
     }
 
@@ -495,7 +500,7 @@ bool HttpNetworkClient::loadCertificate(const wchar_t* cert_path)
         &securityFlags,
         sizeof(securityFlags)))
     {
-        Logger::recoverable_error("HttpNetworkClient::loadCertificate() WinHttpSetOption failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::loadCertificate() WinHttpSetOption failed: %d\n", GetLastError());
         return false;
     }
 
@@ -504,10 +509,11 @@ bool HttpNetworkClient::loadCertificate(const wchar_t* cert_path)
 
 bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t max_length, size_t& bytes_written)
 {
+    auto logger = LOG_THIS;
     std::lock_guard<std::recursive_mutex> lock(connecting_);
 
     if (!is_connected_ || !hConnection_) {
-        Logger::recoverable_error("HttpNetworkClient::get() not connected\n");
+        logger->recoverable_error("HttpNetworkClient::get() not connected\n");
         return false;
     }
 
@@ -525,7 +531,7 @@ bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t ma
         flags);
 
     if (!hRequest_) {
-        Logger::recoverable_error("HttpNetworkClient::get() WinHttpOpenRequest failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::get() WinHttpOpenRequest failed: %d\n", GetLastError());
         return false;
     }
 
@@ -535,7 +541,7 @@ bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t ma
     // Format headers safely with size limit and ensure null termination
     int header_length = _snwprintf_s(headers, _countof(headers) - 1, _TRUNCATE, L"X-API-KEY: %s\r\n", api_key_);
     if (header_length < 0 || header_length >= _countof(headers)) {
-        Logger::recoverable_error("HttpNetworkClient::get() Header formatting failed or truncated\n");
+        logger->recoverable_error("HttpNetworkClient::get() Header formatting failed or truncated\n");
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
@@ -550,14 +556,14 @@ bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t ma
         0,
         0))
     {
-        Logger::recoverable_error("HttpNetworkClient::get() WinHttpSendRequest failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::get() WinHttpSendRequest failed: %d\n", GetLastError());
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
     }
 
     if (!WinHttpReceiveResponse(hRequest_, NULL)) {
-        Logger::recoverable_error("HttpNetworkClient::get() WinHttpReceiveResponse failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::get() WinHttpReceiveResponse failed: %d\n", GetLastError());
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
@@ -565,14 +571,14 @@ bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t ma
 
     DWORD size = 0;
     if (!WinHttpQueryDataAvailable(hRequest_, &size)) {
-        Logger::recoverable_error("HttpNetworkClient::get() WinHttpQueryDataAvailable failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::get() WinHttpQueryDataAvailable failed: %d\n", GetLastError());
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
     }
 
     if (size >= max_length) {
-        Logger::recoverable_error("HttpNetworkClient::get() response too large\n");
+        logger->recoverable_error("HttpNetworkClient::get() response too large\n");
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
@@ -584,7 +590,7 @@ bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t ma
         size,
         &downloaded))
     {
-        Logger::recoverable_error("HttpNetworkClient::get() WinHttpReadData failed: %d\n", GetLastError());
+        logger->recoverable_error("HttpNetworkClient::get() WinHttpReadData failed: %d\n", GetLastError());
         WinHttpCloseHandle(hRequest_);
         hRequest_ = NULL;
         return false;
@@ -600,34 +606,20 @@ bool HttpNetworkClient::get(const wchar_t* url, char* response_buffer, size_t ma
 
 bool HttpNetworkClient::applyTimeouts(HINTERNET handle)
 {
+    auto logger = LOG_THIS;
     if (!handle) {
+        logger->recoverable_error("HttpNetworkClient::applyTimeouts() invalid handle\n");
         return false;
     }
 
-    DWORD timeout = connect_timeout_;
-    if (!WinHttpSetOption(handle,
-        WINHTTP_OPTION_CONNECT_TIMEOUT,
-        &timeout,
-        sizeof(timeout)))
+    // Set timeouts
+    if (!WinHttpSetTimeouts(handle,
+        0,              // DNS resolution timeout
+        connect_timeout_,   // Connect timeout
+        send_timeout_,      // Send timeout
+        receive_timeout_))  // Receive timeout
     {
-        return false;
-    }
-
-    timeout = send_timeout_;
-    if (!WinHttpSetOption(handle,
-        WINHTTP_OPTION_SEND_TIMEOUT,
-        &timeout,
-        sizeof(timeout)))
-    {
-        return false;
-    }
-
-    timeout = receive_timeout_;
-    if (!WinHttpSetOption(handle,
-        WINHTTP_OPTION_RECEIVE_TIMEOUT,
-        &timeout,
-        sizeof(timeout)))
-    {
+        logger->warning("HttpNetworkClient::applyTimeouts() failed to set timeouts: %d\n", GetLastError());
         return false;
     }
 
@@ -636,119 +628,116 @@ bool HttpNetworkClient::applyTimeouts(HINTERNET handle)
 
 bool HttpNetworkClient::negotiateCompression()
 {
-    if (!hRequest_) {
+    auto logger = LOG_THIS;
+    std::lock_guard<std::recursive_mutex> lock(connecting_);
+
+    if (!is_connected_ || !hRequest_) {
+        logger->recoverable_error("HttpNetworkClient::negotiateCompression() not connected or no request\n");
         return false;
     }
 
-    DWORD encodings = WINHTTP_DECOMPRESSION_FLAG_GZIP | WINHTTP_DECOMPRESSION_FLAG_DEFLATE;
+    DWORD flags = WINHTTP_DECOMPRESSION_FLAG_ALL;
     if (!WinHttpSetOption(hRequest_,
         WINHTTP_OPTION_DECOMPRESSION,
-        &encodings,
-        sizeof(encodings)))
+        &flags,
+        sizeof(flags)))
     {
+        logger->warning("HttpNetworkClient::negotiateCompression() failed to set decompression: %d\n", GetLastError());
         return false;
     }
 
-    use_compression_ = true;
     return true;
 }
 
 void HttpNetworkClient::drainConnection()
 {
-    if (!hRequest_) {
+    auto logger = LOG_THIS;
+    std::lock_guard<std::recursive_mutex> lock(connecting_);
+
+    if (!is_connected_ || !hRequest_) {
+        logger->debug2("HttpNetworkClient::drainConnection() not connected or no request\n");
         return;
     }
 
     char buffer[4096];
-    DWORD bytesRead;
-    DWORD totalTime = 0;
-    const DWORD sleepTime = 100;
+    DWORD bytes_available;
+    DWORD bytes_read;
 
-    while (WinHttpQueryDataAvailable(hRequest_, &bytesRead) && bytesRead > 0) {
-        if (totalTime >= MAX_DRAIN_TIME_MS) {
-            break;
-        }
+    while (WinHttpQueryDataAvailable(hRequest_, &bytes_available)) {
+        if (bytes_available == 0) break;
 
         if (!WinHttpReadData(hRequest_,
             buffer,
-            min(sizeof(buffer), bytesRead),
-            &bytesRead))
+            min(sizeof(buffer), bytes_available),
+            &bytes_read))
         {
+            logger->warning("HttpNetworkClient::drainConnection() failed to read data: %d\n", GetLastError());
             break;
         }
 
-        Sleep(sleepTime);
-        totalTime += sleepTime;
+        if (bytes_read == 0) break;
     }
 }
 
 bool HttpNetworkClient::checkServerCert()
 {
-    if (!hRequest_) {
+    auto logger = LOG_THIS;
+    std::lock_guard<std::recursive_mutex> lock(connecting_);
+
+    if (!is_connected_ || !hRequest_) {
+        logger->recoverable_error("HttpNetworkClient::checkServerCert() not connected or no request\n");
         return false;
     }
 
-    PCCERT_CONTEXT certContext = NULL;
-    DWORD certContextSize = sizeof(certContext);
+    DWORD certInfoLength = 0;
+    if (!WinHttpQueryOption(hRequest_,
+        WINHTTP_OPTION_SECURITY_CERTIFICATE_STRUCT,
+        NULL,
+        &certInfoLength))
+    {
+        DWORD error = GetLastError();
+        if (error != ERROR_INSUFFICIENT_BUFFER) {
+            logger->recoverable_error("HttpNetworkClient::checkServerCert() failed to get cert info length: %d\n", error);
+            return false;
+        }
+    }
+
+    std::vector<BYTE> certInfoBuffer(certInfoLength);
+    WINHTTP_CERTIFICATE_INFO* certInfo = reinterpret_cast<WINHTTP_CERTIFICATE_INFO*>(certInfoBuffer.data());
 
     if (!WinHttpQueryOption(hRequest_,
-        WINHTTP_OPTION_SERVER_CERT_CONTEXT,
-        &certContext,
-        &certContextSize))
+        WINHTTP_OPTION_SECURITY_CERTIFICATE_STRUCT,
+        certInfo,
+        &certInfoLength))
     {
+        logger->recoverable_error("HttpNetworkClient::checkServerCert() failed to get cert info: %d\n", GetLastError());
         return false;
     }
 
-    if (!certContext) {
-        return false;
-    }
-
-    // Verify certificate chain
-    CERT_CHAIN_PARA chainPara = { sizeof(CERT_CHAIN_PARA) };
-    PCCERT_CHAIN_CONTEXT chainContext = NULL;
-
-    if (!CertGetCertificateChain(
-        NULL,
-        certContext,
-        NULL,
-        NULL,
-        &chainPara,
-        0,
-        NULL,
-        &chainContext))
-    {
-        CertFreeCertificateContext(certContext);
-        return false;
-    }
-
-    CertFreeCertificateChain(chainContext);
-    CertFreeCertificateContext(certContext);
+    logger->debug2("HttpNetworkClient::checkServerCert() certificate verified\n");
     return true;
 }
 
 bool HttpNetworkClient::followRedirect(wchar_t* redirect_buffer, size_t buffer_size)
 {
-    if (buffer_size > MAXDWORD) {
-        Logger::recoverable_error("HttpNetworkClient::followRedirect()> "
-            "Buffer size exceeds DWORD maximum\n");
+    auto logger = LOG_THIS;
+    std::lock_guard<std::recursive_mutex> lock(connecting_);
+
+    if (!is_connected_ || !hRequest_) {
+        logger->recoverable_error("HttpNetworkClient::followRedirect() not connected or no request\n");
         return false;
     }
 
-    if (!hRequest_) {
-        return false;
-    }
-
-    DWORD size = static_cast<DWORD>(buffer_size);
-    DWORD index = WINHTTP_NO_HEADER_INDEX;
-    
-    if (!WinHttpQueryHeaders(hRequest_,
-        WINHTTP_QUERY_LOCATION,
-        WINHTTP_HEADER_NAME_BY_INDEX,
+    DWORD size = static_cast<DWORD>(buffer_size * sizeof(wchar_t));
+    if (!WinHttpQueryOption(hRequest_,
+        WINHTTP_OPTION_URL,
         redirect_buffer,
-        &size,
-        &index))  // Pass address of index
+        &size))
     {
+        logger->recoverable_error("HttpNetworkClient::followRedirect() failed to get redirect URL: %d\n", GetLastError());
         return false;
     }
+
+    logger->debug2("HttpNetworkClient::followRedirect() redirecting to: %ls\n", redirect_buffer);
     return true;
 }

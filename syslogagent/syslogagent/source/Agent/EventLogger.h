@@ -6,7 +6,6 @@
 #include <queue>
 #include <cstdint>
 
-using std::wstring;
 using std::string;
 using std::queue;
 
@@ -25,7 +24,7 @@ public:
     static bool logNetworkSend(const char* buf, size_t length);
     static bool logNetworkReceive(const char* result, size_t result_length);
     static bool isQueueEmpty();
-    static void enqueueEventForLogging(const string& event);
+    static void enqueueEventForLogging(const char* event);
     static string queuePopFront();
 
     // Delete copy constructor and assignment operator
@@ -49,20 +48,21 @@ private:
     static std::unique_ptr<EventLogger, std::default_delete<EventLogger>> instance_;
     std::queue<LoggedEvent> _queued_events_to_log;
 
-    // File names
-    static const wstring SUBSCRIBED_EVENTS_FILENAME;
-    static const wstring GENERATED_EVENTS_FILENAME;
-    static const wstring SENT_EVENTS_FILENAME;
-    static const wstring SENT_DATA_FILENAME;
+    // File names (as wide char arrays to avoid heap allocations)
+    static inline constexpr wchar_t SUBSCRIBED_EVENTS_FILENAME[] = L"subscribed_events.txt";
+    static inline constexpr wchar_t GENERATED_EVENTS_FILENAME[] = L"generated_events.txt";
+    static inline constexpr wchar_t SENT_EVENTS_FILENAME[] = L"sent_events.txt";
+    static inline constexpr wchar_t SENT_DATA_FILENAME[] = L"sent_data.txt";
 
     // Private constructor for singleton
     EventLogger() = default;
 
     // Helper methods
-    static const wstring& getFilenameForDestination(const LogDestination dest);
+    static const wchar_t* getFilenameForDestination(const LogDestination dest);
     void writeToFile(const LogDestination dest, const char* message);
     void writeToFile(const LogDestination dest, const char* message, size_t length);
     void writeSentData(const char* data, size_t length);
 };
+
 
 } // namespace Syslog_agent

@@ -59,7 +59,7 @@
     <LinkIncremental>true</LinkIncremental>
     <TargetName>Syslog$(ProjectName)</TargetName>
     <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
-    <LibraryPath>$(ProjectDir)\lib;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)\lib;$(ProjectDir)\x64\$(Configuration);$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UnitTesting|x64'">
     <LinkIncremental>true</LinkIncremental>
@@ -71,6 +71,7 @@
     <TargetName>Syslog$(ProjectName)</TargetName>
     <LibraryPath>$(ProjectDir)\lib;$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
+    <OutDir>..\..\x64\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -78,13 +79,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>D:\Source\Logzilla\syslogagent_with_forwarder\syslogagent\source\Agent\include\libgnutls-30;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\Infrastructure;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>ws2_32.lib;winhttp.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;winhttp.lib;crypt32.lib;LogZillaInfra.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PreLinkEvent>
       <Command>mc message.mc</Command>
@@ -144,10 +145,7 @@
     <ClInclude Include="IEventHandler.h" />
     <ClInclude Include="INetworkClient.h" />
     <ClInclude Include="JSONMessageBatcher.h" />
-    <ClInclude Include="Logger.h" />
     <ClInclude Include="ArrayQueue.h" />
-    <ClInclude Include="Bitmap.h" />
-    <ClInclude Include="BitmappedObjectPool.h" />
     <ClInclude Include="FileWatcher.h" />
     <ClInclude Include="message.h" />
     <ClInclude Include="MessageBatcher.h" />
@@ -168,7 +166,6 @@
     <ClInclude Include="SyslogSender.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TLS.h" />
-    <ClInclude Include="Util.h" />
     <ClInclude Include="WindowsEvent.h" />
     <ClInclude Include="WindowsTimer.h" />
     <ClInclude Include="HttpNetworkClient.h" />
@@ -186,8 +183,6 @@
     </ClCompile>
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="INetworkClient.cpp" />
-    <ClCompile Include="Logger.cpp" />
-    <ClCompile Include="Bitmap.cpp" />
     <ClCompile Include="Configuration.cpp" />
     <ClCompile Include="FileWatcher.cpp" />
     <ClCompile Include="MessageBatcher.cpp" />
@@ -207,7 +202,6 @@
     </ClCompile>
     <ClCompile Include="SyslogSender.cpp" />
     <ClCompile Include="TLS.cpp" />
-    <ClCompile Include="Util.cpp" />
     <ClCompile Include="WindowsEvent.cpp" />
     <ClCompile Include="WindowsTimer.cpp" />
     <ClCompile Include="HttpNetworkClient.cpp" />

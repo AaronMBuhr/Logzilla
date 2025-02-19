@@ -47,13 +47,14 @@ NetworkClient::~NetworkClient()
 
 bool NetworkClient::applyTimeouts(HINTERNET handle)
 {
+    auto logger = LOG_THIS;
     if (!WinHttpSetTimeouts(handle,
         connect_timeout_,
         send_timeout_,
         receive_timeout_,
         receive_timeout_))
     {
-        Logger::recoverable_error("Failed to set timeouts: %u\n", GetLastError());
+        logger->recoverable_error("Failed to set timeouts: %u\n", GetLastError());
         return false;
     }
     return true;
@@ -61,6 +62,7 @@ bool NetworkClient::applyTimeouts(HINTERNET handle)
 
 bool NetworkClient::negotiateCompression()
 {
+    auto logger = LOG_THIS;
     if (!use_compression_) {
         return true;
     }
@@ -75,12 +77,13 @@ bool NetworkClient::negotiateCompression()
     }
 
     use_compression_ = false;
-    Logger::debug2("Compression not available\n");
+    logger->debug2("Compression not available\n");
     return true;
 }
 
 void NetworkClient::drainConnection()
 {
+    auto logger = LOG_THIS;
     if (!hRequest_) return;
 
     static constexpr DWORD DRAIN_BUFFER_SIZE = 16384;  // 16KB drain buffer
@@ -96,7 +99,7 @@ void NetworkClient::drainConnection()
     while (GetTickCount() - startTime < MAX_DRAIN_TIME_MS) {
         if (!WinHttpQueryDataAvailable(hRequest_, &size)) {
             lastError = GetLastError();
-            Logger::debug2("drainConnection: WinHttpQueryDataAvailable failed with %u\n", lastError);
+            logger->debug2("drainConnection: WinHttpQueryDataAvailable failed with %u\n", lastError);
             return;
         }
 
@@ -109,7 +112,7 @@ void NetworkClient::drainConnection()
 
             if (!WinHttpReadData(hRequest_, drainBuffer, chunkSize, &bytesRead)) {
                 lastError = GetLastError();
-                Logger::debug2("drainConnection: WinHttpReadData failed with %u\n", lastError);
+                logger->debug2("drainConnection: WinHttpReadData failed with %u\n", lastError);
                 return;
             }
 
@@ -117,7 +120,7 @@ void NetworkClient::drainConnection()
             
             if (bytesRead > size) {
                 // Protect against underflow and corrupted size reporting
-                Logger::debug2("drainConnection: Read more bytes than reported available\n");
+                logger->debug2("drainConnection: Read more bytes than reported available\n");
                 return;
             }
 
@@ -127,16 +130,17 @@ void NetworkClient::drainConnection()
     }
 
     if (GetTickCount() - startTime >= MAX_DRAIN_TIME_MS) {
-        Logger::debug2("drainConnection: Timed out after draining %u bytes\n", totalSize);
+        logger->debug2("drainConnection: Timed out after draining %u bytes\n", totalSize);
     } else {
-        Logger::debug2("drainConnection: Successfully drained %u bytes\n", totalSize);
+        logger->debug2("drainConnection: Successfully drained %u bytes\n", totalSize);
     }
 }
 
 bool NetworkClient::checkServerCert()
 {
+    auto logger = LOG_THIS;
     if (!hRequest_) {
-        Logger::critical("Cannot check server cert: no active request\n");
+        logger->critical("Cannot check server cert: no active request\n");
         return false;
     }
 
@@ -148,7 +152,7 @@ bool NetworkClient::checkServerCert()
         &securityFlags,
         &securityFlagsSize))
     {
-        Logger::recoverable_error("Failed to query security flags: %u\n", GetLastError());
+        logger->recoverable_error("Failed to query security flags: %u\n", GetLastError());
         return false;
     }
 
@@ -162,23 +166,23 @@ bool NetworkClient::checkServerCert()
         &securityFlags,
         sizeof(securityFlags)))
     {
-        Logger::recoverable_error("Failed to set security flags: %u\n", GetLastError());
+        logger->recoverable_error("Failed to set security flags: %u\n", GetLastError());
         return false;
     }
 
     // Log the final security state for debugging
-    Logger::debug2("Certificate validation state:\n");
+    logger->debug2("Certificate validation state:\n");
     if (securityFlags & SECURITY_FLAG_IGNORE_UNKNOWN_CA) {
-        Logger::debug2("- Ignoring unknown CA\n");
+        logger->debug2("- Ignoring unknown CA\n");
     }
     if (securityFlags & SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE) {
-        Logger::debug2("- Ignoring incorrect certificate usage\n");
+        logger->debug2("- Ignoring incorrect certificate usage\n");
     }
     if (securityFlags & SECURITY_FLAG_IGNORE_CERT_CN_INVALID) {
-        Logger::debug2("- Ignoring invalid CN\n");
+        logger->debug2("- Ignoring invalid CN\n");
     }
     if (securityFlags & SECURITY_FLAG_IGNORE_CERT_DATE_INVALID) {
-        Logger::debug2("- Ignoring invalid certificate date\n");
+        logger->debug2("- Ignoring invalid certificate date\n");
     }
 
     return true;
@@ -186,8 +190,9 @@ bool NetworkClient::checkServerCert()
 
 bool NetworkClient::followRedirect(wchar_t* redirect_buffer, size_t buffer_size)
 {
+    auto logger = LOG_THIS;
     if (remaining_redirects_ <= 0) {
-        Logger::recoverable_error("Too many redirects\n");
+        logger->recoverable_error("Too many redirects\n");
         return false;
     }
 
@@ -195,17 +200,17 @@ bool NetworkClient::followRedirect(wchar_t* redirect_buffer, size_t buffer_size)
     WinHttpQueryHeaders(hRequest_, WINHTTP_QUERY_LOCATION, WINHTTP_HEADER_NAME_BY_INDEX, NULL, &size, WINHTTP_NO_HEADER_INDEX);
 
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER) {
-        Logger::recoverable_error("Failed to get redirect location\n");
+        logger->recoverable_error("Failed to get redirect location\n");
         return false;
     }
 
     if (size > buffer_size) {
-        Logger::recoverable_error("Redirect URL too long\n");
+        logger->recoverable_error("Redirect URL too long\n");
         return false;
     }
 
     if (!WinHttpQueryHeaders(hRequest_, WINHTTP_QUERY_LOCATION, WINHTTP_HEADER_NAME_BY_INDEX, redirect_buffer, &size, WINHTTP_NO_HEADER_INDEX)) {
-        Logger::recoverable_error("Failed to get redirect URL\n");
+        logger->recoverable_error("Failed to get redirect URL\n");
         return false;
     }
 
@@ -225,71 +230,75 @@ bool NetworkClient::followRedirect(wchar_t* redirect_buffer, size_t buffer_size)
 bool NetworkClient::initialize(const Configuration* config, const wchar_t* api_key,
     const wchar_t* url, bool use_ssl, unsigned int port)
 {
+    auto logger = LOG_THIS;
     config_ = config;
     use_ssl_ = use_ssl;
 
+    // Check API key length
     if (!api_key || wcslen(api_key) >= MAX_API_KEY_LENGTH) {
-        Logger::fatal("API key empty or too long\n");
+        logger->fatal("API key empty or too long\n");
         return false;
     }
     wcsncpy_s(api_key_, api_key, MAX_API_KEY_LENGTH);
 
+    // Parse URL to get host and port
     const wchar_t* parsed_url = url;
-    if (wcsncmp(parsed_url, L"https://", 8) == 0) {
-        parsed_url += 8;
-        use_ssl_ = true;
-    }
-    else if (wcsncmp(parsed_url, L"http://", 7) == 0) {
+    if (wcsncmp(parsed_url, L"http://", 7) == 0) {
         parsed_url += 7;
-        use_ssl_ = false;
+    }
+    else if (wcsncmp(parsed_url, L"https://", 8) == 0) {
+        parsed_url += 8;
     }
 
-    const wchar_t* port_pos = wcschr(parsed_url, L':');
     const wchar_t* path_pos = wcschr(parsed_url, L'/');
-
-    size_t host_len = (port_pos && (!path_pos || port_pos < path_pos)) ? (port_pos - parsed_url) :
+    const wchar_t* port_pos = wcschr(parsed_url, L':');
+    size_t host_len = 
         (path_pos ? (path_pos - parsed_url) : wcslen(parsed_url));
 
     if (wcslen(url) >= MAX_URL_LENGTH) {
-        Logger::critical("URL too long\n");
+        logger->critical("URL too long\n");
         return false;
     }
     wcsncpy_s(url_, parsed_url, host_len);
+    url_[host_len] = L'\0';
 
-    if (port != 0) {
+    // Get port from URL if not specified
+    if (port > 0) {
         port_ = port;
     }
     else if (port_pos && (!path_pos || port_pos < path_pos)) {
         port_ = _wtoi(port_pos + 1);
         if (port_ == 0 || port_ > 65535) {
-            Logger::critical("Invalid port number\n");
+            logger->critical("Invalid port number\n");
             return false;
         }
     }
     else {
-        port_ = use_ssl_ ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT;
+        port_ = use_ssl_ ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
     }
 
-    hSession_ = WinHttpOpen(L"SyslogAgent",
+    // Initialize WinHTTP session
+    hSession_ = WinHttpOpen(
+        L"SyslogAgent",
         WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
         WINHTTP_NO_PROXY_NAME,
         WINHTTP_NO_PROXY_BYPASS,
         0);
 
     if (!hSession_) {
-        Logger::recoverable_error("Error %u in WinHttpOpen\n", GetLastError());
+        logger->recoverable_error("Error %u in WinHttpOpen\n", GetLastError());
         return false;
     }
 
     if (!applyTimeouts(hSession_)) {
-        close();
         return false;
     }
 
+    // Enable HTTP/2 if configured
     if (config_->getUseHTTP2()) {
         DWORD dwOption = WINHTTP_PROTOCOL_FLAG_HTTP2;
         if (!WinHttpSetOption(hSession_, WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, &dwOption, sizeof(dwOption))) {
-            Logger::warning("Failed to enable HTTP/2, falling back to HTTP/1.1: %u\n", GetLastError());
+            logger->warning("Failed to enable HTTP/2, falling back to HTTP/1.1: %u\n", GetLastError());
         }
     }
 
@@ -298,13 +307,14 @@ bool NetworkClient::initialize(const Configuration* config, const wchar_t* api_k
 
 bool NetworkClient::connect()
 {
+    auto logger = LOG_THIS;
     if (is_connected_) {
         return true;
     }
 
     hConnection_ = WinHttpConnect(hSession_, url_, port_, 0);
     if (!hConnection_) {
-        Logger::recoverable_error("Error %u in WinHttpConnect\n", GetLastError());
+        logger->recoverable_error("Error %u in WinHttpConnect\n", GetLastError());
         return false;
     }
 
@@ -314,59 +324,64 @@ bool NetworkClient::connect()
 
 NetworkClient::RESULT_TYPE NetworkClient::post(const char* buf, uint32_t length)
 {
+    auto logger = LOG_THIS;
     if (!is_connected_ || !hConnection_) {
         return ERROR_NOT_CONNECTED;
     }
+
+    cleanup_request();
 
     DWORD flags = WINHTTP_FLAG_REFRESH;
     if (use_ssl_) {
         flags |= WINHTTP_FLAG_SECURE;
     }
 
-    hRequest_ = WinHttpOpenRequest(hConnection_,
+    hRequest_ = WinHttpOpenRequest(
+        hConnection_,
         L"POST",
-        L"/",
+        L"/incoming",
         NULL,
         WINHTTP_NO_REFERER,
         WINHTTP_DEFAULT_ACCEPT_TYPES,
         flags);
 
     if (!hRequest_) {
-        Logger::recoverable_error("Error %u in WinHttpOpenRequest\n", GetLastError());
+        logger->recoverable_error("Error %u in WinHttpOpenRequest\n", GetLastError());
         return GetLastError();
     }
 
-    if (!checkServerCert()) {
+    if (use_ssl_ && !checkServerCert()) {
         cleanup_request();
-        return ERROR_INVALID_CERTIFICATE;
+        return ERROR_WINHTTP_SECURE_FAILURE;
     }
 
     if (!negotiateCompression()) {
-        Logger::warning("Failed to negotiate compression\n");
+        logger->warning("Failed to negotiate compression\n");
     }
 
     std::wstring headers = L"Content-Type: application/json\r\n";
-    headers += L"X-API-KEY: ";
+    headers += L"X-Api-Key: ";
     headers += api_key_;
     headers += L"\r\n";
 
-    if (!WinHttpSendRequest(hRequest_,
+    if (!WinHttpSendRequest(
+        hRequest_,
         headers.c_str(),
-        -1,
-        (LPVOID)buf,
+        static_cast<DWORD>(-1),
+        const_cast<char*>(buf),
         length,
         length,
         0))
     {
         DWORD error = GetLastError();
-        Logger::recoverable_error("Error %u in WinHttpSendRequest\n", error);
+        logger->recoverable_error("Error %u in WinHttpSendRequest\n", error);
         cleanup_request();
         return error;
     }
 
     if (!WinHttpReceiveResponse(hRequest_, NULL)) {
         DWORD error = GetLastError();
-        Logger::recoverable_error("Error %u in WinHttpReceiveResponse\n", error);
+        logger->recoverable_error("Error %u in WinHttpReceiveResponse\n", error);
         cleanup_request();
         return error;
     }
@@ -374,7 +389,8 @@ NetworkClient::RESULT_TYPE NetworkClient::post(const char* buf, uint32_t length)
     DWORD statusCode = 0;
     DWORD statusCodeSize = sizeof(statusCode);
 
-    if (!WinHttpQueryHeaders(hRequest_,
+    if (!WinHttpQueryHeaders(
+        hRequest_,
         WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
         NULL,
         &statusCode,
@@ -382,15 +398,18 @@ NetworkClient::RESULT_TYPE NetworkClient::post(const char* buf, uint32_t length)
         NULL))
     {
         DWORD error = GetLastError();
-        Logger::recoverable_error("Error %u in WinHttpQueryHeaders\n", error);
+        logger->recoverable_error("Error %u in WinHttpQueryHeaders\n", error);
         cleanup_request();
         return error;
     }
 
     // Handle redirects
-    if (statusCode >= 300 && statusCode < 400) {
-        wchar_t redirectUrl[MAX_URL_LENGTH];
-        if (followRedirect(redirectUrl, MAX_URL_LENGTH)) {
+    if (statusCode == HTTP_STATUS_MOVED || 
+        statusCode == HTTP_STATUS_REDIRECT || 
+        statusCode == HTTP_STATUS_REDIRECT_METHOD) {
+        wchar_t redirect_url[MAX_URL_LENGTH];
+        if (followRedirect(redirect_url, MAX_URL_LENGTH)) {
+            cleanup_request();
             return post(buf, length);
         }
         return ERROR_WINHTTP_REDIRECT_FAILED;
@@ -399,11 +418,12 @@ NetworkClient::RESULT_TYPE NetworkClient::post(const char* buf, uint32_t length)
     drainConnection();
     cleanup_request();
 
-    return statusCode == 200 ? RESULT_SUCCESS : ERROR_INVALID_DATA;
+    return statusCode;
 }
 
 void NetworkClient::close()
 {
+    auto logger = LOG_THIS;
     cleanup_request();
     if (hConnection_) {
         WinHttpCloseHandle(hConnection_);

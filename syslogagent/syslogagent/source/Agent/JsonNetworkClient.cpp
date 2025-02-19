@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include "JsonNetworkClient.h"
 #include "Logger.h"
+#include "JsonNetworkClient.h"
 #include "Configuration.h"
 
 #include <WinSock2.h>
@@ -56,33 +56,34 @@ bool JsonNetworkClient::connect()
         return true;
     }
 
+    auto logger = LOG_THIS;
     std::lock_guard<std::recursive_mutex> lock(connecting_);
     
     // Initialize Winsock
     WSADATA wsaData;
     int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (result != 0) {
-        Logger::recoverable_error("JsonNetworkClient::connect() WSAStartup failed: %d\n", result);
+        logger->recoverable_error("JsonNetworkClient::connect() WSAStartup failed: %d\n", result);
         return false;
     }
 
     socket_ = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (socket_ == INVALID_SOCKET) {
-        Logger::recoverable_error("JsonNetworkClient::connect() socket failed: %d\n", WSAGetLastError());
+        logger->recoverable_error("JsonNetworkClient::connect() socket failed: %d\n", WSAGetLastError());
         WSACleanup();
         return false;
     }
 
     if (setsockopt(socket_, SOL_SOCKET, SO_RCVTIMEO, (char*)&receive_timeout_, sizeof(receive_timeout_)) == SOCKET_ERROR) {
-        Logger::warning("JsonNetworkClient::connect() failed to set receive timeout: %d\n", WSAGetLastError());
+        logger->warning("JsonNetworkClient::connect() failed to set receive timeout: %d\n", WSAGetLastError());
     }
     if (setsockopt(socket_, SOL_SOCKET, SO_SNDTIMEO, (char*)&send_timeout_, sizeof(send_timeout_)) == SOCKET_ERROR) {
-        Logger::warning("JsonNetworkClient::connect() failed to set send timeout: %d\n", WSAGetLastError());
+        logger->warning("JsonNetworkClient::connect() failed to set send timeout: %d\n", WSAGetLastError());
     }
 
     char host_utf8[256];
     if (!ws2s(remote_host_address_.c_str(), host_utf8, sizeof(host_utf8))) {
-        Logger::recoverable_error("JsonNetworkClient::connect() failed to convert host address\n");
+        logger->recoverable_error("JsonNetworkClient::connect() failed to convert host address\n");
         closesocket(socket_);
         WSACleanup();
         return false;
@@ -95,13 +96,13 @@ bool JsonNetworkClient::connect()
     
     INT ip_result = InetPtonA(AF_INET, host_utf8, &addr.sin_addr);
     if (ip_result == 1) {
-        Logger::info("JsonNetworkClient::connect() attempting direct IP connection to: %s\n", host_utf8);
+        logger->info("JsonNetworkClient::connect() attempting direct IP connection to: %s\n", host_utf8);
         int connect_result = ::connect(socket_, (struct sockaddr*)&addr, sizeof(addr));
         if (connect_result != SOCKET_ERROR) {
             is_connected_ = true;
             return true;
         }
-        Logger::warning("JsonNetworkClient::connect() direct connection failed: %d\n", WSAGetLastError());
+        logger->warning("JsonNetworkClient::connect() direct connection failed: %d\n", WSAGetLastError());
     }
 
     // If direct connection failed or hostname was not an IP, fall back to DNS
@@ -110,11 +111,11 @@ bool JsonNetworkClient::connect()
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     
-    Logger::info("JsonNetworkClient::connect() falling back to DNS resolution for host: %s\n", host_utf8);
+    logger->info("JsonNetworkClient::connect() falling back to DNS resolution for host: %s\n", host_utf8);
     struct addrinfo* result_addr;
     int dns_result = ::getaddrinfo(host_utf8, std::to_string(remote_port_).c_str(), &hints, &result_addr);
     if (dns_result != 0) {
-        Logger::recoverable_error("JsonNetworkClient::connect() all connection attempts failed for host: %s\n", host_utf8);
+        logger->recoverable_error("JsonNetworkClient::connect() all connection attempts failed for host: %s\n", host_utf8);
         closesocket(socket_);
         WSACleanup();
         return false;
@@ -134,7 +135,7 @@ bool JsonNetworkClient::connect()
     ::freeaddrinfo(result_addr);
 
     if (!connected) {
-        Logger::recoverable_error("JsonNetworkClient::connect() connect failed: %d\n", WSAGetLastError());
+        logger->recoverable_error("JsonNetworkClient::connect() connect failed: %d\n", WSAGetLastError());
         closesocket(socket_);
         WSACleanup();
         return false;
@@ -146,8 +147,9 @@ bool JsonNetworkClient::connect()
 
 INetworkClient::RESULT_TYPE JsonNetworkClient::post(const char* buf, uint32_t length)
 {
+    auto logger = LOG_THIS;
     if (!is_connected_) {
-        Logger::recoverable_error("JsonNetworkClient::post() not connected\n");
+        logger->recoverable_error("JsonNetworkClient::post() not connected\n");
         return RESULT_TYPE(ERROR_NETWORK_UNREACHABLE, "Failed: not connected to server\n(no response)");
     }
 
@@ -160,7 +162,7 @@ INetworkClient::RESULT_TYPE JsonNetworkClient::post(const char* buf, uint32_t le
         DWORD error = WSAGetLastError();
         char msg[1024];
         snprintf(msg, sizeof(msg), "Failed: send error WSA %lu\n(no response)", error);
-        Logger::recoverable_error("JsonNetworkClient::post() send failed: %d\n", error);
+        logger->recoverable_error("JsonNetworkClient::post() send failed: %d\n", error);
         return RESULT_TYPE(ERROR_NETWORK_UNREACHABLE, msg);
     }
 
@@ -200,16 +202,20 @@ void JsonNetworkClient::close()
 
 bool JsonNetworkClient::getLogzillaVersion(char* version_buf, size_t max_length, size_t& bytes_written)
 {
+    auto logger = LOG_THIS;
     // Not implemented for JSON client
+    logger->debug2("JsonNetworkClient::getLogzillaVersion() not implemented for JSON client\n");
     bytes_written = 0;
     return false;
 }
 
 std::string JsonNetworkClient::connectionNameUtf8()
 {
+    auto logger = LOG_THIS;
     char buffer[256];
     if (ws2s(remote_host_address_.c_str(), buffer, sizeof(buffer))) {
         return std::string(buffer);
     }
+    logger->warning("JsonNetworkClient::connectionNameUtf8() failed to convert host address\n");
     return "";
 }

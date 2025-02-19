@@ -3,7 +3,7 @@ SyslogAgent: a syslog agent for Windows
 Copyright 2021 Logzilla Corp.
 */
 
-#include "stdafx.h"
+#include "pch.h"
 #include <algorithm>
 #include <cctype>
 #include <clocale>
@@ -22,16 +22,16 @@ Copyright 2021 Logzilla Corp.
 #include <Psapi.h>
 #include <TlHelp32.h>
 #include "Util.h"
-#include "Globals.h"
 #include "Logger.h"
 #include <winhttp.h>
 
-namespace Syslog_agent {
 
 using namespace std;
 
-void Util::toPrintableAscii(char* destination, int destination_count, 
+void Util::toPrintableAscii(char* destination, int destination_count,
     const wchar_t* source, char space_replacement) {
+    auto logger = LOG_THIS;
+
     int i;
     for (i = 0; i < destination_count - 1; i++) {
         if (source[i] == 0) break;
@@ -68,7 +68,7 @@ size_t Util::wstr2str_truncate(char* dest, size_t dest_size, const wchar_t* src)
 
 size_t Util::toLowercase(wchar_t* str) {
     if (!str) return 0;
-    
+
     size_t count = 0;
     while (str[count]) {
         str[count] = towlower(str[count]);
@@ -114,8 +114,30 @@ wstring Util::getThisPath(bool with_trailing_backslash)
     if (last_pos == string::npos || last_pos < 1) {
         return wstring();
     }
-    return module_filename_wstr.substr(0, last_pos) 
+    return module_filename_wstr.substr(0, last_pos)
         + (with_trailing_backslash ? L"\\" : L"");
+}
+
+bool Util::getThisPath(wchar_t* buffer, size_t buffer_size, bool with_trailing_backslash) {
+    if (!buffer || buffer_size < MAX_PATH) return false;
+
+    DWORD result = GetModuleFileNameW(NULL, buffer, static_cast<DWORD>(buffer_size));
+    if (result == 0 || result >= buffer_size) return false;
+
+    // Find last backslash
+    wchar_t* last_slash = wcsrchr(buffer, L'\\');
+    if (!last_slash) return false;
+
+    // Null terminate after the last slash to get the directory
+    *(last_slash + 1) = L'\0';
+
+    // Add trailing backslash if requested and not already present
+    if (with_trailing_backslash && last_slash[0] != L'\\') {
+        if (wcslen(buffer) + 2 > buffer_size) return false;  // +2 for \ and null terminator
+        wcscat_s(buffer, buffer_size, L"\\");
+    }
+
+    return true;
 }
 
 string Util::readFileAsString(const char* filename) {
@@ -137,7 +159,7 @@ string Util::readFileAsString(const wchar_t* filename) {
 
     fseek(infile, 0, SEEK_END);
     int64_t fsize = ftell(infile);
-    fseek(infile, 0, SEEK_SET);  
+    fseek(infile, 0, SEEK_SET);
     vector<char> contents(fsize + 1);
     fread(contents.data(), 1, fsize, infile);
     fclose(infile);
@@ -145,15 +167,15 @@ string Util::readFileAsString(const wchar_t* filename) {
     return string(contents.data(), fsize);
 }
 
-void Util::replaceAll(std::string& str, const std::string& from, 
+void Util::replaceAll(std::string& str, const std::string& from,
     const std::string& to) {
     if (from.empty())
         return;
     size_t start_pos = 0;
     while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
         str.replace(start_pos, from.length(), to);
-        start_pos += to.length(); 
-            // In case 'to' contains 'from', like replacing 'x' with 'yx'
+        start_pos += to.length();
+        // In case 'to' contains 'from', like replacing 'x' with 'yx'
     }
 }
 
@@ -171,49 +193,49 @@ size_t Util::hashWstring(const std::wstring& _Keyval)
     return (_Val);
 }
 
-int Util::jsonEscape(char* input_buffer, char* output_buffer, 
+int Util::jsonEscape(char* input_buffer, char* output_buffer,
     int output_buffer_length) {
     int output_pos = 0;
     for (int i = 0;
         output_pos < output_buffer_length - 1 && input_buffer[i] != 0;
         ++i) {
         unsigned char cur_char = static_cast<unsigned char>(input_buffer[i]);
-        
+
         // Handle control characters (0x00-0x1F)
         if (cur_char < 0x20) {
             if (output_pos + 6 >= output_buffer_length - 1) break;  // Need room for \u00XX
-            
+
             // Special handling for common control chars
             switch (cur_char) {
-                case '\b': // backspace
-                    output_buffer[output_pos++] = '\\';
-                    output_buffer[output_pos++] = 'b';
-                    break;
-                case '\f': // form feed
-                    output_buffer[output_pos++] = '\\';
-                    output_buffer[output_pos++] = 'f';
-                    break;
-                case '\n': // newline
-                    output_buffer[output_pos++] = '\\';
-                    output_buffer[output_pos++] = 'n';
-                    break;
-                case '\r': // carriage return
-                    output_buffer[output_pos++] = '\\';
-                    output_buffer[output_pos++] = 'r';
-                    break;
-                case '\t': // tab
-                    output_buffer[output_pos++] = '\\';
-                    output_buffer[output_pos++] = 't';
-                    break;
-                default:
-                    // Use \u00XX format for other control chars
-                    output_buffer[output_pos++] = '\\';
-                    output_buffer[output_pos++] = 'u';
-                    output_buffer[output_pos++] = '0';
-                    output_buffer[output_pos++] = '0';
-                    output_buffer[output_pos++] = "0123456789ABCDEF"[(cur_char >> 4) & 0x0F];
-                    output_buffer[output_pos++] = "0123456789ABCDEF"[cur_char & 0x0F];
-                    break;
+            case '\b': // backspace
+                output_buffer[output_pos++] = '\\';
+                output_buffer[output_pos++] = 'b';
+                break;
+            case '\f': // form feed
+                output_buffer[output_pos++] = '\\';
+                output_buffer[output_pos++] = 'f';
+                break;
+            case '\n': // newline
+                output_buffer[output_pos++] = '\\';
+                output_buffer[output_pos++] = 'n';
+                break;
+            case '\r': // carriage return
+                output_buffer[output_pos++] = '\\';
+                output_buffer[output_pos++] = 'r';
+                break;
+            case '\t': // tab
+                output_buffer[output_pos++] = '\\';
+                output_buffer[output_pos++] = 't';
+                break;
+            default:
+                // Use \u00XX format for other control chars
+                output_buffer[output_pos++] = '\\';
+                output_buffer[output_pos++] = 'u';
+                output_buffer[output_pos++] = '0';
+                output_buffer[output_pos++] = '0';
+                output_buffer[output_pos++] = "0123456789ABCDEF"[(cur_char >> 4) & 0x0F];
+                output_buffer[output_pos++] = "0123456789ABCDEF"[cur_char & 0x0F];
+                break;
             }
         }
         else if (cur_char == '"' || cur_char == '\\') {
@@ -393,7 +415,7 @@ void Util::epochToDateTime(const char* epochStr, char* output) {
     std::strftime(output, 20, "%Y-%m-%d %H:%M:%S", &timeinfo);
 }
 
-int Util::compareSoftwareVersions(const std::string& version_a, 
+int Util::compareSoftwareVersions(const std::string& version_a,
     const std::string& version_b) {
     std::vector<int> parts_a = splitVersion(version_a);
     std::vector<int> parts_b = splitVersion(version_b);
@@ -421,15 +443,16 @@ int Util::compareSoftwareVersions(const std::string& version_a,
 std::vector<int> Util::splitVersion(const std::string& version) {
     std::vector<int> parts;
     std::string clean_version;
-    
+
     // Find the first occurrence of a non-numeric separator (-, ~, etc)
     size_t suffix_pos = version.find_first_of("-~+");
     if (suffix_pos != std::string::npos) {
         clean_version = version.substr(0, suffix_pos);
-    } else {
+    }
+    else {
         clean_version = version;
     }
-    
+
     std::istringstream ss(clean_version);
     std::string token;
 
@@ -462,41 +485,72 @@ std::vector<int> Util::splitVersion(const std::string& version) {
 }
 
 bool Util::ParseUrl(const wchar_t* url, UrlComponents& components) {
+    auto logger = LOG_THIS;
+
     if (!url || wcslen(url) == 0) {
-        Logger::recoverable_error("ParseUrl() empty URL\n");
+        logger->recoverable_error("ParseUrl() empty URL\n");
         return false;
     }
 
-    const size_t urlLen = wcslen(url);
-    if (urlLen > static_cast<size_t>(MAXDWORD)) {
-        Logger::recoverable_error("ParseUrl() URL too long\n");
-        return false;
-    }
-
-    std::vector<wchar_t> hostName(urlLen + 1);
-    std::vector<wchar_t> urlPath(urlLen + 1);
-    std::vector<wchar_t> scheme(urlLen + 1);
+    std::wstring urlStr(url);
     
-    URL_COMPONENTS urlComp = { 0 };
-    urlComp.dwStructSize = sizeof(urlComp);
-    urlComp.lpszHostName = hostName.data();
-    urlComp.dwHostNameLength = static_cast<DWORD>(urlLen + 1);
-    urlComp.lpszUrlPath = urlPath.data();
-    urlComp.dwUrlPathLength = static_cast<DWORD>(urlLen + 1);
-    urlComp.lpszScheme = scheme.data();
-    urlComp.dwSchemeLength = static_cast<DWORD>(urlLen + 1);
+    // Parse scheme (http/https)
+    size_t schemeEnd = urlStr.find(L"://");
+    if (schemeEnd == std::wstring::npos) {
+        // No scheme specified, assume http
+        components.isSecure = false;
+    } else {
+        std::wstring scheme = urlStr.substr(0, schemeEnd);
+        // Convert to lowercase for comparison
+        std::transform(scheme.begin(), scheme.end(), scheme.begin(), ::towlower);
+        components.isSecure = (scheme == L"https");
+        urlStr = urlStr.substr(schemeEnd + 3); // Skip past "://"
+    }
+
+    // Find end of host (marked by '/' or ':')
+    size_t hostEnd = urlStr.find_first_of(L":/");
+    if (hostEnd == std::wstring::npos) {
+        hostEnd = urlStr.length();
+    }
     
-    if (!WinHttpCrackUrl(url, 0, 0, &urlComp)) {
-        Logger::recoverable_error("ParseUrl() failed to parse URL: %d\n", GetLastError());
+    components.hostName = urlStr.substr(0, hostEnd);
+    if (components.hostName.empty()) {
+        logger->recoverable_error("ParseUrl() no hostname found\n");
         return false;
     }
 
-    components.hostName = hostName.data();
-    components.isSecure = (_wcsicmp(scheme.data(), L"https") == 0);
-    components.port = urlComp.nPort;
-    components.path = urlPath.data();
+    // Parse port if present
+    size_t portStart = urlStr.find(L':', hostEnd);
+    if (portStart != std::wstring::npos) {
+        size_t pathStart = urlStr.find(L'/', portStart);
+        std::wstring portStr;
+        if (pathStart != std::wstring::npos) {
+            portStr = urlStr.substr(portStart + 1, pathStart - portStart - 1);
+        } else {
+            portStr = urlStr.substr(portStart + 1);
+        }
+        
+        try {
+            components.port = std::stoi(portStr);
+            components.hasExplicitPort = true;
+        } catch (const std::exception&) {
+            logger->recoverable_error("ParseUrl() invalid port number\n");
+            return false;
+        }
+        
+        if (components.port <= 0 || components.port > 65535) {
+            logger->recoverable_error("ParseUrl() port number out of range\n");
+            return false;
+        }
+    }
+
+    // Parse path
+    size_t pathStart = urlStr.find(L'/', hostEnd);
+    if (pathStart != std::wstring::npos) {
+        components.path = urlStr.substr(pathStart);
+    } else {
+        components.path = L"/";
+    }
 
     return true;
 }
-
-} // end namespace Syslog_agent

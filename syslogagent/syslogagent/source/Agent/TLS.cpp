@@ -111,10 +111,10 @@ int TLS::convertPemCertToDer(const uint8_t* pem, uint32_t plen, uint8_t** der,
 
 
 int verifyCertificate(gnutls_session_t session) {
-
+    auto logger = LOG_THIS;
     unsigned int cert_list_size;
     const gnutls_datum_t* raw_cert = gnutls_certificate_get_peers(session, &cert_list_size);
-    Logger::debug2("verifyCertificate() verifying cert: list_size=%d, cert size=%d\n", 
+    logger->debug2("verifyCertificate() verifying cert: list_size=%d, cert size=%d\n", 
         cert_list_size, raw_cert->size);
     if (TLS::getCertDerLength() != raw_cert->size) {
         return -1;
@@ -161,9 +161,10 @@ void TLS::setServerCertPem(const char * const server_cert_pem) {
 
 
 void TLS::setupTlsForConnection() {
+    auto logger = LOG_THIS;
 
     if (gnutls_check_version("3.6.6") == NULL) {
-        Logger::critical("TLS::setupTlsForConnection() GnuTLS 3.6.6 or later is required\n");
+        logger->critical("TLS::setupTlsForConnection() GnuTLS 3.6.6 or later is required\n");
         throw std::runtime_error("GnuTLS version requirement not met");
     }
 
@@ -189,7 +190,7 @@ void TLS::setupTlsForConnection() {
 
 
 bool TLS::doHandshake(SOCKET socket) {
-
+    auto logger = LOG_THIS;
     int ret;
     char* desc;
     gnutls_datum_t out;
@@ -213,15 +214,15 @@ bool TLS::doHandshake(SOCKET socket) {
             status = gnutls_session_get_verify_cert_status(session_);
             CHECK(gnutls_certificate_verification_status_print(status,
                 type, &out, 0));
-            Logger::critical("TLS::setupTlsForConnection() Certificate verification failed: %s\n", out.data);
+            logger->critical("TLS::setupTlsForConnection() Certificate verification failed: %s\n", out.data);
             // gnutls_free(out.data);
         }
-        Logger::critical("TLS::setupTlsForConnection() Handshake failed: %s\n", gnutls_strerror(ret));
+        logger->critical("TLS::setupTlsForConnection() Handshake failed: %s\n", gnutls_strerror(ret));
         return false;
     }
     else {
         desc = gnutls_session_get_desc(session_);
-        Logger::info("TLS::setupTlsForConnection() TLS connection established: %s\n", desc);
+        logger->info("TLS::setupTlsForConnection() TLS connection established: %s\n", desc);
         gnutls_free(desc);
         return true;
     }
