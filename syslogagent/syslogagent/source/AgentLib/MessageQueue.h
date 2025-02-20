@@ -142,9 +142,7 @@ public:
         enqueue_hook_ = std::move(hook);
     }
 
-    void beginShutdown() {
-        is_shutting_down_ = true;
-    }
+    void beginShutdown();
 
     bool isShuttingDown() const {
         return is_shutting_down_;

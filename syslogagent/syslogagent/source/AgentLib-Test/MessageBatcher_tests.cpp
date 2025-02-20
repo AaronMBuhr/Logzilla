@@ -311,3 +311,331 @@ TEST_F(MessageBatcherTest, StressTestLongBatches) {
 
     EXPECT_GT(batches.size(), 1);
 }
+
+
+// -----------------------------------------------------------------------------
+// Test subclass that simulates a header failure (returns zero size)
+// -----------------------------------------------------------------------------
+class TestMessageBatcherFailHeader : public MessageBatcher {
+public:
+    TestMessageBatcherFailHeader(uint32_t max_batch_size, uint32_t max_batch_age)
+        : MessageBatcher(max_batch_size, max_batch_age) {
+    }
+
+protected:
+    uint32_t GetMaxMessageSize_() const override { return 1024; }
+    uint32_t GetMinBatchInterval_() const override { return 100; }
+
+    // Simulate failure: header too large (or unable to produce header)
+    void GetMessageHeader_(char* /*dest*/, size_t /*max_size*/, size_t& size_out) const override {
+        size_out = 0;
+    }
+
+    void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* sep = "|";
+        size_t len = strlen(sep);
+        if (max_size >= len) {
+            memcpy(dest, sep, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+
+    void GetMessageTrailer_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* trailer = "[BATCH_END]";
+        size_t len = strlen(trailer);
+        if (max_size >= len) {
+            memcpy(dest, trailer, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+};
+
+// -----------------------------------------------------------------------------
+// Test subclass that simulates a trailer failure (returns zero size)
+// -----------------------------------------------------------------------------
+class TestMessageBatcherFailTrailer : public MessageBatcher {
+public:
+    TestMessageBatcherFailTrailer(uint32_t max_batch_size, uint32_t max_batch_age)
+        : MessageBatcher(max_batch_size, max_batch_age) {
+    }
+
+protected:
+    uint32_t GetMaxMessageSize_() const override { return 1024; }
+    uint32_t GetMinBatchInterval_() const override { return 100; }
+
+    void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* header = "[BATCH_START]";
+        size_t len = strlen(header);
+        if (max_size >= len) {
+            memcpy(dest, header, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+
+    void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* sep = "|";
+        size_t len = strlen(sep);
+        if (max_size >= len) {
+            memcpy(dest, sep, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+
+    // Simulate trailer failure: cannot write trailer to buffer.
+    void GetMessageTrailer_(char* /*dest*/, size_t /*max_size*/, size_t& size_out) const override {
+        size_out = 0;
+    }
+};
+
+// -----------------------------------------------------------------------------
+// Test subclass that simulates separator failure (failing on second call)
+// -----------------------------------------------------------------------------
+class TestMessageBatcherFailSeparator : public MessageBatcher {
+public:
+    TestMessageBatcherFailSeparator(uint32_t max_batch_size, uint32_t max_batch_age)
+        : MessageBatcher(max_batch_size, max_batch_age), call_count(0) {
+    }
+
+protected:
+    uint32_t GetMaxMessageSize_() const override { return 1024; }
+    uint32_t GetMinBatchInterval_() const override { return 100; }
+
+    void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* header = "[BATCH_START]";
+        size_t len = strlen(header);
+        if (max_size >= len) {
+            memcpy(dest, header, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+
+    // For the first call (first separator) succeed; then fail on subsequent calls.
+    void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
+        if (call_count > 0) {
+            size_out = 0; // simulate failure on second (or later) separator addition
+        }
+        else {
+            const char* sep = "|";
+            size_t len = strlen(sep);
+            if (max_size >= len) {
+                memcpy(dest, sep, len);
+                size_out = len;
+            }
+            else {
+                size_out = 0;
+            }
+        }
+        call_count++;
+    }
+
+    void GetMessageTrailer_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* trailer = "[BATCH_END]";
+        size_t len = strlen(trailer);
+        if (max_size >= len) {
+            memcpy(dest, trailer, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+private:
+    mutable int call_count;
+};
+
+// -----------------------------------------------------------------------------
+// Test subclass that throws an exception in GetMessageHeader_
+// -----------------------------------------------------------------------------
+class TestMessageBatcherThrowHeader : public MessageBatcher {
+public:
+    TestMessageBatcherThrowHeader(uint32_t max_batch_size, uint32_t max_batch_age)
+        : MessageBatcher(max_batch_size, max_batch_age) {
+    }
+
+protected:
+    uint32_t GetMaxMessageSize_() const override { return 1024; }
+    uint32_t GetMinBatchInterval_() const override { return 100; }
+
+    // Throw an exception to simulate an unexpected error.
+    void GetMessageHeader_(char* /*dest*/, size_t /*max_size*/, size_t& /*size_out*/) const override {
+        throw std::runtime_error("Simulated exception in header");
+    }
+
+    void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* sep = "|";
+        size_t len = strlen(sep);
+        if (max_size >= len) {
+            memcpy(dest, sep, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+
+    void GetMessageTrailer_(char* dest, size_t max_size, size_t& size_out) const override {
+        const char* trailer = "[BATCH_END]";
+        size_t len = strlen(trailer);
+        if (max_size >= len) {
+            memcpy(dest, trailer, len);
+            size_out = len;
+        }
+        else {
+            size_out = 0;
+        }
+    }
+};
+
+// -----------------------------------------------------------------------------
+// Fixture for additional MessageBatcher tests
+// -----------------------------------------------------------------------------
+class MessageBatcherAdditionalTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        message_queue = std::make_shared<MessageQueue>(10, 20);
+    }
+
+    void TearDown() override {
+        message_queue.reset();
+    }
+
+    std::shared_ptr<MessageQueue> message_queue;
+};
+
+// -----------------------------------------------------------------------------
+// ExactFitMessage: The message exactly fills the available buffer.
+// -----------------------------------------------------------------------------
+TEST_F(MessageBatcherAdditionalTest, ExactFitMessage) {
+    // Define a small buffer where the sizes can be computed.
+    // For TestMessageBatcher, header = "[BATCH_START]" (13 bytes),
+    // trailer = "[BATCH_END]" (11 bytes). For a buffer of size 50,
+    // available for message = 50 - 13 - 11 = 26.
+    const size_t buffer_size = 50;
+    char buffer[50];
+    std::string msg(26, 'A');
+
+    // Use the base test batcher (from your current tests).
+    TestMessageBatcher batcher(5, 1000);
+    message_queue->enqueue(msg.c_str(), msg.length());
+
+    auto result = batcher.BatchEvents(message_queue, buffer, buffer_size);
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_EQ(result.messages_batched, 1);
+    EXPECT_EQ(result.bytes_written, buffer_size);
+
+    std::string expected = "[BATCH_START]" + msg + "[BATCH_END]";
+    EXPECT_EQ(std::string(buffer, result.bytes_written), expected);
+}
+
+// -----------------------------------------------------------------------------
+// MixedValidAndInvalidMessages: Test when one message is too large and skipped.
+// -----------------------------------------------------------------------------
+TEST_F(MessageBatcherAdditionalTest, MixedValidAndInvalidMessages) {
+    std::string valid1 = "valid1";
+    // Create an invalid message (length > GetMaxMessageSize_ which is 1024)
+    std::string invalid(1500, 'X');
+    std::string valid2 = "valid2";
+
+    message_queue->enqueue(valid1.c_str(), valid1.length());
+    message_queue->enqueue(invalid.c_str(), invalid.length());
+    message_queue->enqueue(valid2.c_str(), valid2.length());
+
+    TestMessageBatcher batcher(5, 1000);
+    char buffer[1024];
+    auto result = batcher.BatchEvents(message_queue, buffer, sizeof(buffer));
+
+    // Expect only the valid messages to be batched (skipping the invalid one)
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_EQ(result.messages_batched, 2);
+
+    std::string batch(buffer, result.bytes_written);
+    EXPECT_NE(batch.find("valid1"), std::string::npos);
+    EXPECT_NE(batch.find("valid2"), std::string::npos);
+    // The invalid message should not appear in the batch.
+    EXPECT_EQ(batch.find(invalid.substr(0, 10)), std::string::npos);
+}
+
+// -----------------------------------------------------------------------------
+// HeaderFailureTest: When header generation fails, expect BufferTooSmall.
+// -----------------------------------------------------------------------------
+TEST_F(MessageBatcherAdditionalTest, HeaderFailureTest) {
+    TestMessageBatcherFailHeader batcher(5, 1000);
+    std::string msg = "test message";
+    message_queue->enqueue(msg.c_str(), msg.length());
+
+    char buffer[1024];
+    auto result = batcher.BatchEvents(message_queue, buffer, sizeof(buffer));
+
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::BufferTooSmall);
+    EXPECT_EQ(result.messages_batched, 0);
+}
+
+// -----------------------------------------------------------------------------
+// TrailerFailureTest: When trailer generation fails, expect BufferTooSmall.
+// -----------------------------------------------------------------------------
+TEST_F(MessageBatcherAdditionalTest, TrailerFailureTest) {
+    TestMessageBatcherFailTrailer batcher(5, 1000);
+    std::string msg = "test message";
+    message_queue->enqueue(msg.c_str(), msg.length());
+
+    char buffer[1024];
+    auto result = batcher.BatchEvents(message_queue, buffer, sizeof(buffer));
+
+    // Trailer failure forces the batch to be incomplete.
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::BufferTooSmall);
+}
+
+// -----------------------------------------------------------------------------
+// SeparatorFailureTest: When separator addition fails, only the first message
+// should be batched.
+// -----------------------------------------------------------------------------
+TEST_F(MessageBatcherAdditionalTest, SeparatorFailureTest) {
+    TestMessageBatcherFailSeparator batcher(5, 1000);
+    std::string msg1 = "first";
+    std::string msg2 = "second";
+
+    // Enqueue two messages so that a separator is needed for the second.
+    message_queue->enqueue(msg1.c_str(), msg1.length());
+    message_queue->enqueue(msg2.c_str(), msg2.length());
+
+    char buffer[1024];
+    auto result = batcher.BatchEvents(message_queue, buffer, sizeof(buffer));
+
+    // Expect that only the first message is batched (separator fails on second call).
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::Success);
+    EXPECT_EQ(result.messages_batched, 1);
+
+    std::string expected = "[BATCH_START]" + msg1 + "[BATCH_END]";
+    EXPECT_EQ(std::string(buffer, result.bytes_written), expected);
+}
+
+// -----------------------------------------------------------------------------
+// ExceptionTest: If a virtual method throws an exception, BatchEvents should
+// catch it and return InvalidBuffer.
+// -----------------------------------------------------------------------------
+TEST_F(MessageBatcherAdditionalTest, ExceptionTest) {
+    TestMessageBatcherThrowHeader batcher(5, 1000);
+    std::string msg = "test message";
+    message_queue->enqueue(msg.c_str(), msg.length());
+
+    char buffer[1024];
+    auto result = batcher.BatchEvents(message_queue, buffer, sizeof(buffer));
+
+    EXPECT_EQ(result.status, MessageBatcher::BatchResult::Status::InvalidBuffer);
+    EXPECT_EQ(result.messages_batched, 0);
+}

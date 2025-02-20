@@ -176,9 +176,8 @@ int MessageQueue::peek(Message* msg, char* message_content, const uint32_t max_l
 }
 
 void MessageQueue::removeFrontInternal() {
-    auto logger = LOG_THIS;
+    // If there is no message to remove, just return.
     if (!first_message_) {
-        logger->recoverable_error("MessageQueue::removeFrontInternal() : queue empty\n");
         return;
     }
 
@@ -189,19 +188,19 @@ void MessageQueue::removeFrontInternal() {
     }
     length_--;
 
-    // Set next to nullptr before releasing to prevent any dangling pointer access
+    // Set next to nullptr before releasing to prevent dangling pointer access.
     msg->next = nullptr;
-    
-    // Release buffers first
+
+    // Release all associated buffers.
     releaseMessageBuffers(*msg);
-    
-    // Clear message fields before marking as unused
+
+    // Clear message fields before marking as unused.
     msg->buffer_count = 0;
     msg->data_length = 0;
     msg->timestamp = 0;
     msg->message_buffers = nullptr;
-    
-    // Finally mark as unused
+
+    // Finally, mark the message as unused.
     messages_pool_->markAsUnused(msg);
 }
 
@@ -213,6 +212,11 @@ int MessageQueue::dequeue(char* message_content, const uint32_t max_len) {
     }
 
     std::unique_lock<std::mutex> lock(queue_mutex_);
+
+    // Immediately fail if the queue is shutting down.
+    if (is_shutting_down_.load()) {
+        return -1;
+    }
 
     if (!first_message_) {
         logger->debug("MessageQueue::dequeue() : queue is empty\n");
@@ -227,13 +231,13 @@ int MessageQueue::dequeue(char* message_content, const uint32_t max_len) {
 
     int copied = 0;
     for (MessageBuffer* buffer = first_message_->message_buffers; buffer != nullptr; buffer = buffer->next) {
-        uint32_t toCopy = (std::min)(first_message_->data_length - static_cast<uint32_t>(copied), 
-            static_cast<uint32_t>(MESSAGE_BUFFER_SIZE));
+        uint32_t toCopy = (std::min)(first_message_->data_length - static_cast<uint32_t>(copied),
+                                     static_cast<uint32_t>(MESSAGE_BUFFER_SIZE));
         memcpy(message_content + copied, buffer->buffer, toCopy);
         copied += toCopy;
     }
-    // Null terminate the output string
-    if (copied < max_len) {
+    // Null terminate the output string if space allows.
+    if (copied < static_cast<int>(max_len)) {
         message_content[copied] = '\0';
     }
 
@@ -275,5 +279,17 @@ std::experimental::generator<MessageQueue::Message*> MessageQueue::traverseQueue
         co_yield msg;
     }
 }
+
+void MessageQueue::beginShutdown() {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    is_shutting_down_.store(true);
+    // Flush all queued messages.
+    while (first_message_) {
+        removeFrontInternal();
+    }
+    // Notify any waiting threads.
+    items_cv_.notify_all();
+}
+
 
 }
