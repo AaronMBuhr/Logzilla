@@ -19,10 +19,6 @@ namespace Syslog_agent {
 // Define static members
 std::atomic<bool> SyslogSender::stop_requested_ = false;
 
-const char SyslogSender::event_header_[] = "{\"events\":[";
-const char SyslogSender::message_separator_[] = ",";
-const char SyslogSender::message_trailer_[] = "]}";
-
 SyslogSender::SyslogSender(
     std::shared_ptr<MessageQueue> primary_queue,
     std::shared_ptr<MessageQueue> secondary_queue,
@@ -30,9 +26,9 @@ SyslogSender::SyslogSender(
     std::shared_ptr<INetworkClient> secondary_network_client,
     std::shared_ptr<MessageBatcher> primary_batcher,
     std::shared_ptr<MessageBatcher> secondary_batcher,
-    uint32_t max_batch_size,
+    uint32_t max_batch_count,
     uint32_t max_batch_age)
-    : max_batch_size_(max_batch_size)
+    : max_batch_count_(max_batch_count)
     , max_batch_age_(max_batch_age)
     , primary_queue_(std::move(primary_queue))
     , secondary_queue_(std::move(secondary_queue))
@@ -79,8 +75,8 @@ bool SyslogSender::waitForBatch(MessageQueue* first_queue, MessageQueue* second_
     auto logger = LOG_THIS;
     std::unique_lock<std::mutex> lock(batch_mutex_);
     auto size_check = [this, first_queue, second_queue]() { 
-        return (first_queue && first_queue->length() >= max_batch_size_) 
-            || (second_queue && second_queue->length() >= max_batch_size_); 
+        return (first_queue && first_queue->length() >= max_batch_count_) 
+            || (second_queue && second_queue->length() >= max_batch_count_); 
     };
     if (size_check()) {
         return false;
@@ -106,10 +102,6 @@ void SyslogSender::run() const {
     bool primary_has_messages = true;
     bool secondary_has_messages = true;
 
-    // Allocate send buffer from global pool
-    std::unique_ptr<char[]> batch_buffer(new char[MAX_MESSAGE_SIZE]);
-    uint32_t batch_buffer_length = 0;
-
     while (!isStopRequested()) {
         try {
             logger->debug3("SyslogSender::run()> Queue lengths - Primary: %d, Secondary: %d\n",
@@ -129,20 +121,26 @@ void SyslogSender::run() const {
                 logger->debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
                 size_t initial_queue_size = primary_queue->length();
                 
+                char* batch_buffer = primary_batcher_->GetMessageBuffer("primary batcher");
+                if (!batch_buffer) {
+                    logger->recoverable_error("SyslogSender::run()> Failed to get primary batch buffer\n");
+                    continue;
+                }
+
                 for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
-                    auto batch_result = primary_batcher_->BatchEvents(primary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
+                    auto batch_result = primary_batcher_->BatchEvents(primary_queue_, batch_buffer, primary_batcher_->GetMaxBatchSizeBytes());
                     logger->debug3("SyslogSender::run()> Primary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
                     if (batch_result.status == MessageBatcher::BatchResult::Status::Success) {
-                        batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
                         sendMessageBatch(primary_queue_, primary_network_client_, batch_result.messages_batched,
-                            batch_buffer.get(), batch_buffer_length);
+                            batch_buffer, static_cast<uint32_t>(batch_result.bytes_written));
                         messages_processed += batch_result.messages_batched;
                     }
                     else {
                         break;
                     }
                 }
+                primary_batcher_->ReleaseMessageBuffer(batch_buffer);
                 primary_has_messages = (primary_queue->length() > 0);
             }
 
@@ -151,20 +149,26 @@ void SyslogSender::run() const {
                 logger->debug3("SyslogSender::run()> Attempting to batch secondary queue messages\n");
                 size_t initial_queue_size = secondary_queue->length();
                 
+                char* batch_buffer = secondary_batcher_->GetMessageBuffer("secondary batcher");
+                if (!batch_buffer) {
+                    logger->recoverable_error("SyslogSender::run()> Failed to get secondary batch buffer\n");
+                    continue;
+                }
+
                 for (size_t messages_processed = 0; messages_processed < initial_queue_size;) {
-                    auto batch_result = secondary_batcher_->BatchEvents(secondary_queue_, batch_buffer.get(), MAX_MESSAGE_SIZE);
+                    auto batch_result = secondary_batcher_->BatchEvents(secondary_queue_, batch_buffer, secondary_batcher_->GetMaxBatchSizeBytes());
                     logger->debug3("SyslogSender::run()> Secondary batch result status: %d, messages: %d, bytes: %d\n",
                         (int)batch_result.status, batch_result.messages_batched, batch_result.bytes_written);
                     if (batch_result.status == MessageBatcher::BatchResult::Status::Success) {
-                        batch_buffer_length = static_cast<uint32_t>(batch_result.bytes_written);
                         sendMessageBatch(secondary_queue_, secondary_network_client_, batch_result.messages_batched,
-                            batch_buffer.get(), batch_buffer_length);
+                            batch_buffer, static_cast<uint32_t>(batch_result.bytes_written));
                         messages_processed += batch_result.messages_batched;
                     }
                     else {
                         break;
                     }
                 }
+                secondary_batcher_->ReleaseMessageBuffer(batch_buffer);
                 secondary_has_messages = (secondary_queue->length() > 0);
             }
         }
@@ -255,7 +259,7 @@ bool SyslogSender::enqueueHook(size_t queue_length, MessageQueue::Message* messa
     }
     else {
         // This is called after successful enqueue
-        if (queue_length >= max_batch_size_) {
+        if (queue_length >= max_batch_count_) {
             batch_cv_.notify_one();
         }
         return true;

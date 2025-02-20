@@ -5,7 +5,7 @@
 
 namespace Syslog_agent {
 
-    MessageBatcher::MessageBatcher(uint32_t max_batch_size, uint32_t max_batch_age)
+    MessageBatcher::MessageBatcher(std::uint32_t max_batch_size, std::uint32_t max_batch_age)
         : max_batch_size_(max_batch_size), max_batch_age_(max_batch_age) {
     }
 
@@ -40,6 +40,7 @@ namespace Syslog_agent {
             size_t header_size = 0;
             size_t separator_size = 0;
             size_t trailer_size = 0;
+            char temp_buffer[1024];  // Temporary buffer for size calculations
 
             // Get header
             GetMessageHeader_(batch_buffer, buffer_size, header_size);
@@ -48,8 +49,7 @@ namespace Syslog_agent {
                 return BatchResult(BatchResult::Status::BufferTooSmall);
             }
 
-            // Get separator and trailer sizes (using temp buffer)
-            char temp_buffer[128];
+            // Get separator and trailer sizes
             GetMessageSeparator_(temp_buffer, sizeof(temp_buffer), separator_size);
             GetMessageTrailer_(temp_buffer, sizeof(temp_buffer), trailer_size);
 
@@ -63,12 +63,12 @@ namespace Syslog_agent {
                 return BatchResult(BatchResult::Status::BufferTooSmall);
             }
 
-            uint32_t max_batch = (std::min)(max_batch_size_, static_cast<uint32_t>(queue_length));
+            std::uint32_t max_batch = (std::min)(max_batch_size_, static_cast<std::uint32_t>(queue_length));
             logger->debug3("MessageBatcher::BatchEventsInternal()> Will process max %d messages\n", max_batch);
 
             // Header is already written, start after it
             size_t current_pos = header_size;
-            uint32_t messages_batched = 0;
+            std::uint32_t messages_batched = 0;
             bool found_valid_message = false;  // Track if we found any valid messages to process
 
             // Process messages
@@ -84,7 +84,7 @@ namespace Syslog_agent {
                     continue;
                 }
 
-                if (msg_len < 0 || static_cast<size_t>(msg_len) > GetMaxMessageSize_()) {
+                if (msg_len < 0 || static_cast<size_t>(msg_len) > GetMaxBatchSizeBytes_()) {
                     logger->recoverable_error("MessageBatcher::BatchEventsInternal()> Message too large\n");
                     found_valid_message = true;  // We found a message, even though it was too large
                     continue;  // Skip this message but continue processing

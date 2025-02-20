@@ -153,12 +153,11 @@ namespace Syslog_agent {
         OStreamBuf ostream_buffer(json_buffer, buflen);
         std::ostream json_output(&ostream_buffer);
 
-        // Function to check buffer space and log warning if needed
         auto checkBufferSpace = [&](const char* field_name, size_t needed_space) -> bool {
-            size_t current_len = strlen(json_buffer);
-            if (current_len + needed_space >= buflen) {
+            std::streamoff current_len = ostream_buffer.current_length();
+            if (static_cast<size_t>(current_len) + needed_space >= buflen) {
                 logger->warning("Buffer overflow prevented: current %zu + needed %zu would exceed buffer size %zu while adding %s",
-                    current_len, needed_space, buflen, field_name);
+                    static_cast<size_t>(current_len), needed_space, buflen, field_name);
                 return false;
             }
             return true;
@@ -395,7 +394,9 @@ namespace Syslog_agent {
                         logger->force("Enqueuing rep %zu\n", rep);
                         primary_message_queue_->enqueue(msg, strlen(msg));
                         // Simulate delay for test mode
-                        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                        if (rep % 10 == 0) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                        }
                     }
 				}
                 else {

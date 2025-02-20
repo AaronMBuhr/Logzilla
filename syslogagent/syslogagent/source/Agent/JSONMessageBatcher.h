@@ -1,14 +1,20 @@
 #pragma once
 
 #include "MessageBatcher.h"
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <cstring>
 
 namespace Syslog_agent {
 
 class JSONMessageBatcher : public MessageBatcher {
 public:
-    static constexpr uint32_t MAX_MESSAGE_SIZE = 65536;         // Maximum size of a message batch in bytes
-    static constexpr uint32_t BATCH_SIZE_THRESHOLD = 100;       // Messages per batch
-    static constexpr uint32_t MIN_BATCH_INTERVAL = 100;         // Minimum ms between batches
+    static constexpr std::uint32_t MAX_BATCH_SIZE_BYTES = 65536;         // Maximum size of a message batch in bytes
+    static constexpr std::uint32_t BATCH_BUFFER_CHUNK_SIZE = 12;        // Number of buffers to allocate
+    static constexpr std::uint32_t BATCH_BUFFER_PERCENT_SLACK = 25;     // Unused buffer percentage
+    static constexpr std::uint32_t BATCH_SIZE_THRESHOLD = 100;       // Messages per batch
+    static constexpr std::uint32_t MIN_BATCH_INTERVAL = 100;         // Minimum ms between batches
 
 private:
     // Store string literals as member variables to return char*
@@ -21,41 +27,86 @@ private:
     char trailer_[sizeof(TRAILER)];    // Includes null terminator
 
 public:
-    JSONMessageBatcher(uint32_t max_batch_size, uint32_t max_batch_age) 
+    JSONMessageBatcher(std::uint32_t max_batch_size, std::uint32_t max_batch_age) 
         : MessageBatcher(max_batch_size, max_batch_age) {
-        strcpy_s(header_, sizeof(header_), HEADER);
-        strcpy_s(separator_, sizeof(separator_), SEPARATOR);
-        strcpy_s(trailer_, sizeof(trailer_), TRAILER);
+        std::strcpy(header_, HEADER);
+        std::strcpy(separator_, SEPARATOR);
+        std::strcpy(trailer_, TRAILER);
     }
-    ~JSONMessageBatcher() {}
+    
+    ~JSONMessageBatcher() = default;
 
-    uint32_t GetMaxMessageSize_() const override { return MAX_MESSAGE_SIZE; }
-    uint32_t GetMinBatchInterval_() const override { return MIN_BATCH_INTERVAL; }
+protected:
+    std::uint32_t GetMaxBatchSizeBytes_() const override { return MAX_BATCH_SIZE_BYTES; }
+    std::uint32_t GetMinBatchInterval_() const override { return MIN_BATCH_INTERVAL; }
     
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
-        size_out = strlen(header_);
+        size_out = std::strlen(header_);
         if (size_out < max_size) {
-            strcpy_s(dest, max_size, header_);
+            std::strcpy(dest, header_);
+        }
+        else {
+            size_out = 0;
         }
     }
     
     void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
-        size_out = strlen(separator_);
+        size_out = std::strlen(separator_);
         if (size_out < max_size) {
-            strcpy_s(dest, max_size, separator_);
+            std::strcpy(dest, separator_);
+        }
+        else {
+            size_out = 0;
         }
     }
     
     void GetMessageTrailer_(char* dest, size_t max_size, size_t& size_out) const override {
-        size_out = strlen(trailer_);
+        size_out = std::strlen(trailer_);
         if (size_out < max_size) {
-            strcpy_s(dest, max_size, trailer_);
+            std::strcpy(dest, trailer_);
         }
         else {
             dest[0] = '\0';
             size_out = 0;
         }
     }
+
+    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+        auto logger = LOG_THIS;
+        std::lock_guard<std::mutex> lock(buffer_mutex_);
+        if (!batch_buffers_) {
+            batch_buffers_ = std::make_unique<BitmappedObjectPool<char[MAX_BATCH_SIZE_BYTES]>>(
+                BATCH_BUFFER_CHUNK_SIZE, BATCH_BUFFER_PERCENT_SLACK);
+            if (!batch_buffers_) {
+                logger->fatal("Failed to allocate message buffer pool\n");
+                return nullptr;
+            }
+        }
+        auto* buffer = batch_buffers_->getAndMarkNextUnused();
+        if (!buffer) {
+            if (debug_identifier) {
+                logger->recoverable_error("Failed to allocate message buffer for %s\n", debug_identifier);
+            }
+            else {
+                logger->recoverable_error("Failed to allocate message buffer\n");
+            }
+            return nullptr;
+        }
+        return static_cast<char*>(*buffer);
+    }
+
+    std::uint32_t GetMaxBatchSizeBytes() const override { return MAX_BATCH_SIZE_BYTES; }
+
+    bool ReleaseMessageBuffer(char* buffer) override {
+        if (!buffer || !batch_buffers_) {
+            return false;
+        }
+        return batch_buffers_->markAsUnused(reinterpret_cast<char(*)[MAX_BATCH_SIZE_BYTES]>(buffer));
+    }
+
+protected:
+    std::unique_ptr<BitmappedObjectPool<char[MAX_BATCH_SIZE_BYTES]>> batch_buffers_;
+    mutable std::mutex buffer_mutex_;
 };
 
-}
+} // namespace Syslog_agent

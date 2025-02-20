@@ -102,7 +102,7 @@ void sendMessagesThread() {
         Service::secondary_network_client_,
         Service::primary_batcher_,
         Service::secondary_batcher_,
-        Service::config_.getMaxBatchSize(),
+        Service::config_.getMaxBatchCount(),
         Service::config_.getMaxBatchAge()
     );
 
@@ -289,7 +289,7 @@ bool Service::initializeNetworkComponents() {
             make_shared<JsonNetworkClient>(urlComponents.hostName, port)
         );
         primary_batcher_ = make_shared<JSONMessageBatcher>(
-            config_.getMaxBatchSize(),
+            config_.getMaxBatchCount(),
             config_.getMaxBatchAge()
         );
         isJsonPort = true;
@@ -297,7 +297,7 @@ bool Service::initializeNetworkComponents() {
         logger->debug2("Using HTTP client for port %d\n", port);
         primary_network_client_ = make_shared<HttpNetworkClient>();
         primary_batcher_ = make_shared<HTTPMessageBatcher>(
-            config_.getMaxBatchSize(),
+            config_.getMaxBatchCount(),
             config_.getMaxBatchAge()
         );
     }
@@ -404,7 +404,7 @@ bool Service::initializeSecondaryComponents() {
             make_shared<JsonNetworkClient>(urlComponents.hostName, port)
         );
         secondary_batcher_ = make_shared<JSONMessageBatcher>(
-            config_.getMaxBatchSize(),
+            config_.getMaxBatchCount(),
             config_.getMaxBatchAge()
         );
         isJsonPort = true;
@@ -412,7 +412,7 @@ bool Service::initializeSecondaryComponents() {
         logger->debug2("Using HTTP client for secondary port %d\n", port);
         secondary_network_client_ = make_shared<HttpNetworkClient>();
         secondary_batcher_ = make_shared<HTTPMessageBatcher>(
-            config_.getMaxBatchSize(),
+            config_.getMaxBatchCount(),
             config_.getMaxBatchAge()
         );
     }

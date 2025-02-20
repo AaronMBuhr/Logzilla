@@ -63,9 +63,9 @@ protected:
         if (!queue) return false;
         
         // Check queue length
-        if (queue->length() >= max_batch_size_) {
-            logger->debug2("SyslogSender::shouldSendBatch()> Queue length %zu exceeds max batch size %u\n",
-                queue->length(), max_batch_size_);
+        if (queue->length() >= max_batch_count_) {
+            logger->debug2("SyslogSender::shouldSendBatch()> Queue length %zu exceeds max batch count %u\n",
+                queue->length(), max_batch_count_);
             return true;
         }
         
@@ -89,11 +89,7 @@ protected:
 private:
     static std::atomic<bool> stop_requested_;
 
-    static const char event_header_[];
-    static const char message_separator_[];
-    static const char message_trailer_[];
-
-    const uint32_t max_batch_size_;
+    const uint32_t max_batch_count_;
     const uint32_t max_batch_age_;
 
     std::shared_ptr<MessageQueue> primary_queue_;

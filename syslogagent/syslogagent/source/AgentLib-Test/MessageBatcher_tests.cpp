@@ -20,8 +20,22 @@ public:
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
+    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+        // Simple implementation for tests - allocate a fixed buffer
+        return new char[GetMaxBatchSizeBytes()];
+    }
+
+    bool ReleaseMessageBuffer(char* buffer) override {
+        delete[] buffer;
+        return true;
+    }
+
+    uint32_t GetMaxBatchSizeBytes() const override {
+        return GetMaxBatchSizeBytes_();
+    }
+
 protected:
-    uint32_t GetMaxMessageSize_() const override {
+    uint32_t GetMaxBatchSizeBytes_() const override {
         return 1024; // For test purposes
     }
 
@@ -204,6 +218,10 @@ TEST_F(MessageBatcherTest, BatchFormatConsistency) {
     EXPECT_TRUE(batch.find("[BATCH_START]") == 0);
     EXPECT_TRUE(batch.find("|") != std::string::npos);
     EXPECT_EQ(batch.substr(batch.size() - strlen("[BATCH_END]")), "[BATCH_END]");
+    EXPECT_NE(batch.find("msg1|msg2"), std::string::npos);
+
+    // Messages should still be in the queue since we haven't committed yet
+    EXPECT_EQ(message_queue->length(), 2);
 }
 
 // -----------------------------------------------------------------------------
@@ -318,13 +336,26 @@ TEST_F(MessageBatcherTest, StressTestLongBatches) {
 // -----------------------------------------------------------------------------
 class TestMessageBatcherFailHeader : public MessageBatcher {
 public:
-    TestMessageBatcherFailHeader(uint32_t max_batch_size, uint32_t max_batch_age)
+    TestMessageBatcherFailHeader(std::uint32_t max_batch_size, std::uint32_t max_batch_age)
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
+    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+        return new char[GetMaxBatchSizeBytes()];
+    }
+
+    bool ReleaseMessageBuffer(char* buffer) override {
+        delete[] buffer;
+        return true;
+    }
+
+    std::uint32_t GetMaxBatchSizeBytes() const override {
+        return GetMaxBatchSizeBytes_();
+    }
+
 protected:
-    uint32_t GetMaxMessageSize_() const override { return 1024; }
-    uint32_t GetMinBatchInterval_() const override { return 100; }
+    std::uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
+    std::uint32_t GetMinBatchInterval_() const override { return 100; }
 
     // Simulate failure: header too large (or unable to produce header)
     void GetMessageHeader_(char* /*dest*/, size_t /*max_size*/, size_t& size_out) const override {
@@ -365,8 +396,21 @@ public:
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
+    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+        return new char[GetMaxBatchSizeBytes()];
+    }
+
+    bool ReleaseMessageBuffer(char* buffer) override {
+        delete[] buffer;
+        return true;
+    }
+
+    uint32_t GetMaxBatchSizeBytes() const override {
+        return GetMaxBatchSizeBytes_();
+    }
+
 protected:
-    uint32_t GetMaxMessageSize_() const override { return 1024; }
+    uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
     uint32_t GetMinBatchInterval_() const override { return 100; }
 
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
@@ -404,13 +448,26 @@ protected:
 // -----------------------------------------------------------------------------
 class TestMessageBatcherFailSeparator : public MessageBatcher {
 public:
-    TestMessageBatcherFailSeparator(uint32_t max_batch_size, uint32_t max_batch_age)
+    TestMessageBatcherFailSeparator(std::uint32_t max_batch_size, std::uint32_t max_batch_age)
         : MessageBatcher(max_batch_size, max_batch_age), call_count(0) {
     }
 
+    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+        return new char[GetMaxBatchSizeBytes()];
+    }
+
+    bool ReleaseMessageBuffer(char* buffer) override {
+        delete[] buffer;
+        return true;
+    }
+
+    std::uint32_t GetMaxBatchSizeBytes() const override {
+        return GetMaxBatchSizeBytes_();
+    }
+
 protected:
-    uint32_t GetMaxMessageSize_() const override { return 1024; }
-    uint32_t GetMinBatchInterval_() const override { return 100; }
+    std::uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
+    std::uint32_t GetMinBatchInterval_() const override { return 100; }
 
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
         const char* header = "[BATCH_START]";
@@ -463,13 +520,26 @@ private:
 // -----------------------------------------------------------------------------
 class TestMessageBatcherThrowHeader : public MessageBatcher {
 public:
-    TestMessageBatcherThrowHeader(uint32_t max_batch_size, uint32_t max_batch_age)
+    TestMessageBatcherThrowHeader(std::uint32_t max_batch_size, std::uint32_t max_batch_age)
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
+    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+        return new char[GetMaxBatchSizeBytes()];
+    }
+
+    bool ReleaseMessageBuffer(char* buffer) override {
+        delete[] buffer;
+        return true;
+    }
+
+    std::uint32_t GetMaxBatchSizeBytes() const override {
+        return GetMaxBatchSizeBytes_();
+    }
+
 protected:
-    uint32_t GetMaxMessageSize_() const override { return 1024; }
-    uint32_t GetMinBatchInterval_() const override { return 100; }
+    std::uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
+    std::uint32_t GetMinBatchInterval_() const override { return 100; }
 
     // Throw an exception to simulate an unexpected error.
     void GetMessageHeader_(char* /*dest*/, size_t /*max_size*/, size_t& /*size_out*/) const override {

@@ -196,7 +196,7 @@ namespace Syslog_agent {
             return use_compression_;
         }
 
-        uint32_t getMaxBatchSize() const {
+        uint32_t getMaxBatchCount() const {
             shared_lock<shared_mutex> lock(mutex_);
             return max_batch_size_;
         }
