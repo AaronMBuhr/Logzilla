@@ -63,14 +63,14 @@
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\AgentLib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\Agent;$(ProjectDir)..\AgentLib;$(ProjectDir)..\Infrastructure;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <AdditionalLibraryDirectories>$(ProjectDir)..\Agent\x64\$(Configuration)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>AgentLib.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>AgentLib.lib;LogZillaInfra.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d "$(ProjectDir)..\Agent\x64\$(Configuration)\AgentLib.dll" "$(OutDir)"</Command>
@@ -117,6 +117,7 @@
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="MessageBatcher_extended_tests.cpp" />
     <ClCompile Include="MessageBatcher_tests.cpp" />
     <ClCompile Include="MessageQueue_tests.cpp" />
     <ClCompile Include="test.cpp" />
@@ -130,6 +131,9 @@
   <ItemGroup>
     <ProjectReference Include="..\AgentLib\AgentLib.vcxproj">
       <Project>{194f0eb4-cbbd-4497-ae6b-f1de2ff3a366}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Infrastructure\Infrastructure.vcxproj">
+      <Project>{1dbe5c78-bcdc-4d64-ac43-81c6a01a3301}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

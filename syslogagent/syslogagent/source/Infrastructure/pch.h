@@ -9,6 +9,8 @@
 
 // add headers that you want to pre-compile here
 #include "framework.h"
+#include "Bitmap.h"
+
+#define INFRASTRUCTURE_EXPORTS
 
 #endif //PCH_H
-

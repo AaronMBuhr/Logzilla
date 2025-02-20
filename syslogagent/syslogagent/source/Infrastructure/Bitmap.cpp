@@ -52,14 +52,16 @@ bool Bitmap::isSet(size_t bit_number) const {
 }
 
 void Bitmap::setBitTo(size_t bit_number, unsigned char new_bit_value) {
+    if (bit_number >= number_of_bits_) {
+        throw std::out_of_range("bit_number exceeds bitmap size");
+    }
     size_t word_num = bit_number / (sizeof(size_t) * BITS_PER_BYTE);
     size_t word_bit_number = bit_number % (sizeof(size_t) * BITS_PER_BYTE);
-    size_t check_bit = (static_cast<size_t>(1)) << word_bit_number;
+    size_t bit_mask = (static_cast<size_t>(1)) << word_bit_number;
     if (new_bit_value) {
-        bitmap_[word_num] |= check_bit;
-    }
-    else {
-        bitmap_[word_num] &= (~check_bit);
+        bitmap_[word_num] |= bit_mask;
+    } else {
+        bitmap_[word_num] &= ~bit_mask;
     }
 }
 
@@ -101,7 +103,7 @@ int Bitmap::getFirstOne() const {
 }
 
 int Bitmap::getAndClearFirstOne() {
-    return getAndOptionallyClearFirstOne(true);
+    return const_cast<Bitmap*>(this)->getAndOptionallyClearFirstOne(true);
 }
 
 int Bitmap::getAndOptionallySetFirstZero(bool do_set) {
@@ -194,6 +196,7 @@ int Bitmap::countZeroes() {
 }
 
 std::string Bitmap::asHexString() const {
+    std::lock_guard<detail::BitmapMutex> guard(in_use_);
     std::string result;
 #if defined(_WIN64) || defined(__x86_64__) || defined(__ppc64__)
     // 64-bit: 16 hex digits.
@@ -212,6 +215,7 @@ std::string Bitmap::asHexString() const {
 }
 
 std::string Bitmap::asBinaryString() const {
+    std::lock_guard<detail::BitmapMutex> guard(in_use_);
     char buf[1001];
     if (number_of_bits_ > 1000) {
         return "(too many bits for binary string)";
