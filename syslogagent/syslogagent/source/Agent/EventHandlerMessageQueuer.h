@@ -104,43 +104,17 @@ namespace Syslog_agent {
 
         Result handleEvent(const wchar_t* subscription_name, EventLogEvent& event) override;
 
-        // Test mode control methods
-        void enableTestMode(int delay_ms = 1) {
-            test_mode_enabled_ = true;
-            test_mode_delay_ms_ = delay_ms;
-            cached_events_.clear();
-            current_cache_index_ = 0;
-        }
-
-        void disableTestMode() {
-            test_mode_enabled_ = false;
-            cached_events_.clear();
-        }
-
-        bool isTestModeEnabled() const { return test_mode_enabled_; }
-        size_t getCachedEventCount() const { return cached_events_.size(); }
-        void setTestModeDelay(int delay_ms) { test_mode_delay_ms_ = delay_ms; }
-
     private:
         static constexpr double BUFFER_WARNING_THRESHOLD = 0.90;  // 90% as decimal
         static constexpr uint32_t ESTIMATED_FIELD_OVERHEAD = 20;  // Estimated overhead per field in bytes
+        bool skipping_dates_ = false;
 
     protected:
         // Estimates final message size before generation
         size_t estimateMessageSize(const EventData& data, int logformat) const;
-        bool generateLogMessage(EventLogEvent& event, const int logformat, char* json_buffer, size_t buflen);
+        Result generateLogMessage(EventLogEvent& event, const int logformat, char* json_buffer, size_t buflen);
         bool generateJson(const EventData& data, int logformat, char* json_buffer, size_t buflen);
         static unsigned char unixSeverityFromWindowsSeverity(char windows_severity_num);
-
-        // Test mode for event replay
-        // DEBUGGING
-        static constexpr size_t MAX_CACHED_EVENTS = 10000;
-		static constexpr size_t MAX_REPEATS = 1000000;
-        int repeat_count_ = 0;
-        vector<char*> cached_events_;
-        bool test_mode_enabled_ = false;
-        int test_mode_delay_ms_ = 1;
-        size_t current_cache_index_ = 0;
 
         Configuration& configuration_;
         shared_ptr<MessageQueue> primary_message_queue_;

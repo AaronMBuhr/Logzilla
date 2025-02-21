@@ -1,3 +1,7 @@
+
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+
+
 #pragma once
 #include <string>
 #include <fstream>
@@ -66,3 +70,5 @@ private:
 
 
 } // namespace Syslog_agent
+
+#endif

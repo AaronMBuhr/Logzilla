@@ -4,6 +4,9 @@
 #include "Util.h"
 #include "Logger.h"
 
+
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+
 namespace Syslog_agent {
 
     StatefulLogger* StatefulLogger::singleton() {
@@ -61,3 +64,5 @@ namespace Syslog_agent {
     }
 
 } // namespace Syslog_agent
+
+#endif

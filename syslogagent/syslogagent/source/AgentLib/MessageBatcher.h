@@ -34,8 +34,8 @@ namespace Syslog_agent {
         // Returns both status and number of messages batched
         BatchResult BatchEvents(shared_ptr<MessageQueue> message_queue, char* batch_buffer, size_t buffer_size) const;
 
-        virtual char* GetMessageBuffer(const char* debug_identifier = nullptr) = 0;
-        virtual bool ReleaseMessageBuffer(char* buffer) = 0;
+        virtual char* GetBatchBuffer(const char* debug_identifier = nullptr) const = 0;
+        virtual bool ReleaseBatchBuffer(char* buffer) const = 0;
         virtual std::uint32_t GetMaxBatchSizeBytes() const = 0;
     
     protected:
@@ -43,7 +43,6 @@ namespace Syslog_agent {
         std::uint32_t max_batch_age_;
 
         virtual std::uint32_t GetMaxBatchSizeBytes_() const = 0;
-        virtual std::uint32_t GetMinBatchInterval_() const = 0;
 
         // Modified virtual methods to include buffer safety
         virtual void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const = 0;

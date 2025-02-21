@@ -71,13 +71,13 @@ namespace Syslog_agent {
             std::uint32_t messages_batched = 0;
             bool found_valid_message = false;  // Track if we found any valid messages to process
 
+            char* peek_buffer = this->GetBatchBuffer("peek_buffer");
             // Process messages
             for (const auto& msg : message_queue->traverseQueue()) {
                 if (!msg) continue;
 
                 // Get message length
-                char peek_buffer[MessageQueue::MESSAGE_BUFFER_SIZE];
-                int msg_len = message_queue->peek(msg, peek_buffer, sizeof(peek_buffer));
+                int msg_len = message_queue->peek(msg, peek_buffer, GetMaxBatchSizeBytes());
 
                 if (msg_len == 0) {
                     logger->recoverable_error("MessageBatcher::BatchEventsInternal()> Message with zero length, discarding\n");
@@ -101,6 +101,7 @@ namespace Syslog_agent {
                     // First message won't fit even with just header and trailer
                     logger->recoverable_error("MessageBatcher::BatchEventsInternal()> Buffer too small for even one message (needs %zu, have %zu)\n",
                         space_needed + header_size, buffer_size);
+                    this->ReleaseBatchBuffer(peek_buffer);
                     return BatchResult(BatchResult::Status::BufferTooSmall);
                 }
                 else if (current_pos + space_needed > buffer_size) {
@@ -133,6 +134,8 @@ namespace Syslog_agent {
                     break;
                 }
             }
+
+            this->ReleaseBatchBuffer(peek_buffer);
 
             // If we haven't batched any messages but found valid ones to process,
             // return Success with 0 messages (they were all too large)

@@ -158,8 +158,9 @@ void Service::run(bool running_as_console) {
             throw std::runtime_error("Failed to create shutdown event handles");
         }
 
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
         SlidingWindowMetrics::instance().setWindowDuration(Service::RATE_CHECK_INTERVAL_SEC);
-
+#endif
         // Register service control handler if running as service
         if (!running_as_console) {
             RegisterServiceCtrlHandler();
@@ -566,7 +567,7 @@ void Service::handleQueueStatusAndConfig() {
 
     if (config_.getUseLogAgent() && primary_message_queue_->isEmpty() 
         && (secondary_message_queue_ == nullptr || secondary_message_queue_->isEmpty())) {
-        logger->debug3("Saving config to registry\n");
+        // logger->debug3("Saving config to registry\n");
         config_.saveToRegistry();
     }
 }
@@ -596,7 +597,8 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
                 logger->debug("Service::mainLoop()> heartbeat: 100 loops\n");
                 loop_count = 0;
             }
-			if (std::chrono::steady_clock::now() - rateCheckStart >= std::chrono::seconds(Service::RATE_CHECK_INTERVAL_SEC)) {
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+            if (std::chrono::steady_clock::now() - rateCheckStart >= std::chrono::seconds(Service::RATE_CHECK_INTERVAL_SEC)) {
 				rateCheckStart = std::chrono::steady_clock::now();
                 auto& metrics = SlidingWindowMetrics::instance();
                 double inRate = metrics.incomingRate();
@@ -610,6 +612,7 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
                         inRate, outRate, inRate / outRate);
                 }
 			}
+#endif
         }
         catch (const std::exception& e) {
             logger->recoverable_error("Service::mainLoop()> Exception: %s\n", e.what());
@@ -746,7 +749,6 @@ void Service::shutdown() {
 
 void Service::fatalErrorHandler(const char* msg) {
     auto logger = LOG_THIS;
-    logger->fatal("Fatal error: %s\n", msg);
     shutdown_requested_ = true;
     shutdown_event_.signal();
 }

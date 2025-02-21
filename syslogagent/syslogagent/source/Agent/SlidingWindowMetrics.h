@@ -1,3 +1,5 @@
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+
 #pragma once
 
 #include <chrono>
@@ -134,3 +136,5 @@ private:
     SlidingWindowRateTracker incoming_;
     SlidingWindowRateTracker outgoing_;
 };
+
+#endif

@@ -27,6 +27,3 @@
 // Third-party headers
 #include "pugixml.hpp"
 
-// Project headers
-#include "framework.h"
-#include "Util.h"

@@ -132,7 +132,7 @@ bool Logger::log(const LogLevel log_level, const char* format, ...) {
     Logger::getDateTimeStr(dt_buf, sizeof(dt_buf));
 
     bool result = true;
-    const char* level_str = (log_level <= FORCE) ? LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
+    const char* level_str = (log_level >= NONE && log_level <= FATAL) ? LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
 
     // Format the full log header.
     char header[128];
@@ -190,8 +190,7 @@ bool Logger::log_no_datetime(const LogLevel log_level, const char* format, ...) 
     lock_guard<mutex> lock(pimpl_->logger_lock_);
 
     bool result = true;
-    const char* level_str = (log_level <= FORCE) ?
-        LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
+    const char* level_str = (log_level >= NONE && log_level <= FATAL) ? LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
 
     // Write the log level header (without a timestamp).
     switch (log_destination_) {

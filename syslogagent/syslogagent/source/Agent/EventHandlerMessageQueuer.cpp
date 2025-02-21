@@ -4,6 +4,7 @@ Copyright 2021 Logzilla Corp.
 */
 
 #include "stdafx.h"
+#include <ctime>
 #include <iomanip>
 #include <locale>
 #include "pugixml.hpp"
@@ -17,8 +18,11 @@ Copyright 2021 Logzilla Corp.
 #include "SyslogSender.h"
 #include "StatefulLogger.h"
 
-#include "EventLogger.h"
 #include "XMLToJsonConverter.h"
+
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+#include "EventLogger.h"
+#endif
 
 using namespace std;
 using namespace Syslog_agent;
@@ -136,12 +140,54 @@ namespace Syslog_agent {
         return estimated_size;
     }
 
-    bool EventHandlerMessageQueuer::generateLogMessage(
+    void epoch_to_datetime(std::time_t epoch, char* buffer, size_t bufsize) {
+        if (bufsize < 20) return;  // Need 19 chars + null terminator
+        
+        // Convert to time struct
+        std::tm* timeinfo = std::localtime(&epoch);
+        
+        // Format into buffer
+        std::strftime(buffer, bufsize, "%Y-%m-%d %H:%M:%S", timeinfo);
+    }
+
+    Result EventHandlerMessageQueuer::generateLogMessage(
         EventLogEvent& event, const int logformat, char* json_buffer, size_t buflen)
     {
+        auto logger = LOG_THIS;
         EventHandlerMessageQueuer::EventData data;
         data.parseFrom(event, this->configuration_);
-        return this->generateJson(data, logformat, json_buffer, buflen);
+
+        char* end;
+        long event_timestamp_value = std::strtol(data.timestamp, &end, 10);
+
+        if (*end == '\0') {
+            // Successful conversion
+            // Get seconds since epoch
+            std::time_t now = std::time(nullptr);
+            long earliest_allowed_timestamp = now - (SharedConstants::MAX_CATCHUP_DAYS * 24 * 60 * 60);
+            char buffer[20];  // YYYY-MM-DD HH:MM:SS\0
+            epoch_to_datetime(event_timestamp_value, buffer, sizeof(buffer));    
+            if (event_timestamp_value < earliest_allowed_timestamp) {
+                if (!skipping_dates_) {
+                    skipping_dates_ = true;
+                    logger->warning("Skipping events starting from %s\n", buffer);
+                }
+                return Result(ERROR_CANCELLED, "generateLogMessage", "Event too old, skipped.");
+            }
+            else {
+                if (skipping_dates_) {
+                    skipping_dates_ = false;
+                    logger->info("End skipping dates starting at %s\n", buffer);
+                }
+            }
+        } 
+
+        if (this->generateJson(data, logformat, json_buffer, buflen)) {
+			return Result(ERROR_SUCCESS, "generateLogMessage", "Successfully generated JSON message");
+		}
+        else {
+            return Result(ERROR_INVALID_DATA, "generateLogMessage", "Failed to generate JSON message");
+        }
     }
 
     bool EventHandlerMessageQueuer::generateJson(
@@ -219,10 +265,11 @@ namespace Syslog_agent {
             json_output << "\"program\":\"" << data.provider << "\"";
         }
 
-
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
         StatefulLogger::setEventId(data.event_id);
         StatefulLogger::setEventLog(log_name_utf8_.c_str());
         StatefulLogger::setEventDatetime(data.timestamp);
+#endif
 
         // Add event data fields
         if (data.event_data_count > 0) {
@@ -372,62 +419,45 @@ namespace Syslog_agent {
                 logger->recoverable_error("Estimated message size %zu exceeds buffer size %zu\n",
                     estimated_size, Globals::MESSAGE_BUFFER_SIZE);
                 Globals::instance()->releaseMessageBuffer(json_buffer);
-                return Result(ERROR_INSUFFICIENT_BUFFER, "handleEvent()", "Buffer too small");
+                return Result(ERROR_INSUFFICIENT_BUFFER, "handleEvent", "Buffer too small");
             }
 
             // Generate JSON for primary queue
-			bool success = generateLogMessage(event, configuration_.getPrimaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
-            if (!success) {
-                logger->recoverable_error("Failed to generate JSON for primary queue\n");
+			Result generate_result = generateLogMessage(event, configuration_.getPrimaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
+            if (generate_result.statusCode() != ERROR_SUCCESS) {
                 Globals::instance()->releaseMessageBuffer(json_buffer);
-                return Result(ERROR_INVALID_DATA, "handleEvent()", "Failed to generate JSON");
+                if (generate_result.statusCode() != ERROR_CANCELLED) {
+					logger->recoverable_error("Failed to generate JSON for primary queue\n");
+                }
+                return generate_result;
             }
 
             // Queue message for primary server
             primary_message_queue_->enqueue(json_buffer, strlen(json_buffer));
 
-            // DEBUGGING
-			if (true /* isTestModeEnabled() */) {
-				if (cached_events_.size() >= MAX_CACHED_EVENTS) {
-					for (int rep = 0; rep < MAX_REPEATS; rep++) {
-                        auto msg = cached_events_[rep % cached_events_.size()];
-                        logger->force("Enqueuing rep %zu\n", rep);
-                        primary_message_queue_->enqueue(msg, strlen(msg));
-                        // Simulate delay for test mode
-                        if (rep % 10 == 0) {
-                            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                        }
-                    }
-				}
-                else {
-                    // In test mode, cache the event for later replay
-                    cached_events_.push_back(json_buffer);
-					logger->force("Cached event %zu\n", cached_events_.size());
-                }
-			}
-
             // Handle secondary server if configured
             if (configuration_.hasSecondaryHost()) {
                 // Generate JSON for secondary queue
-                success = generateJson(data, configuration_.getSecondaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
-                if (!success) {
-                    logger->recoverable_error("Failed to generate JSON for secondary queue\n");
+                generate_result = generateLogMessage(event, configuration_.getSecondaryLogformat(), json_buffer, Globals::MESSAGE_BUFFER_SIZE);
+                if (generate_result.statusCode() != ERROR_SUCCESS) {
                     Globals::instance()->releaseMessageBuffer(json_buffer);
-                    return Result(ERROR_INVALID_DATA, "handleEvent()", "Failed to generate JSON");
+					if (generate_result.statusCode() != ERROR_CANCELLED) {
+						logger->recoverable_error("Failed to generate JSON for secondary queue\n");
+					}
+                    return generate_result;
                 }
 
                 // Queue message for secondary server
                 secondary_message_queue_->enqueue(json_buffer, strlen(json_buffer));
             }
 
-			// DEBUGGING
-            // Globals::instance()->releaseMessageBuffer(json_buffer);
+            Globals::instance()->releaseMessageBuffer(json_buffer);
             return Result();
         }
         catch (const std::exception& e) {
             logger->recoverable_error("Exception in handleEvent: %s\n", e.what());
             Globals::instance()->releaseMessageBuffer(json_buffer);
-            return Result(ERROR_INVALID_DATA, "handleEvent()", e.what());
+            return Result(ERROR_INVALID_DATA, "handleEvent", e.what());
         }
     }
 
@@ -438,6 +468,9 @@ namespace Syslog_agent {
         unsigned char severity;
 
         switch (windows_severity_num) {
+		case '0':
+			severity = SharedConstants::Severities::ALERT;
+			break;
         case '1':
             severity = SharedConstants::Severities::CRITICAL;
             break;

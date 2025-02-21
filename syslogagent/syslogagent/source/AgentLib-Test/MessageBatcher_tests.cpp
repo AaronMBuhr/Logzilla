@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "MessageBatcher.h"
-#include "MessageQueue.h"
+#include "../AgentLib/MessageBatcher.h"
+#include "../AgentLib/MessageQueue.h"
 
 #include <string>
 #include <vector>
@@ -20,12 +20,12 @@ public:
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
-    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+    char* GetBatchBuffer(const char* debug_identifier = nullptr) const override {
         // Simple implementation for tests - allocate a fixed buffer
         return new char[GetMaxBatchSizeBytes()];
     }
 
-    bool ReleaseMessageBuffer(char* buffer) override {
+    bool ReleaseBatchBuffer(char* buffer) const override {
         delete[] buffer;
         return true;
     }
@@ -39,9 +39,6 @@ protected:
         return 1024; // For test purposes
     }
 
-    uint32_t GetMinBatchInterval_() const override {
-        return 100;  // 100ms
-    }
 
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
         const char* header = "[BATCH_START]";
@@ -340,11 +337,11 @@ public:
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
-    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+    char* GetBatchBuffer(const char* debug_identifier = nullptr) const override {
         return new char[GetMaxBatchSizeBytes()];
     }
 
-    bool ReleaseMessageBuffer(char* buffer) override {
+    bool ReleaseBatchBuffer(char* buffer) const override {
         delete[] buffer;
         return true;
     }
@@ -355,7 +352,6 @@ public:
 
 protected:
     std::uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
-    std::uint32_t GetMinBatchInterval_() const override { return 100; }
 
     // Simulate failure: header too large (or unable to produce header)
     void GetMessageHeader_(char* /*dest*/, size_t /*max_size*/, size_t& size_out) const override {
@@ -396,11 +392,11 @@ public:
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
-    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+    char* GetBatchBuffer(const char* debug_identifier = nullptr) const override {
         return new char[GetMaxBatchSizeBytes()];
     }
 
-    bool ReleaseMessageBuffer(char* buffer) override {
+    bool ReleaseBatchBuffer(char* buffer) const override {
         delete[] buffer;
         return true;
     }
@@ -411,7 +407,6 @@ public:
 
 protected:
     uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
-    uint32_t GetMinBatchInterval_() const override { return 100; }
 
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
         const char* header = "[BATCH_START]";
@@ -452,11 +447,11 @@ public:
         : MessageBatcher(max_batch_size, max_batch_age), call_count(0) {
     }
 
-    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+    char* GetBatchBuffer(const char* debug_identifier = nullptr) const override {
         return new char[GetMaxBatchSizeBytes()];
     }
 
-    bool ReleaseMessageBuffer(char* buffer) override {
+    bool ReleaseBatchBuffer(char* buffer) const override {
         delete[] buffer;
         return true;
     }
@@ -467,7 +462,6 @@ public:
 
 protected:
     std::uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
-    std::uint32_t GetMinBatchInterval_() const override { return 100; }
 
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
         const char* header = "[BATCH_START]";
@@ -524,11 +518,11 @@ public:
         : MessageBatcher(max_batch_size, max_batch_age) {
     }
 
-    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+    char* GetBatchBuffer(const char* debug_identifier = nullptr) const override {
         return new char[GetMaxBatchSizeBytes()];
     }
 
-    bool ReleaseMessageBuffer(char* buffer) override {
+    bool ReleaseBatchBuffer(char* buffer) const override {
         delete[] buffer;
         return true;
     }
@@ -539,7 +533,6 @@ public:
 
 protected:
     std::uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
-    std::uint32_t GetMinBatchInterval_() const override { return 100; }
 
     // Throw an exception to simulate an unexpected error.
     void GetMessageHeader_(char* /*dest*/, size_t /*max_size*/, size_t& /*size_out*/) const override {

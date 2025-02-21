@@ -12,7 +12,9 @@ Copyright 2021 Logzilla Corp.
 #include "Logger.h"
 #include "SlidingWindowMetrics.h"
 #include "Util.h"
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
 #include "EventLogger.h"
+#endif
 
 namespace Syslog_agent {
 
@@ -121,7 +123,7 @@ void SyslogSender::run() const {
                 logger->debug3("SyslogSender::run()> Attempting to batch primary queue messages\n");
                 size_t initial_queue_size = primary_queue->length();
                 
-                char* batch_buffer = primary_batcher_->GetMessageBuffer("primary batcher");
+                char* batch_buffer = primary_batcher_->GetBatchBuffer("primary batcher");
                 if (!batch_buffer) {
                     logger->recoverable_error("SyslogSender::run()> Failed to get primary batch buffer\n");
                     continue;
@@ -140,7 +142,7 @@ void SyslogSender::run() const {
                         break;
                     }
                 }
-                primary_batcher_->ReleaseMessageBuffer(batch_buffer);
+                primary_batcher_->ReleaseBatchBuffer(batch_buffer);
                 primary_has_messages = (primary_queue->length() > 0);
             }
 
@@ -149,7 +151,7 @@ void SyslogSender::run() const {
                 logger->debug3("SyslogSender::run()> Attempting to batch secondary queue messages\n");
                 size_t initial_queue_size = secondary_queue->length();
                 
-                char* batch_buffer = secondary_batcher_->GetMessageBuffer("secondary batcher");
+                char* batch_buffer = secondary_batcher_->GetBatchBuffer("secondary batcher");
                 if (!batch_buffer) {
                     logger->recoverable_error("SyslogSender::run()> Failed to get secondary batch buffer\n");
                     continue;
@@ -168,7 +170,7 @@ void SyslogSender::run() const {
                         break;
                     }
                 }
-                secondary_batcher_->ReleaseMessageBuffer(batch_buffer);
+                secondary_batcher_->ReleaseBatchBuffer(batch_buffer);
                 secondary_has_messages = (secondary_queue->length() > 0);
             }
         }
@@ -204,14 +206,18 @@ int SyslogSender::sendMessageBatch(
         logger->debug2("SyslogSender::sendMessageBatch()> Attempting to send batch of %u messages (%u bytes)\n",
             batch_count, batch_buf_length);
 
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
         if (logger->getLogLevel() == Logger::DEBUG3) {
             EventLogger::logNetworkSend(batch_buf, batch_buf_length);
         }
+#endif
 
         // Attempt to send the batch
         INetworkClient::RESULT_TYPE result = network_client->post(batch_buf, batch_buf_length);
 
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
         EventLogger::logNetworkReceive(result.getMessage(), strlen(result.getMessage()));
+#endif
 
         if (result != INetworkClient::RESULT_SUCCESS) {
             // Don't log as critical during shutdown - it's expected to fail
@@ -234,10 +240,12 @@ int SyslogSender::sendMessageBatch(
                     i + 1, batch_count);
                 break;
             }
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
             SlidingWindowMetrics::instance().recordOutgoing();
             string eventJson = EventLogger::queuePopFront();
             EventLogger::log(EventLogger::LogDestination::SentEvents,
                 "Event sent: %s\n", eventJson.c_str());
+#endif
             messages_removed++;
         }
 

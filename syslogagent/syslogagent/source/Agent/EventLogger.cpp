@@ -8,6 +8,9 @@
 #include <string>
 #include <fstream>
 
+
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+
 using std::string;
 
 namespace Syslog_agent {
@@ -310,3 +313,5 @@ bool EventLogger::logNetworkReceive(const char* result, size_t result_length) {
 }
 
 } // namespace Syslog_agent
+
+#endif

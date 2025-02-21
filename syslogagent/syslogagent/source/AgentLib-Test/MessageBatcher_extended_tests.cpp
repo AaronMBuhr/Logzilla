@@ -1,7 +1,7 @@
 #include "pch.h"
 #include <gtest/gtest.h>
-#include "HTTPMessageBatcher.h"  // Your HTTPMessageBatcher subclass
-#include "MessageQueue.h"
+#include "../Agent/HTTPMessageBatcher.h"  // Your HTTPMessageBatcher subclass
+#include "../AgentLib/MessageQueue.h"
 #include <chrono>
 #include <thread>
 #include <nlohmann/json.hpp>

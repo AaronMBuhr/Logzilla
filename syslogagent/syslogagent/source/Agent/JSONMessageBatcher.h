@@ -14,7 +14,6 @@ public:
     static constexpr std::uint32_t BATCH_BUFFER_CHUNK_SIZE = 12;        // Number of buffers to allocate
     static constexpr std::uint32_t BATCH_BUFFER_PERCENT_SLACK = 25;     // Unused buffer percentage
     static constexpr std::uint32_t BATCH_SIZE_THRESHOLD = 100;       // Messages per batch
-    static constexpr std::uint32_t MIN_BATCH_INTERVAL = 100;         // Minimum ms between batches
 
 private:
     // Store string literals as member variables to return char*
@@ -38,7 +37,6 @@ public:
 
 protected:
     std::uint32_t GetMaxBatchSizeBytes_() const override { return MAX_BATCH_SIZE_BYTES; }
-    std::uint32_t GetMinBatchInterval_() const override { return MIN_BATCH_INTERVAL; }
     
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
         size_out = std::strlen(header_);
@@ -71,7 +69,7 @@ protected:
         }
     }
 
-    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+    char* GetBatchBuffer(const char* debug_identifier = nullptr) const override {
         auto logger = LOG_THIS;
         std::lock_guard<std::mutex> lock(buffer_mutex_);
         if (!batch_buffers_) {
@@ -97,7 +95,7 @@ protected:
 
     std::uint32_t GetMaxBatchSizeBytes() const override { return MAX_BATCH_SIZE_BYTES; }
 
-    bool ReleaseMessageBuffer(char* buffer) override {
+    bool ReleaseBatchBuffer(char* buffer) const override {
         if (!buffer || !batch_buffers_) {
             return false;
         }
@@ -105,7 +103,7 @@ protected:
     }
 
 protected:
-    std::unique_ptr<BitmappedObjectPool<char[MAX_BATCH_SIZE_BYTES]>> batch_buffers_;
+    mutable std::unique_ptr<BitmappedObjectPool<char[MAX_BATCH_SIZE_BYTES]>> batch_buffers_;
     mutable std::mutex buffer_mutex_;
 };
 

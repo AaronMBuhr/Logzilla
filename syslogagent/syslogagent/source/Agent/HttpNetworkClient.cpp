@@ -195,7 +195,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
     }
 
     logger->debug2("HttpNetworkClient::post() Starting post operation - Length: %d bytes\n", length);
-    
+
     DWORD flags = WINHTTP_FLAG_REFRESH;
     if (use_ssl_) {
         flags |= WINHTTP_FLAG_SECURE;
@@ -319,6 +319,7 @@ HttpNetworkClient::RESULT_TYPE HttpNetworkClient::post(const char* buf, uint32_t
     response_buffer[total_read] = '\0';  // Ensure null termination
 
     cleanup_request();
+
 
     // Format the result message with both status and response body
     char msg[1024 + 256];  // Large enough for status line + response

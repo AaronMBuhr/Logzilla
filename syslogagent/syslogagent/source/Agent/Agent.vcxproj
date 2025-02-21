@@ -81,8 +81,9 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>..\Infrastructure;..\AgentLib;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -100,7 +101,9 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_UNITTEST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <EnableModules>true</EnableModules>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -119,17 +122,18 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <ForcedIncludeFiles>windows_includes.h</ForcedIncludeFiles>
-      <AdditionalIncludeDirectories>D:\Source\Logzilla\syslogagent_with_forwarder\syslogagent\source\Agent\include;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>..\Infrastructure;..\AgentLib;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Agent\external\pugixml\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <EnableModules>true</EnableModules>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>ws2_32.lib;winhttp.lib;ntdll.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ws2_32.lib;winhttp.lib;ntdll.lib;crypt32.lib;LogZillaInfra.lib;AgentLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\x64\$(Configuration)</AdditionalLibraryDirectories>
     </Link>
     <PreLinkEvent>
@@ -214,6 +218,14 @@
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Agent.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AgentLib\AgentLib.vcxproj">
+      <Project>{194f0eb4-cbbd-4497-ae6b-f1de2ff3a366}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Infrastructure\Infrastructure.vcxproj">
+      <Project>{1dbe5c78-bcdc-4d64-ac43-81c6a01a3301}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

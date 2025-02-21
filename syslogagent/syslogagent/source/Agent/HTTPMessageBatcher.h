@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MessageBatcher.h"
+#include "../AgentLib/MessageBatcher.h"
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -9,8 +9,8 @@ namespace Syslog_agent {
 
 class HTTPMessageBatcher : public MessageBatcher {
 public:
-    static constexpr std::uint32_t MAX_BATCH_SIZE_BYTES = 2 * 1024 * 1024;   // Maximum size of a message batch in bytes
-    static constexpr std::uint32_t MIN_BATCH_INTERVAL = 100;                 // Minimum ms between batches
+                                                                        // DEBUGGING
+    static constexpr std::uint32_t MAX_BATCH_SIZE_BYTES = /* 2 * 1024 * 1024 */ 512 * 1024;   // Maximum size of a message batch in bytes
     static constexpr std::uint32_t BATCH_BUFFER_CHUNK_SIZE = 16;            // Number of buffers to allocate at once
     static constexpr std::uint32_t BATCH_BUFFER_PERCENT_SLACK = 25;         // Percentage of extra buffers to maintain
 
@@ -28,7 +28,6 @@ public:
 
 protected:
     std::uint32_t GetMaxBatchSizeBytes_() const override { return MAX_BATCH_SIZE_BYTES; }
-    std::uint32_t GetMinBatchInterval_() const override { return MIN_BATCH_INTERVAL; }
 
     void GetMessageHeader_(char* dest, size_t max_size, size_t& size_out) const override {
         size_t len = strlen(HEADER);
@@ -60,7 +59,7 @@ protected:
         }
     }
 
-    char* GetMessageBuffer(const char* debug_identifier = nullptr) override {
+    char* GetBatchBuffer(const char* debug_identifier = nullptr) const override {
         auto logger = LOG_THIS;
         std::lock_guard<std::mutex> lock(buffer_mutex_);
         if (!batch_buffers_) {
@@ -84,7 +83,7 @@ protected:
         return static_cast<char*>(*buffer);
     }
 
-    bool ReleaseMessageBuffer(char* buffer) override {
+    bool ReleaseBatchBuffer(char* buffer) const override {
         if (!buffer || !batch_buffers_) {
             return false;
         }
@@ -94,7 +93,7 @@ protected:
     std::uint32_t GetMaxBatchSizeBytes() const override { return MAX_BATCH_SIZE_BYTES; }
 
 protected:
-    std::unique_ptr<BitmappedObjectPool<char[MAX_BATCH_SIZE_BYTES]>> batch_buffers_;
+    mutable std::unique_ptr<BitmappedObjectPool<char[MAX_BATCH_SIZE_BYTES]>> batch_buffers_;
     mutable std::mutex buffer_mutex_;
 };
 

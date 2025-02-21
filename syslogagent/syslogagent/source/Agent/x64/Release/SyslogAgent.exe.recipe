@@ -2,6 +2,12 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
+      <FullPath>E:\Source\Mine\Logzilla\syslogagent\syslogagent\x64\Release\AgentLib.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
+      <FullPath>E:\Source\Mine\Logzilla\syslogagent\syslogagent\x64\Release\LogZillaInfra.dll</FullPath>
+    </ProjectOutput>
+    <ProjectOutput>
       <FullPath>E:\Source\Mine\Logzilla\syslogagent\syslogagent\x64\Release\SyslogAgent.exe</FullPath>
     </ProjectOutput>
   </ProjectOutputs>

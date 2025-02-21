@@ -26,6 +26,7 @@ namespace Syslog_agent {
         static constexpr const wchar_t* CERT_FILE_PRIMARY       = L"primary.pfx";
         static constexpr const wchar_t* CERT_FILE_SECONDARY     = L"secondary.pfx";
         static constexpr unsigned int   LZ_JSON_PORT            = 515;
+        static constexpr unsigned int   MAX_CATCHUP_DAYS        = 1;
 
         // Version strings
         static constexpr const wchar_t* CURRENT_VERSION         = SYSLOGAGENT_CURRENT_VERSION;
@@ -34,7 +35,7 @@ namespace Syslog_agent {
         // HTTP settings
         static constexpr bool USE_HTTP2                = true;  // Enable HTTP/2 if available
         static constexpr bool USE_COMPRESSION          = true;  // Enable compression if available
-        static constexpr int  HTTP2_PING_TIMEOUT_MS   = 60000; // Keep HTTP/2 connections alive for 60 seconds
+        static constexpr int  HTTP2_PING_TIMEOUT_MS   = 60000;  // Keep HTTP/2 connections alive for 60 seconds
 
         // Retry settings
         static constexpr int MAX_RETRY_ATTEMPTS = 3;

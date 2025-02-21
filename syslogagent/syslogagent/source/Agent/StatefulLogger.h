@@ -3,6 +3,8 @@ SyslogAgent: a syslog agent for Windows
 Copyright c 2021 Logzilla Corp.
 */
 
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+
 #pragma once
 #include <stdarg.h>
 #include "Logger.h"
@@ -35,3 +37,5 @@ namespace Syslog_agent {
     };
 
 } // namespace Syslog_agent
+
+#endif

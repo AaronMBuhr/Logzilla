@@ -189,8 +189,9 @@ namespace Syslog_agent {
                         }
                     }
 
-					SlidingWindowMetrics::instance().recordIncoming();
-
+#if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
+                    SlidingWindowMetrics::instance().recordIncoming();
+#endif
                     // Create EventLogEvent from handle
                     EventLogEvent evt(hEvent);
                     // Handle the event with proper arguments
