@@ -2,7 +2,7 @@
 <GtaTestDurations xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Executable>E:\Source\Mine\Logzilla\syslogagent\syslogagent\x64\Release\AgentLib-Test.exe</Executable>
   <TestDurations>
-    <TestDuration Test="JsonBatchingTest.ValidJsonBatchTerminationWithVaryingEventSizes" Duration="5012" />
+    <TestDuration Test="JsonBatchingTest.ValidJsonBatchTerminationWithVaryingEventSizes" Duration="5003" />
     <TestDuration Test="MessageBatcherTest.EmptyQueue" Duration="1" />
     <TestDuration Test="MessageBatcherTest.InvalidBuffer" Duration="1" />
     <TestDuration Test="MessageBatcherTest.BasicBatching" Duration="1" />
@@ -24,9 +24,9 @@
     <TestDuration Test="MessageQueueTest.EnqueueInvalidParams" Duration="1" />
     <TestDuration Test="MessageQueueTest.MultipleMessages" Duration="1" />
     <TestDuration Test="MessageQueueTest.MessageTimestamp" Duration="1" />
-    <TestDuration Test="MessageQueueTest.WaitForMessages" Duration="109" />
+    <TestDuration Test="MessageQueueTest.WaitForMessages" Duration="108" />
     <TestDuration Test="MessageQueueTest.ShutdownBehavior" Duration="1" />
-    <TestDuration Test="MessageQueueAdditionalTest.ConcurrentProducerConsumer" Duration="1564" />
+    <TestDuration Test="MessageQueueAdditionalTest.ConcurrentProducerConsumer" Duration="1575" />
     <TestDuration Test="MessageQueueAdditionalTest.MultiplePeeksSameMessage" Duration="1" />
     <TestDuration Test="MessageQueueAdditionalTest.StressTestLargeNumberOfMessages" Duration="2" />
     <TestDuration Test="MessageQueueAdditionalTest.WaitForMessagesAfterDelay" Duration="108" />

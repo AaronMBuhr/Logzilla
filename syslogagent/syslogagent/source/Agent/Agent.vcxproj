@@ -227,6 +227,9 @@
       <Project>{1dbe5c78-bcdc-4d64-ac43-81c6a01a3301}</Project>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="LogZilla.ico" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

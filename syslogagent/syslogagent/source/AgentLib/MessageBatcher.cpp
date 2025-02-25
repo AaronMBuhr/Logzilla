@@ -95,7 +95,7 @@ namespace Syslog_agent {
                 if (messages_batched > 0) {
                     space_needed += separator_size;  // Need separator if not first message
                 }
-                space_needed += trailer_size;  // MUST reserve space for trailer
+                space_needed += trailer_size + 16;  // MUST reserve space for trailer with safety margin
 
                 if (messages_batched == 0 && space_needed + header_size > buffer_size) {
                     // First message won't fit even with just header and trailer
@@ -150,10 +150,17 @@ namespace Syslog_agent {
 
             // Add trailer if we batched any messages
             if (messages_batched > 0) {
+                // Double-check that we have enough space for the trailer
+                if (buffer_size - current_pos <= trailer_size) {
+                    logger->warning("MessageBatcher::BatchEventsInternal()> Not enough space left for trailer, need %zu, have %zu\n", 
+                        trailer_size, buffer_size - current_pos);
+                    return BatchResult(BatchResult::Status::BufferTooSmall);
+                }
+                
                 size_t actual_trailer_size = 0;
                 GetMessageTrailer_(batch_buffer + current_pos, buffer_size - current_pos, actual_trailer_size);
                 if (actual_trailer_size == 0) {
-                    logger->debug("MessageBatcher::BatchEventsInternal()> Failed to add trailer\n");
+                    logger->warning("MessageBatcher::BatchEventsInternal()> Failed to add trailer\n");
                     return BatchResult(BatchResult::Status::BufferTooSmall);
                 }
                 current_pos += actual_trailer_size;
