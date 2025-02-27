@@ -171,7 +171,7 @@ int MessageQueue::peek(Message* msg, char* message_content, const uint32_t max_l
         message_content[copied] = '\0';
     }
 
-    logger->debug3("MessageQueue::peek() Successfully peeked message with length %d\n", msg->data_length);
+    // logger->debug3("MessageQueue::peek() Successfully peeked message with length %d\n", msg->data_length);
     return msg->data_length;
 }
 

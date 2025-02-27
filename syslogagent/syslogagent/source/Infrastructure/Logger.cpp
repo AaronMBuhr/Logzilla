@@ -11,6 +11,58 @@
 #include <windows.h>
 #endif
 
+// Forward declarations for C-style SEH helper functions
+void WriteEmergencyLog(const char* source, const char* file, int line);
+void SafeCallFatalHandler(Logger::FATAL_ERROR_HANDLER handler, const char* message);
+
+// C-style SEH helper functions that don't have C++ objects requiring unwinding
+
+// Helper function to safely call the fatal error handler with SEH
+void SafeCallFatalHandler(Logger::FATAL_ERROR_HANDLER handler, const char* message) {
+    __try {
+        handler(message);
+    }
+    __except(EXCEPTION_EXECUTE_HANDLER) {
+        // If the handler crashes, write to emergency log
+        HANDLE hFile = CreateFileA("syslogagent_emergency.log", 
+                                 FILE_APPEND_DATA, 
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                 NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            const char* crash_msg = "FATAL: Error handler crashed\r\n";
+            DWORD bytesWritten;
+            WriteFile(hFile, crash_msg, (DWORD)strlen(crash_msg), &bytesWritten, NULL);
+            CloseHandle(hFile);
+        }
+    }
+}
+
+// Helper function to write to emergency log with SEH
+void WriteEmergencyLog(const char* source, const char* file, int line) {
+    __try {
+        DWORD exceptionCode = GetLastError(); // Not truly an exception code, but useful info
+        
+        char emergencyMessage[256];
+        sprintf_s(emergencyMessage, "CRITICAL ERROR in %s at %s:%d (error: %d)\r\n", 
+                 source, file, line, exceptionCode);
+        
+        HANDLE hFile = CreateFileA("syslogagent_emergency.log", 
+                                 FILE_APPEND_DATA, 
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                 NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            DWORD bytesWritten;
+            WriteFile(hFile, emergencyMessage, (DWORD)strlen(emergencyMessage), &bytesWritten, NULL);
+            CloseHandle(hFile);
+        }
+    }
+    __except(EXCEPTION_EXECUTE_HANDLER) {
+        // If even this fails, we're in real trouble - try absolute last resort
+        fprintf(stderr, "CRITICAL: Failed to write emergency log for %s at %s:%d\n", 
+                source, file, line);
+    }
+}
+
 using namespace std;
 
 // Static member initialization.
@@ -125,57 +177,73 @@ bool Logger::log(const LogLevel log_level, const char* format, ...) {
         return true;
     }
 
-    lock_guard<mutex> lock(pimpl_->logger_lock_);
-
-    // Prepare a timestamp.
-    char dt_buf[40];
-    Logger::getDateTimeStr(dt_buf, sizeof(dt_buf));
-
     bool result = true;
-    const char* level_str = (log_level >= NONE && log_level <= FATAL) ? LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
+    char dt_buf[40] = {0};
+    char header[128] = {0};
+    
+    try {
+        lock_guard<mutex> lock(pimpl_->logger_lock_);
 
-    // Format the full log header.
-    char header[128];
-    snprintf(header, sizeof(header), "[%s %s] ", dt_buf, level_str);
+        // Prepare a timestamp.
+        Logger::getDateTimeStr(dt_buf, sizeof(dt_buf));
 
-    // Write the log header.
-    switch (log_destination_) {
-    case DEST_CONSOLE:
-        result = logToConsole(header);
-        break;
-    case DEST_FILE:
-        result = logToFile(header);
-        break;
-    case DEST_CONSOLE_AND_FILE:
-        result = logToConsoleAndFile(header);
-        break;
-    default:
-        break;
-    }
+        const char* level_str = (log_level >= NONE && log_level <= FATAL) ? 
+            LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
 
-    if (result) {
-        va_list args;
-        va_start(args, format);
-#ifdef _WIN32
-        vsnprintf_s(log_message_buffer_, MAX_LOGMSG_LENGTH, _TRUNCATE, format, args);
-#else
-        vsnprintf(log_message_buffer_, MAX_LOGMSG_LENGTH, format, args);
-#endif
-        va_end(args);
+        // Format the full log header.
+        snprintf(header, sizeof(header), "[%s %s] ", dt_buf, level_str);
 
+        // Write the log header.
         switch (log_destination_) {
         case DEST_CONSOLE:
-            result = logToConsole(log_message_buffer_);
+            result = logToConsole(header);
             break;
         case DEST_FILE:
-            result = logToFile(log_message_buffer_);
+            result = logToFile(header);
             break;
         case DEST_CONSOLE_AND_FILE:
-            result = logToConsoleAndFile(log_message_buffer_);
+            result = logToConsoleAndFile(header);
             break;
         default:
             break;
         }
+
+        if (result) {
+            va_list args;
+            va_start(args, format);
+            #ifdef _WIN32
+                vsnprintf_s(log_message_buffer_, MAX_LOGMSG_LENGTH, _TRUNCATE, format, args);
+            #else
+                vsnprintf(log_message_buffer_, MAX_LOGMSG_LENGTH, format, args);
+            #endif
+            va_end(args);
+
+            switch (log_destination_) {
+            case DEST_CONSOLE:
+                result = logToConsole(log_message_buffer_);
+                break;
+            case DEST_FILE:
+                result = logToFile(log_message_buffer_);
+                break;
+            case DEST_CONSOLE_AND_FILE:
+                result = logToConsoleAndFile(log_message_buffer_);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        // Last resort: try to output to stderr
+        fprintf(stderr, "Exception in Logger::log: %s\n", e.what());
+        WriteEmergencyLog("Logger::log exception", __FILE__, __LINE__);
+        return false;
+    }
+    catch (...) {
+        // Unknown exception
+        fprintf(stderr, "Unknown exception in Logger::log\n");
+        WriteEmergencyLog("Logger::log unknown exception", __FILE__, __LINE__);
+        return false;
     }
     return result;
 }
@@ -187,80 +255,132 @@ bool Logger::log_no_datetime(const LogLevel log_level, const char* format, ...) 
         return true;
     }
 
-    lock_guard<mutex> lock(pimpl_->logger_lock_);
-
     bool result = true;
-    const char* level_str = (log_level >= NONE && log_level <= FATAL) ? LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
+    
+    try {
+        lock_guard<mutex> lock(pimpl_->logger_lock_);
 
-    // Write the log level header (without a timestamp).
-    switch (log_destination_) {
-    case DEST_CONSOLE:
-        result = logToConsole(level_str);
-        break;
-    case DEST_FILE:
-        result = logToFile(level_str);
-        break;
-    case DEST_CONSOLE_AND_FILE:
-        result = logToConsoleAndFile(level_str);
-        break;
-    default:
-        return false;
-    }
+        const char* level_str = (log_level >= NONE && log_level <= FATAL) ? 
+            LOGLEVEL_ABBREVS[static_cast<int>(log_level)] : "";
 
-    if (result) {
-        va_list args;
-        va_start(args, format);
-#ifdef _WIN32
-        vsnprintf_s(log_message_buffer_, MAX_LOGMSG_LENGTH, _TRUNCATE, format, args);
-#else
-        vsnprintf(log_message_buffer_, MAX_LOGMSG_LENGTH, format, args);
-#endif
-        va_end(args);
-
+        // Write the log level header (without a timestamp).
         switch (log_destination_) {
         case DEST_CONSOLE:
-            result = logToConsole(log_message_buffer_);
+            result = logToConsole(level_str);
             break;
         case DEST_FILE:
-            result = logToFile(log_message_buffer_);
+            result = logToFile(level_str);
             break;
         case DEST_CONSOLE_AND_FILE:
-            result = logToConsoleAndFile(log_message_buffer_);
+            result = logToConsoleAndFile(level_str);
             break;
         default:
-            break;
+            return false;
         }
+
+        if (result) {
+            va_list args;
+            va_start(args, format);
+            #ifdef _WIN32
+                vsnprintf_s(log_message_buffer_, MAX_LOGMSG_LENGTH, _TRUNCATE, format, args);
+            #else
+                vsnprintf(log_message_buffer_, MAX_LOGMSG_LENGTH, format, args);
+            #endif
+            va_end(args);
+
+            switch (log_destination_) {
+            case DEST_CONSOLE:
+                result = logToConsole(log_message_buffer_);
+                break;
+            case DEST_FILE:
+                result = logToFile(log_message_buffer_);
+                break;
+            case DEST_CONSOLE_AND_FILE:
+                result = logToConsoleAndFile(log_message_buffer_);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        // Last resort: try to output to stderr
+        fprintf(stderr, "Exception in Logger::log_no_datetime: %s\n", e.what());
+        WriteEmergencyLog("Logger::log_no_datetime exception", __FILE__, __LINE__);
+        return false;
+    }
+    catch (...) {
+        fprintf(stderr, "Unknown exception in Logger::log_no_datetime\n");
+        WriteEmergencyLog("Logger::log_no_datetime unknown exception", __FILE__, __LINE__);
+        return false;
     }
     return result;
 }
 
 bool Logger::logToConsole(const char* log_message_cstring) {
-    fputs(log_message_cstring, stdout);
-    return true;
+    try {
+        if (!log_message_cstring) return false;
+        
+        fputs(log_message_cstring, stdout);
+        fflush(stdout); // Ensure output is flushed
+        return true;
+    }
+    catch (...) {
+        // If we can't even log to console, we're in serious trouble
+        // Try writing to stderr as absolute last resort
+        fprintf(stderr, "EXCEPTION in Logger::logToConsole at %s:%d\n", __FILE__, __LINE__);
+        WriteEmergencyLog("Logger::logToConsole failure", __FILE__, __LINE__);
+        return false;
+    }
 }
 
 bool Logger::logToFile(const char* log_message_cstring) {
-    if (!log_message_cstring || !log_events_to_file_) {
-        return false;
-    }
-
-    // Open file if not already open.
-    if (!pimpl_->log_file_) {
-        pimpl_->log_file_ = safe_fopen(pimpl_->log_path_and_filename_, "a");
-        if (!pimpl_->log_file_) {
+    try {
+        if (!log_message_cstring || !log_events_to_file_) {
             return false;
         }
-    }
 
-    // Write to file.
-    if (fputs(log_message_cstring, pimpl_->log_file_) < 0) {
-        fclose(pimpl_->log_file_);
+        // Open file if not already open.
+        if (!pimpl_->log_file_) {
+            pimpl_->log_file_ = safe_fopen(pimpl_->log_path_and_filename_, "a");
+            if (!pimpl_->log_file_) {
+                // Try to create a backup emergency log if normal log file fails
+                char emergency_path[1024];
+                sprintf_s(emergency_path, "%s.emergency", pimpl_->log_path_and_filename_);
+                pimpl_->log_file_ = safe_fopen(emergency_path, "a");
+                if (!pimpl_->log_file_) {
+                    WriteEmergencyLog("Failed to open log file", __FILE__, __LINE__);
+                    return false;
+                }
+            }
+        }
+
+        // Write to file.
+        if (fputs(log_message_cstring, pimpl_->log_file_) < 0) {
+            // If write fails, close and try to reopen the file
+            FILE* old_file = pimpl_->log_file_;
+            pimpl_->log_file_ = nullptr;
+            fclose(old_file);
+            
+            // Try to reopen
+            pimpl_->log_file_ = safe_fopen(pimpl_->log_path_and_filename_, "a");
+            if (!pimpl_->log_file_ || fputs(log_message_cstring, pimpl_->log_file_) < 0) {
+                WriteEmergencyLog("Failed to write to log file", __FILE__, __LINE__);
+                return false;
+            }
+        }
+
+        fflush(pimpl_->log_file_);
+        return true;
+    }
+    catch (...) {
+        // Try to write to a separate emergency log file
+        WriteEmergencyLog("Exception in Logger::logToFile", __FILE__, __LINE__);
+        
+        // Reset file pointer to ensure next attempt will reopen the file
         pimpl_->log_file_ = nullptr;
         return false;
     }
-
-    fflush(pimpl_->log_file_);
-    return true;
 }
 
 bool Logger::logToConsoleAndFile(const char* log_message_cstring) {
@@ -373,18 +493,48 @@ int Logger::writeToFile(const char* filename, bool append, const char* format, .
 }
 
 void Logger::fatal(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    char formatted_message[MAX_LOGMSG_LENGTH];
-#ifdef _WIN32
-    vsnprintf_s(formatted_message, MAX_LOGMSG_LENGTH, _TRUNCATE, format, args);
-#else
-    vsnprintf(formatted_message, MAX_LOGMSG_LENGTH, format, args);
-#endif
-    va_end(args);
+    try {
+        va_list args;
+        va_start(args, format);
+        char formatted_message[MAX_LOGMSG_LENGTH] = {0};
+        #ifdef _WIN32
+        vsnprintf_s(formatted_message, MAX_LOGMSG_LENGTH, _TRUNCATE, format, args);
+        #else
+        vsnprintf(formatted_message, MAX_LOGMSG_LENGTH, format, args);
+        #endif
+        va_end(args);
 
-    log(FATAL, "%s", formatted_message);
-    if (fatal_error_handler_) {
-        fatal_error_handler_(formatted_message);
+        // Log the fatal message first
+        log(FATAL, "%s", formatted_message);
+        
+        // Also write to the emergency log file (unconditionally)
+        char emergency_message[MAX_LOGMSG_LENGTH + 100];
+        char dt_buf[40];
+        Logger::getDateTimeStr(dt_buf, sizeof(dt_buf));
+        sprintf_s(emergency_message, "[%s FATAL] %s\r\n", dt_buf, formatted_message);
+        
+        HANDLE hFile = CreateFileA("syslogagent_emergency.log", 
+                                 FILE_APPEND_DATA, 
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                 NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (hFile != INVALID_HANDLE_VALUE) {
+            DWORD bytesWritten;
+            WriteFile(hFile, emergency_message, (DWORD)strlen(emergency_message), &bytesWritten, NULL);
+            CloseHandle(hFile);
+        }
+
+        // Call the fatal error handler if available
+        FATAL_ERROR_HANDLER handler = fatal_error_handler_;
+        if (handler) {
+            // We need to use a separate C-style function to handle SEH for the handler
+            SafeCallFatalHandler(handler, formatted_message);
+        }
+    }
+    catch (...) {
+        // Ultimate fallback for catastrophic failures
+        WriteEmergencyLog("Unhandled exception in Logger::fatal", __FILE__, __LINE__);
+        
+        // Try stderr as an absolute last resort
+        fprintf(stderr, "Critical exception in Logger::fatal at %s:%d\n", __FILE__, __LINE__);
     }
 }

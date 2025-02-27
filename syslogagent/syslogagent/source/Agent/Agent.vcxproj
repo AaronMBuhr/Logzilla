@@ -60,19 +60,20 @@
     <TargetName>Syslog$(ProjectName)</TargetName>
     <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir)\lib;$(ProjectDir)\x64\$(Configuration);$(LibraryPath)</LibraryPath>
-    <OutDir>..\..\x64\Debug\</OutDir>
+    <OutDir>$(SolutionDir)\x64\$(Configuration)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UnitTesting|x64'">
     <LinkIncremental>true</LinkIncremental>
     <TargetName>Syslog$(ProjectName)</TargetName>
     <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
+    <OutDir>$(SolutionDir)\x64\$(Configuration)</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <TargetName>Syslog$(ProjectName)</TargetName>
     <LibraryPath>$(ProjectDir)\lib;$(LibraryPath)</LibraryPath>
     <IncludePath>$(ProjectDir);$(ProjectDir)\include;$(IncludePath)</IncludePath>
-    <OutDir>..\..\x64\Release\</OutDir>
+    <OutDir>$(SolutionDir)\x64\$(Configuration)</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -90,6 +91,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ws2_32.lib;winhttp.lib;crypt32.lib;LogZillaInfra.lib;AgentLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\x64\$(Configuration)</AdditionalLibraryDirectories>
+      <OutputFile>$(SolutionDir)x64\$(Configuration)\$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PreLinkEvent>
       <Command>mc message.mc</Command>
@@ -109,6 +111,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>ws2_32.lib;winhttp.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(SolutionDir)x64\$(Configuration)\$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PreLinkEvent>
       <Command>mc message.mc</Command>
@@ -135,6 +138,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>ws2_32.lib;winhttp.lib;ntdll.lib;crypt32.lib;LogZillaInfra.lib;AgentLib.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>..\..\x64\$(Configuration)</AdditionalLibraryDirectories>
+      <OutputFile>$(SolutionDir)x64\$(Configuration)\$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PreLinkEvent>
       <Command>mc message.mc</Command>
@@ -153,30 +157,23 @@
     <ClInclude Include="IEventHandler.h" />
     <ClInclude Include="INetworkClient.h" />
     <ClInclude Include="JSONMessageBatcher.h" />
-    <ClInclude Include="ArrayQueue.h" />
     <ClInclude Include="FileWatcher.h" />
     <ClInclude Include="message.h" />
-    <ClInclude Include="OStreamBuf.h" />
     <ClInclude Include="RateMonitor.h" />
     <ClInclude Include="RecordNumber.h" />
     <ClInclude Include="Configuration.h" />
-    <ClInclude Include="Result.h" />
     <ClInclude Include="Options.h" />
     <ClInclude Include="LogConfiguration.h" />
     <ClInclude Include="Registry.h" />
     <ClInclude Include="Service.h" />
-    <ClInclude Include="SlidingWindowMetrics.h" />
     <ClInclude Include="StatefulLogger.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="SyslogAgentSharedConstants.h" />
     <ClInclude Include="SyslogSender.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TLS.h" />
-    <ClInclude Include="WindowsEvent.h" />
-    <ClInclude Include="WindowsTimer.h" />
     <ClInclude Include="HttpNetworkClient.h" />
     <ClInclude Include="JsonNetworkClient.h" />
-    <ClInclude Include="XMLToJsonConverter.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Agent.cpp" />
@@ -192,12 +189,10 @@
     <ClCompile Include="Configuration.cpp" />
     <ClCompile Include="FileWatcher.cpp" />
     <ClCompile Include="RecordNumber.cpp" />
-    <ClCompile Include="Result.cpp" />
     <ClCompile Include="LogConfiguration.cpp" />
     <ClCompile Include="Options.cpp" />
     <ClCompile Include="Registry.cpp" />
     <ClCompile Include="Service.cpp" />
-    <ClCompile Include="SlidingWindowMetrics.cpp" />
     <ClCompile Include="StatefulLogger.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -206,11 +201,8 @@
     </ClCompile>
     <ClCompile Include="SyslogSender.cpp" />
     <ClCompile Include="TLS.cpp" />
-    <ClCompile Include="WindowsEvent.cpp" />
-    <ClCompile Include="WindowsTimer.cpp" />
     <ClCompile Include="HttpNetworkClient.cpp" />
     <ClCompile Include="JsonNetworkClient.cpp" />
-    <ClCompile Include="XMLToJsonConverter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="message.mc" />
@@ -222,9 +214,6 @@
   <ItemGroup>
     <ProjectReference Include="..\AgentLib\AgentLib.vcxproj">
       <Project>{194f0eb4-cbbd-4497-ae6b-f1de2ff3a366}</Project>
-    </ProjectReference>
-    <ProjectReference Include="..\Infrastructure\Infrastructure.vcxproj">
-      <Project>{1dbe5c78-bcdc-4d64-ac43-81c6a01a3301}</Project>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

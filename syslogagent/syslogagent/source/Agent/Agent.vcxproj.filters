@@ -39,22 +39,10 @@
     <ClInclude Include="Registry.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Result.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="message.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RecordNumber.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ArrayQueue.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="WindowsEvent.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="OStreamBuf.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="TLS.h">
@@ -84,9 +72,6 @@
     <ClInclude Include="EventHandlerMessageQueuer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WindowsTimer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="external\pugixml\src\pugiconfig.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -114,13 +99,7 @@
     <ClInclude Include="EventLogger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="XMLToJsonConverter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RateMonitor.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SlidingWindowMetrics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -149,13 +128,7 @@
     <ClCompile Include="Registry.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Result.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="RecordNumber.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="WindowsEvent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="TLS.cpp">
@@ -176,9 +149,6 @@
     <ClCompile Include="EventHandlerMessageQueuer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WindowsTimer.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="external\pugixml\src\pugixml.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -192,12 +162,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="EventLogger.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="XMLToJsonConverter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SlidingWindowMetrics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="INetworkClient.cpp">

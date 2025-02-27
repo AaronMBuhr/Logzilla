@@ -501,6 +501,13 @@ bool Service::getAndSetLogZillaVersion(const shared_ptr<INetworkClient>& client,
 void Service::initializeEventLogSubscriptions(const vector<LogConfiguration>& logs) {
     auto logger = LOG_THIS;
     try {
+        // Pre-allocate the subscriptions vector to avoid reallocations
+        const size_t log_count = logs.size();
+        logger->debug("Pre-allocating space for %zu event log subscriptions\n", log_count);
+        
+        // Reserve space but don't resize - this avoids default construction
+        subscriptions_.reserve(log_count);
+        
         for (auto& log : logs) {
             // Validate log name before conversion
             if (log.name_.empty()) {
@@ -518,13 +525,6 @@ void Service::initializeEventLogSubscriptions(const vector<LogConfiguration>& lo
                 throw std::runtime_error("Failed to convert log name to UTF-8");
             }
 
-            unique_ptr<EventHandlerMessageQueuer> handler
-                = make_unique<EventHandlerMessageQueuer>(
-                    config_,
-                    primary_message_queue_,
-                    secondary_message_queue_,
-                    const_cast<const wchar_t*>(log.name_.c_str()));
-
             // Get bookmark - try registry first, then config, then use empty string
             wstring bookmark = Registry::readBookmark(log.channel_.c_str());
             if (bookmark.empty() && !config_.getOnlyWhileRunning()) {
@@ -534,15 +534,23 @@ void Service::initializeEventLogSubscriptions(const vector<LogConfiguration>& lo
             const wstring query(L"*");
             const wstring log_name(log.name_);
             const wstring log_channel(log.channel_);
-            EventLogSubscription subscription(
+
+            logger->debug("Creating event handler for %s\n", log_name_buf);
+            
+            // Create a temporary subscription, then move it into place
+            // This uses move assignment which works with unique_ptr
+            subscriptions_.emplace_back(
                 log_name,
                 log_channel,
                 query,
                 bookmark,
                 config_.getOnlyWhileRunning(),
-                std::move(handler));
+                make_unique<EventHandlerMessageQueuer>(
+                    config_,
+                    primary_message_queue_,
+                    secondary_message_queue_,
+                    const_cast<const wchar_t*>(log.name_.c_str())));
 
-            subscriptions_.push_back(std::move(subscription));
             try {
                 // Subscribe with the appropriate flag based on whether we have a bookmark
                 subscriptions_.back().subscribe(bookmark, config_.getOnlyWhileRunning());
@@ -558,6 +566,7 @@ void Service::initializeEventLogSubscriptions(const vector<LogConfiguration>& lo
         throw;
     }
 }
+
 
 void Service::handleQueueStatusAndConfig() {
     auto logger = LOG_THIS;
@@ -590,8 +599,10 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
             handleQueueStatusAndConfig();
             Sleep(100);  // Small sleep to prevent tight loop
             if (++loop_count % 10 == 0) {
-                for (auto& subscription : subscriptions_)
-                    subscription.saveBookmark();
+                // Save bookmarks periodically during normal operation
+                for (auto& subscription : subscriptions_) {
+                    subscription.incrementedSaveBookmark();
+                }
             }
             if (loop_count >= 100) {
                 logger->debug("Service::mainLoop()> heartbeat: 100 loops\n");
@@ -616,6 +627,10 @@ void Service::mainLoop(bool running_as_console, bool& first_loop, int& restart_n
         }
         catch (const std::exception& e) {
             logger->recoverable_error("Service::mainLoop()> Exception: %s\n", e.what());
+        }
+        catch (...) {
+			logger->recoverable_error("Service::mainLoop()> Unknown exception caught in file %s at line %d\n",
+                __FILE__, __LINE__);
         }
     }
 }
@@ -648,6 +663,52 @@ bool Service::checkForShutdown(bool running_as_console, int& restart_needed) {
     return false;
 }
 
+
+// C-style function for logging shutdown exceptions
+void LogShutdownException(DWORD exceptionCode) {
+    // Try to write to emergency log file
+    HANDLE hFile = CreateFileA("syslogagent_crash.log", 
+                           FILE_APPEND_DATA, 
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        char buffer[1024];
+        time_t now = time(NULL);
+        struct tm tm_now;
+        localtime_s(&tm_now, &now);
+        
+        int len = sprintf_s(buffer, "[%04d-%02d-%02d %02d:%02d:%02d] EXCEPTION DURING SHUTDOWN: Code=0x%08X\r\n", 
+                        tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday, 
+                        tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec,
+                        exceptionCode);
+        DWORD bytesWritten;
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        CloseHandle(hFile);
+    }
+}
+
+// C-style function for logging normal exit
+void LogNormalExit() {
+    // Write to emergency log file
+    HANDLE hFile = CreateFileA("syslogagent_exit.log", 
+                           FILE_APPEND_DATA, 
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        char buffer[1024];
+        time_t now = time(NULL);
+        struct tm tm_now;
+        localtime_s(&tm_now, &now);
+        int len = sprintf_s(buffer, "[%04d-%02d-%02d %02d:%02d:%02d] APPLICATION EXIT: Normal shutdown\r\n", 
+                     tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday, 
+                     tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec);
+        DWORD bytesWritten;
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        CloseHandle(hFile);
+    }
+}
+
+
 void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
     auto logger = LOG_THIS;
     if (restart_needed) {
@@ -666,6 +727,12 @@ void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
             secondary_message_queue_->beginShutdown();
         }
 
+        // Save all bookmarks before closing subscriptions
+        logger->debug2("Service::cleanupAndShutdown()> Saving bookmarks for %zu subscriptions\n", subscriptions_.size());
+        for (auto& subscription : subscriptions_) {
+            subscription.saveBookmark();
+        }
+
         // Close all subscriptions to stop incoming messages
         for (auto& subscription : subscriptions_) {
             subscription.cancelSubscription();
@@ -681,7 +748,10 @@ void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
         cleanupNetworkClient(primary_network_client_);
         cleanupNetworkClient(secondary_network_client_);
 
-        Service::sender_->requestStop();
+        // Use the notification-based stop request to wake up the sender thread
+        if (sender_) {
+            sender_->requestStopAndNotify();
+        }
 
         // Now wait for send thread to complete
         if (send_thread_ && send_thread_->joinable()) {
@@ -737,6 +807,9 @@ void Service::cleanupAndShutdown(bool running_as_console, int restart_needed) {
     catch (const std::exception& e) {
         logger->fatal("Exception during cleanup: %s\n", e.what());
     }
+    
+    // Use C function to log normal exit
+    LogNormalExit();
 }
 
 void Service::shutdown() {

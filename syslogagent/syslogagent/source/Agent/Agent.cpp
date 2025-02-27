@@ -31,7 +31,98 @@ static void service_addEventSource(const wchar_t* path);
 
 static int run_as_console();
 
+// Pure C function for structured exception handling
+LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* pExceptionInfo) {
+    // Get the exception code
+    DWORD exceptionCode = pExceptionInfo->ExceptionRecord->ExceptionCode;
+    DWORD exceptionFlags = pExceptionInfo->ExceptionRecord->ExceptionFlags;
+    LPVOID exceptionAddress = pExceptionInfo->ExceptionRecord->ExceptionAddress;
+    
+    // Try to log using printf as logging system might not be available
+    fprintf(stderr, "UNHANDLED EXCEPTION: Code=0x%08X, Flags=0x%08X, Address=0x%p\n", 
+            exceptionCode, exceptionFlags, exceptionAddress);
+    
+    // Create an emergency log file with the exception info
+    HANDLE hFile = CreateFileA("syslogagent_crash.log", 
+                           FILE_APPEND_DATA, 
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        char buffer[1024];
+        time_t now = time(NULL);
+        struct tm tm_now;
+        localtime_s(&tm_now, &now);
+        
+        int len = sprintf_s(buffer, "[%04d-%02d-%02d %02d:%02d:%02d] FATAL CRASH: Exception 0x%08X at address 0x%p\r\n", 
+                        tm_now.tm_year + 1900, tm_now.tm_mon + 1, tm_now.tm_mday, 
+                        tm_now.tm_hour, tm_now.tm_min, tm_now.tm_sec,
+                        exceptionCode, exceptionAddress);
+        DWORD bytesWritten;
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        
+        // Additional information about the exception
+        switch (exceptionCode) {
+            case EXCEPTION_ACCESS_VIOLATION:
+                len = sprintf_s(buffer, "ACCESS VIOLATION: %s operation at address 0x%p\r\n",
+                            pExceptionInfo->ExceptionRecord->ExceptionInformation[0] ? "Write" : "Read",
+                            (void*)pExceptionInfo->ExceptionRecord->ExceptionInformation[1]);
+                break;
+            case EXCEPTION_STACK_OVERFLOW:
+                len = sprintf_s(buffer, "STACK OVERFLOW\r\n");
+                break;
+            case EXCEPTION_ILLEGAL_INSTRUCTION:
+                len = sprintf_s(buffer, "ILLEGAL INSTRUCTION\r\n");
+                break;
+            case EXCEPTION_PRIV_INSTRUCTION:
+                len = sprintf_s(buffer, "PRIVILEGED INSTRUCTION\r\n");
+                break;
+            default:
+                len = sprintf_s(buffer, "EXCEPTION CODE: 0x%08X\r\n", exceptionCode);
+                break;
+        }
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        
+        // Register info
+        CONTEXT* ctx = pExceptionInfo->ContextRecord;
+        #ifdef _M_X64
+        len = sprintf_s(buffer, "Registers: RAX=0x%016llX, RBX=0x%016llX, RCX=0x%016llX, RDX=0x%016llX\r\n", 
+                    ctx->Rax, ctx->Rbx, ctx->Rcx, ctx->Rdx);
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        len = sprintf_s(buffer, "          RSI=0x%016llX, RDI=0x%016llX, RBP=0x%016llX, RSP=0x%016llX\r\n", 
+                    ctx->Rsi, ctx->Rdi, ctx->Rbp, ctx->Rsp);
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        len = sprintf_s(buffer, "          RIP=0x%016llX\r\n", ctx->Rip);
+        #else
+        len = sprintf_s(buffer, "Registers: EAX=0x%08X, EBX=0x%08X, ECX=0x%08X, EDX=0x%08X\r\n", 
+                    ctx->Eax, ctx->Ebx, ctx->Ecx, ctx->Edx);
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        len = sprintf_s(buffer, "          ESI=0x%08X, EDI=0x%08X, EBP=0x%08X, ESP=0x%08X\r\n", 
+                    ctx->Esi, ctx->Edi, ctx->Ebp, ctx->Esp);
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        len = sprintf_s(buffer, "          EIP=0x%08X\r\n", ctx->Eip);
+        #endif
+        WriteFile(hFile, buffer, len, &bytesWritten, NULL);
+        
+        CloseHandle(hFile);
+    }
+    
+    // Log to event log as a last resort
+    HANDLE hEventLog = RegisterEventSourceA(NULL, "SyslogAgent");
+    if (hEventLog) {
+        char msg[256];
+        sprintf_s(msg, "SyslogAgent crashed with exception 0x%08X at address 0x%p", 
+                exceptionCode, exceptionAddress);
+        const char* strings[] = { msg };
+        ReportEventA(hEventLog, EVENTLOG_ERROR_TYPE, 0, 0, NULL, 1, 0, strings, NULL);
+        DeregisterEventSource(hEventLog);
+    }
+    
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 int wmain(int argc, wchar_t *argv[]) {
+    // Install global unhandled exception handler
+    SetUnhandledExceptionFilter(GlobalExceptionHandler);
 
     auto logger = LOG_THIS;
 
@@ -113,6 +204,20 @@ int wmain(int argc, wchar_t *argv[]) {
     }
 
     return 0;
+}
+
+// C-style helper to log a crash when running in console mode
+void LogConsoleModeCrash() {
+    HANDLE hFile = CreateFileA("syslogagent_crash.log", 
+                           FILE_APPEND_DATA, 
+                           FILE_SHARE_READ | FILE_SHARE_WRITE,
+                           NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        const char* msg = "Application crashed in console mode\r\n";
+        DWORD bytesWritten;
+        WriteFile(hFile, msg, (DWORD)strlen(msg), &bytesWritten, NULL);
+        CloseHandle(hFile);
+    }
 }
 
 static int run_as_console() {

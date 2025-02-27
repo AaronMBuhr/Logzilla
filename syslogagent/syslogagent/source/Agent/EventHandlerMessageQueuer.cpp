@@ -196,7 +196,7 @@ namespace Syslog_agent {
     {
         auto logger = LOG_THIS;
         // Use stack-based buffer for stream
-        OStreamBuf ostream_buffer(json_buffer, buflen);
+        OStreamBuf<char> ostream_buffer(json_buffer, buflen);
         std::ostream json_output(&ostream_buffer);
 
         auto checkBufferSpace = [&](const char* field_name, size_t needed_space) -> bool {
@@ -406,6 +406,7 @@ namespace Syslog_agent {
         const wchar_t* subscription_name, EventLogEvent& event)
     {
         auto logger = LOG_THIS;
+        
         char* json_buffer = Globals::instance()->getMessageBuffer("eventHandlerMessageQueuer");
 
         try {

@@ -39,8 +39,14 @@ public:
 
     void run() const;
 
-    static void requestStop() { stop_requested_ = true; }
-    static bool isStopRequested() { return stop_requested_; }
+    void requestStopAndNotify() { 
+        auto logger = LOG_THIS;
+        logger->debug2("SyslogSender::requestStopAndNotify()> Requesting stop and notifying threads\n");
+        stop_requested_ = true; 
+        batch_cv_.notify_all(); // Wake up any threads waiting for a batch
+    }
+    
+    bool isStopRequested() const { return stop_requested_; }
 
     // Hook for message queue operations - called before/after message enqueue
     bool enqueueHook(size_t queue_length, MessageQueue::Message* message, bool is_pre_enqueue) const;
@@ -87,7 +93,7 @@ protected:
     }
 
 private:
-    static std::atomic<bool> stop_requested_;
+    std::atomic<bool> stop_requested_;
 
     const uint32_t max_batch_count_;
     const uint32_t max_batch_age_;

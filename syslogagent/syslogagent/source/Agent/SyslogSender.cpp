@@ -18,9 +18,6 @@ Copyright 2021 Logzilla Corp.
 
 namespace Syslog_agent {
 
-// Define static members
-std::atomic<bool> SyslogSender::stop_requested_ = false;
-
 SyslogSender::SyslogSender(
     std::shared_ptr<MessageQueue> primary_queue,
     std::shared_ptr<MessageQueue> secondary_queue,
@@ -30,7 +27,8 @@ SyslogSender::SyslogSender(
     std::shared_ptr<MessageBatcher> secondary_batcher,
     uint32_t max_batch_count,
     uint32_t max_batch_age)
-    : max_batch_count_(max_batch_count)
+    : stop_requested_(false)
+    , max_batch_count_(max_batch_count)
     , max_batch_age_(max_batch_age)
     , primary_queue_(std::move(primary_queue))
     , secondary_queue_(std::move(secondary_queue))
@@ -75,23 +73,43 @@ uint64_t SyslogSender::next_wait_time_ms(uint64_t longest_wait_time_ms) const {
 
 bool SyslogSender::waitForBatch(MessageQueue* first_queue, MessageQueue* second_queue) const {
     auto logger = LOG_THIS;
+    
+    // Check stop requested before locking
+    if (this->isStopRequested()) {
+        logger->debug3("SyslogSender::waitForBatch()> Stop requested before lock\n");
+        return false;
+    }
+    
     std::unique_lock<std::mutex> lock(batch_mutex_);
+    
     auto size_check = [this, first_queue, second_queue]() { 
-        return (first_queue && first_queue->length() >= max_batch_count_) 
-            || (second_queue && second_queue->length() >= max_batch_count_); 
+        return this->isStopRequested() || 
+               (first_queue && first_queue->length() >= max_batch_count_) || 
+               (second_queue && second_queue->length() >= max_batch_count_); 
     };
+    
     if (size_check()) {
         return false;
     }
+    
     auto wait_time_ms = next_wait_time_ms(max_batch_age_);
 	if (wait_time_ms == 0) {
 		return false;
 	}
-    logger->debug3("-------------------------------------------------------------------> SyslogSender::waitForBatch()> queue sizes: %d %d, wait time %lu\n", 
+    
+    logger->debug3("SyslogSender::waitForBatch()> queue sizes: %d %d, wait time %lu\n", 
         (first_queue ? first_queue->length() : 0),
         (second_queue ? second_queue->length() : 0), 
         wait_time_ms);
+    
     batch_cv_.wait_for(lock, std::chrono::milliseconds(wait_time_ms), size_check);
+    
+    // Also check for stop request after waking up
+    if (this->isStopRequested()) {
+        logger->debug3("SyslogSender::waitForBatch()> Stop requested after wait\n");
+        return false;
+    }
+    
     return true;
 }
 
@@ -104,17 +122,21 @@ void SyslogSender::run() const {
     bool primary_has_messages = true;
     bool secondary_has_messages = true;
 
-    while (!isStopRequested()) {
+    while (!this->isStopRequested()) {
         try {
             logger->debug3("SyslogSender::run()> Queue lengths - Primary: %d, Secondary: %d\n",
                 primary_queue ? primary_queue->length() : 0,
                 secondary_queue ? secondary_queue->length() : 0);
-                
-            while (waitForBatch(
-                primary_has_messages ? primary_queue : nullptr, 
-                secondary_has_messages ? secondary_queue : nullptr));
+            
+            bool continue_waiting = true;
+            while (continue_waiting && !this->isStopRequested()) {
+                continue_waiting = waitForBatch(
+                    primary_has_messages ? primary_queue : nullptr, 
+                    secondary_has_messages ? secondary_queue : nullptr);
+            }
 
-            if (isStopRequested()) {
+            if (this->isStopRequested()) {
+                logger->debug2("SyslogSender::run()> Stop requested, breaking out of main loop\n");
                 break;
             }
 
@@ -178,6 +200,11 @@ void SyslogSender::run() const {
             logger->recoverable_error("SyslogSender::run()> Exception: %s\n", e.what());
             Sleep(max_batch_age_); // Wait a bit before retrying
         }
+        catch (...) {
+			logger->recoverable_error("SyslogSender::run()> Unknown exception caught in file %s at line %d\n",
+                __FILE__, __LINE__);
+			Sleep(max_batch_age_); // Wait a bit before retrying
+        }
     }
 
     logger->debug2("SyslogSender::run()> Sender thread stopping\n");
@@ -197,7 +224,7 @@ int SyslogSender::sendMessageBatch(
     }
 
     // Check if we're shutting down
-    if (isShuttingDown() || msg_queue->isShuttingDown()) {
+    if (this->isShuttingDown() || msg_queue->isShuttingDown()) {
         logger->debug2("SyslogSender::sendMessageBatch()> Shutdown in progress, skipping batch send\n");
         return 0;
     }
@@ -221,7 +248,7 @@ int SyslogSender::sendMessageBatch(
 
         if (result != INetworkClient::RESULT_SUCCESS) {
             // Don't log as critical during shutdown - it's expected to fail
-            if (isShuttingDown() || msg_queue->isShuttingDown()) {
+            if (this->isShuttingDown() || msg_queue->isShuttingDown()) {
                 logger->debug2("SyslogSender::sendMessageBatch()> Network send failed during shutdown\n");
             }
             else {
@@ -257,8 +284,14 @@ int SyslogSender::sendMessageBatch(
     catch (const std::exception& e) {
         logger->critical("SyslogSender::sendMessageBatch()> Exception: %s\n", e.what());
         return 0; // Return 0 to indicate no messages were processed
+	}
+    catch (...) {
+        logger->critical("SyslogSender::sendMessageBatch()> Unknown exception caught in file %s at line %d\n",
+            __FILE__, __LINE__);
+        return 0; // Return 0 to indicate no messages were processed
     }
 }
+
 
 bool SyslogSender::enqueueHook(size_t queue_length, MessageQueue::Message* message, bool is_pre_enqueue) const {
     if (is_pre_enqueue) {

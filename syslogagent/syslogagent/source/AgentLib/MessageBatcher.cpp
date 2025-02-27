@@ -2,6 +2,7 @@
 #include "MessageBatcher.h"
 #include "MessageQueue.h"
 #include "../Infrastructure/Logger.h"
+#include <typeinfo>
 
 namespace Syslog_agent {
 
@@ -44,9 +45,12 @@ namespace Syslog_agent {
 
             // Get header
             GetMessageHeader_(batch_buffer, buffer_size, header_size);
-            if (header_size == 0) {
+            // Check for header failure - could be either:
+            // 1. The header size is 0 when it's not supposed to be (failure in header generation)
+            // 2. The header is too large for the buffer
+            if (header_size > buffer_size) {
                 logger->recoverable_error("MessageBatcher::BatchEventsInternal()> Header too large\n");
-                return BatchResult(BatchResult::Status::BufferTooSmall);
+                return BatchResult(BatchResult::Status::BufferTooSmall, 0, 0); // Ensure no messages are reported as batched
             }
 
             // Get separator and trailer sizes
@@ -60,7 +64,7 @@ namespace Syslog_agent {
             if (buffer_size < (header_size + trailer_size + 1)) {
                 logger->recoverable_error("MessageBatcher::BatchEventsInternal()> Buffer size %zu too small for minimal batch (need %zu)\n",
                     buffer_size, header_size + trailer_size + 1);
-                return BatchResult(BatchResult::Status::BufferTooSmall);
+                return BatchResult(BatchResult::Status::BufferTooSmall, 0, 0);
             }
 
             std::uint32_t max_batch = (std::min)(max_batch_size_, static_cast<std::uint32_t>(queue_length));
@@ -102,7 +106,7 @@ namespace Syslog_agent {
                     logger->recoverable_error("MessageBatcher::BatchEventsInternal()> Buffer too small for even one message (needs %zu, have %zu)\n",
                         space_needed + header_size, buffer_size);
                     this->ReleaseBatchBuffer(peek_buffer);
-                    return BatchResult(BatchResult::Status::BufferTooSmall);
+                    return BatchResult(BatchResult::Status::BufferTooSmall, 0, 0);
                 }
                 else if (current_pos + space_needed > buffer_size) {
                     // Not enough space for message + separator (if needed) + trailer
@@ -150,19 +154,15 @@ namespace Syslog_agent {
 
             // Add trailer if we batched any messages
             if (messages_batched > 0) {
-                // Double-check that we have enough space for the trailer
-                if (buffer_size - current_pos <= trailer_size) {
+                // Check if we have enough space left for the trailer
+                if (buffer_size - current_pos < trailer_size) {
                     logger->warning("MessageBatcher::BatchEventsInternal()> Not enough space left for trailer, need %zu, have %zu\n", 
                         trailer_size, buffer_size - current_pos);
-                    return BatchResult(BatchResult::Status::BufferTooSmall);
+                    return BatchResult(BatchResult::Status::BufferTooSmall, 0, 0);
                 }
                 
                 size_t actual_trailer_size = 0;
                 GetMessageTrailer_(batch_buffer + current_pos, buffer_size - current_pos, actual_trailer_size);
-                if (actual_trailer_size == 0) {
-                    logger->warning("MessageBatcher::BatchEventsInternal()> Failed to add trailer\n");
-                    return BatchResult(BatchResult::Status::BufferTooSmall);
-                }
                 current_pos += actual_trailer_size;
             }
 

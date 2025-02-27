@@ -36,7 +36,26 @@ namespace Syslog_agent {
             bookmark_xml_buffer_[0] = 0;
         }
 
+        // Move constructor
         EventLogSubscription(EventLogSubscription&& source) noexcept;
+
+        // Move assignment operator
+        EventLogSubscription& operator=(EventLogSubscription&& source) noexcept;
+        
+        // Default constructor - creates an empty, uninitialized subscription
+        // This is needed for vector operations
+        EventLogSubscription() : 
+            bookmark_(NULL),
+            subscription_handle_(NULL),
+            subscription_active_(false),
+            bookmark_modified_(false),
+            last_bookmark_save_(0),
+            events_since_last_save_(0),
+            only_while_running_(false)
+        {
+            bookmark_xml_buffer_[0] = 0;
+        }
+
         ~EventLogSubscription();
 
         void subscribe(const wstring& bookmark_xml, const bool only_while_running);
@@ -52,6 +71,8 @@ namespace Syslog_agent {
             }
             return false;
         }
+        EVT_HANDLE getBookmark() const { return bookmark_; }
+        bool updateBookmark(EVT_HANDLE hEvent);
 
     private:
         static DWORD WINAPI handleSubscriptionEvent(
@@ -73,7 +94,7 @@ namespace Syslog_agent {
         wchar_t bookmark_xml_buffer_[MAX_BOOKMARK_SIZE];
         bool only_while_running_;
 
-        // Now store a pointer to IEventHandler instead of ChannelEventHandlerBase
+        // Store a unique_ptr to IEventHandler
         unique_ptr<IEventHandler> event_handler_;
 
         EVT_HANDLE bookmark_;

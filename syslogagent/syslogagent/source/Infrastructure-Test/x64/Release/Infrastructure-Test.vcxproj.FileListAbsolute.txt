@@ -1,1 +1,2 @@
+E:\Source\Mine\Logzilla\syslogagent\source-fix\Infrastructure-Test\x64\Release\Infrastr.D9C362CF.Up2Date
 E:\Source\Mine\Logzilla\syslogagent\syslogagent\source\Infrastructure-Test\x64\Release\Infrastr.D9C362CF.Up2Date

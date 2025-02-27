@@ -2,10 +2,14 @@
 
 #ifdef _WIN32
 #include "pch.h"
+#ifdef INFRASTRUCTURE_STATIC
+#define INFRASTRUCTURE_API
+#else
 #ifdef INFRASTRUCTURE_EXPORTS
 #define INFRASTRUCTURE_API __declspec(dllexport)
 #else
 #define INFRASTRUCTURE_API __declspec(dllimport)
+#endif
 #endif
 #else
 #define INFRASTRUCTURE_API
@@ -21,6 +25,8 @@
 #include <cstring>
 #include <cstdio>
 #include "framework.h"
+
+#define LOG_HERE(logger) logger->debug3("LOG_HERE> %s:%s (#%d)\n", __FILE__, __func__, __LINE__)
 
 // Macro for printf format checking (MSVC doesn't support __attribute__ so we disable it)
 #ifdef _MSC_VER

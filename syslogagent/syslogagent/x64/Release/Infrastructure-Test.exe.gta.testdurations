@@ -8,6 +8,20 @@
     <TestDuration Test="BitmapTest.GetAndClearFirstOne" Duration="1" />
     <TestDuration Test="BitmapTest.GetAndSetFirstZero" Duration="1" />
     <TestDuration Test="BitmapTest.CountOnesAndZeroes" Duration="1" />
-    <TestDuration Test="TestCaseName.TestName" Duration="1" />
+    <TestDuration Test="OStreamBufTest.BasicWriting" Duration="1" />
+    <TestDuration Test="OStreamBufTest.MultipleWrites" Duration="1" />
+    <TestDuration Test="OStreamBufTest.BufferOverflow" Duration="1" />
+    <TestDuration Test="OStreamBufTest.DifferentTypes" Duration="1" />
+    <TestDuration Test="OStreamBufTest.StreamManipulators" Duration="1" />
+    <TestDuration Test="OStreamBufTest.EmptyString" Duration="1" />
+    <TestDuration Test="OStreamBufTest.ExactCapacity" Duration="1" />
+    <TestDuration Test="OStreamBufWideTest.WideCharSupport" Duration="1" />
+    <TestDuration Test="OStreamBufSmallTest.MinimalBuffer" Duration="1" />
+    <TestDuration Test="WindowsEventTest.BasicSignalAndWait" Duration="107" />
+    <TestDuration Test="WindowsEventTest.WaitTimeout" Duration="62" />
+    <TestDuration Test="WindowsEventTest.ResetAfterSignal" Duration="1" />
+    <TestDuration Test="WindowsEventTest.MultipleSignalsWithoutReset" Duration="1" />
+    <TestDuration Test="WindowsEventTest.CloseHandle" Duration="1" />
+    <TestDuration Test="WindowsEventTest.MultipleWaiters" Duration="108" />
   </TestDurations>
 </GtaTestDurations>

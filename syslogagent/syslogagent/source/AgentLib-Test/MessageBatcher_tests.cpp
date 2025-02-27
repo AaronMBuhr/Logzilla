@@ -357,8 +357,8 @@ protected:
     std::uint32_t GetMaxBatchSizeBytes_() const override { return 1024; }
 
     // Simulate failure: header too large (or unable to produce header)
-    void GetMessageHeader_(char* /*dest*/, size_t /*max_size*/, size_t& size_out) const override {
-        size_out = 0;
+    void GetMessageHeader_(char* /*dest*/, size_t max_size, size_t& size_out) const override {
+        size_out = max_size + 1; // Return a size larger than the available space
     }
 
     void GetMessageSeparator_(char* dest, size_t max_size, size_t& size_out) const override {
@@ -435,9 +435,11 @@ protected:
         }
     }
 
-    // Simulate trailer failure: cannot write trailer to buffer.
-    void GetMessageTrailer_(char* /*dest*/, size_t /*max_size*/, size_t& size_out) const override {
-        size_out = 0;
+    // Simulate a trailer that's too large for the buffer
+    void GetMessageTrailer_(char* dest, size_t max_size, size_t& size_out) const override {
+        // When called for size calculation in temp_buffer, return a very large size
+        // that will trigger the buffer-too-small check
+        size_out = 2000; // Much larger than our buffer size (1024)
     }
 };
 

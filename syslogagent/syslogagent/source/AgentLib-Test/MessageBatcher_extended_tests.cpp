@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 #include "../Agent/HTTPMessageBatcher.h"  // Your HTTPMessageBatcher subclass
 #include "../AgentLib/MessageQueue.h"
+#include "MessageQueueTestExtensions.h"
 #include <chrono>
 #include <thread>
 #include <nlohmann/json.hpp>

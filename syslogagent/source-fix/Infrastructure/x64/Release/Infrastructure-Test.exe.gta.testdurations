@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GtaTestDurations xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Executable>E:\Source\Mine\Logzilla\syslogagent\source-fix\Infrastructure\x64\Release\Infrastructure-Test.exe</Executable>
+  <TestDurations>
+    <TestDuration Test="BitmapTest.BitSetAndClear" Duration="1" />
+    <TestDuration Test="BitmapTest.GetAndClearFirstOne" Duration="1" />
+    <TestDuration Test="BitmapTest.GetAndSetFirstZero" Duration="1" />
+    <TestDuration Test="BitmapTest.CountOnesAndZeroes" Duration="1" />
+    <TestDuration Test="OStreamBufTest.BasicWriting" Duration="1" />
+    <TestDuration Test="OStreamBufTest.MultipleWrites" Duration="1" />
+    <TestDuration Test="OStreamBufTest.BufferOverflow" Duration="1" />
+    <TestDuration Test="OStreamBufTest.DifferentTypes" Duration="1" />
+    <TestDuration Test="OStreamBufTest.StreamManipulators" Duration="1" />
+    <TestDuration Test="OStreamBufWideTest.WideCharSupport" Duration="1" />
+  </TestDurations>
+</GtaTestDurations>

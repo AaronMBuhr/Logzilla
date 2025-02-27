@@ -232,24 +232,39 @@ void Registry::writeBookmark(const wchar_t* channel, const wchar_t* bookmark_buf
     wchar_t tempbuf[4096];
     swprintf_s(tempbuf, 4096, L"%s\\%s",
         SharedConstants::RegistryKey::CHANNELS_KEY, channel);
+    
+    // Try to open the key first
     status = RegOpenKeyEx(HKEY_LOCAL_MACHINE, tempbuf, 0,
         KEY_WRITE, &channel_key);
+    
+    // If key doesn't exist, create it
     if (status != ERROR_SUCCESS) {
-        DWORD error = GetLastError();
-        Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
-        logger->recoverable_error("Registry::writeBookmark()> error %d,"
-            " could not open channel %s\n", error, reinterpret_cast<char*>(tempbuf));
-        return;
+        DWORD disposition;
+        status = RegCreateKeyExW(HKEY_LOCAL_MACHINE, tempbuf, 0, NULL,
+            REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &channel_key, &disposition);
+        
+        if (status != ERROR_SUCCESS) {
+            DWORD error = GetLastError();
+            Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
+            logger->recoverable_error("Registry::writeBookmark()> error %d,"
+                " could not create/open channel %s\n", error, reinterpret_cast<char*>(tempbuf));
+            return;
+        }
+        
+        logger->debug2("Registry::writeBookmark()> Created new registry key for channel %ls\n", channel);
     }
 
     status = RegSetValueEx(channel_key, SharedConstants::RegistryKey::CHANNEL_BOOKMARK,
         0, REG_SZ, (LPBYTE)bookmark_buffer, buffer_size);
-    RegCloseKey(channel_key);
+    
     if (status != ERROR_SUCCESS) {
         DWORD error = GetLastError();
+        RegCloseKey(channel_key);
         Util::toPrintableAscii(reinterpret_cast<char*>(tempbuf), sizeof(tempbuf), channel, ' ');
         logger->recoverable_error("Registry::writeBookmark()> error %d,"
             " could not write bookmark for channel %s\n", error, reinterpret_cast<char*>(tempbuf));
+    } else {
+        RegCloseKey(channel_key);
     }
 }
 

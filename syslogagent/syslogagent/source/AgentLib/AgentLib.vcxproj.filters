@@ -27,6 +27,15 @@
     <ClInclude Include="MessageQueue.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HTTPMessageBatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IEventHandler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="JSONMessageBatcher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">

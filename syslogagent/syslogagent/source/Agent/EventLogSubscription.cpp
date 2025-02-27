@@ -9,11 +9,52 @@
 
 namespace Syslog_agent {
 
+    // C-style function for handling SEH exceptions
+    // This has no C++ objects so it can safely use __try/__except
+    static DWORD HandleSubscriptionSEH(
+        EVT_SUBSCRIBE_NOTIFY_ACTION action,
+        PVOID pContext,
+        EVT_HANDLE hEvent)
+    {
+        auto logger = LOG_THIS;
+
+        __try {
+            // Call into the C++ implementation
+            auto subscription = reinterpret_cast<EventLogSubscription*>(pContext);
+            if (!subscription) {
+                return ERROR_INVALID_PARAMETER;
+            }
+
+            // Handle updates to bookmark - this might throw SEH
+            if (action == EvtSubscribeActionDeliver && hEvent) {
+                EVT_HANDLE bookmark = subscription->getBookmark();
+                if (bookmark) {
+                    if (!subscription->updateBookmark(hEvent)) {
+                        DWORD lastError = GetLastError();
+                        logger->recoverable_error("HandleSubscriptionSEH()> Failed to update bookmark, error: %lu\n",
+                            lastError);
+                        return lastError;
+                    }
+                    return ERROR_SUCCESS;
+                }
+            }
+
+            return ERROR_SUCCESS; // Successfully handled SEH-prone operations
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) {
+            // Return the Windows exception code
+            DWORD exceptionCode = GetExceptionCode();
+            logger->critical("HandleSubscriptionSEH()> Structured exception: 0x%08X at %s:%d\n",
+                exceptionCode, __FILE__, __LINE__);
+            return exceptionCode;
+        }
+    }
+
     // Move constructor
     EventLogSubscription::EventLogSubscription(EventLogSubscription&& source) noexcept
-        : subscription_name_(source.subscription_name_),
-        channel_(source.channel_),
-        query_(source.query_),
+        : subscription_name_(std::move(source.subscription_name_)),
+        channel_(std::move(source.channel_)),
+        query_(std::move(source.query_)),
         event_handler_(std::move(source.event_handler_)),
         bookmark_(source.bookmark_),
 		only_while_running_(source.only_while_running_),
@@ -25,14 +66,60 @@ namespace Syslog_agent {
     {
         memcpy(bookmark_xml_buffer_, source.bookmark_xml_buffer_, sizeof(bookmark_xml_buffer_));
 
+        // Clear source pointers to prevent double deletion
         source.bookmark_ = NULL;
         source.subscription_handle_ = NULL;
         source.bookmark_xml_buffer_[0] = 0;
+        // No need to reset event_handler_ as it's been moved
 
         if (source.subscription_active_) {
             source.subscription_active_ = false;
             subscribe(bookmark_xml_buffer_, source.only_while_running_);
         }
+    }
+
+    // Move assignment operator
+    EventLogSubscription& EventLogSubscription::operator=(EventLogSubscription&& source) noexcept {
+        if (this != &source) {
+            // Clean up existing resources
+            if (subscription_active_) {
+                cancelSubscription();
+            }
+            
+            if (bookmark_ != NULL) {
+                EvtClose(bookmark_);
+                bookmark_ = NULL;
+            }
+            
+            // Move resource ownership
+            subscription_name_ = std::move(source.subscription_name_);
+            channel_ = std::move(source.channel_);
+            query_ = std::move(source.query_);
+            event_handler_ = std::move(source.event_handler_);
+            bookmark_ = source.bookmark_;
+            only_while_running_ = source.only_while_running_;
+            subscription_handle_ = source.subscription_handle_;
+            subscription_active_ = false; // We'll resubscribe if needed
+            bookmark_modified_ = source.bookmark_modified_;
+            last_bookmark_save_ = source.last_bookmark_save_;
+            events_since_last_save_ = 0;
+            
+            memcpy(bookmark_xml_buffer_, source.bookmark_xml_buffer_, sizeof(bookmark_xml_buffer_));
+            
+            // Clear source handles to prevent double deletion
+            source.bookmark_ = NULL;
+            source.subscription_handle_ = NULL;
+            source.bookmark_xml_buffer_[0] = 0;
+            // event_handler_ is already moved, no need to clear
+            
+            // Resubscribe if the source was active
+            if (source.subscription_active_) {
+                source.subscription_active_ = false;
+                subscribe(bookmark_xml_buffer_, source.only_while_running_);
+            }
+        }
+        
+        return *this;
     }
 
     // Destructor
@@ -143,7 +230,7 @@ namespace Syslog_agent {
     void EventLogSubscription::cancelSubscription() {
         auto logger = LOG_THIS;
         if (subscription_active_) {
-            saveBookmark();
+            // saveBookmark();
             if (subscription_handle_) {
                 if (!EvtClose(subscription_handle_)) {
                     logger->recoverable_error("EventLogSubscription::cancelSubscription()> "
@@ -157,18 +244,24 @@ namespace Syslog_agent {
     }
 
     DWORD WINAPI EventLogSubscription::handleSubscriptionEvent(
-        EVT_SUBSCRIBE_NOTIFY_ACTION action,
-        PVOID pContext,
-        EVT_HANDLE hEvent)
+        EVT_SUBSCRIBE_NOTIFY_ACTION action, 
+        PVOID pContext, 
+        EVT_HANDLE hEvent) 
     {
         auto logger = LOG_THIS;
-        auto subscription = reinterpret_cast<EventLogSubscription*>(pContext);
-        if (!subscription) {
-            logger->critical("EventLogSubscription::handleSubscriptionEvent()> Invalid subscription context\n");
-            return ERROR_INVALID_PARAMETER;
-        }
-
+        
         try {
+            // First, handle the SEH-prone parts in a separate C function
+            DWORD sehResult = HandleSubscriptionSEH(action, pContext, hEvent);
+            if (sehResult != ERROR_SUCCESS) {
+                logger->critical("EventLogSubscription::handleSubscriptionEvent()> Structured exception: 0x%08X at %s:%d\n",
+                    sehResult, __FILE__, __LINE__);
+                return ERROR_SUCCESS;
+            }
+            
+            // If we get here, we've handled the SEH-prone parts successfully
+            EventLogSubscription* subscription = static_cast<EventLogSubscription*>(pContext);
+            
             switch (action) {
             case EvtSubscribeActionError:
                 if (hEvent && (DWORD_PTR)hEvent != ERROR_EVT_QUERY_RESULT_STALE) {
@@ -178,33 +271,36 @@ namespace Syslog_agent {
                 break;
 
             case EvtSubscribeActionDeliver:
-                if (hEvent && subscription->event_handler_) {
-                    // Update the bookmark with the current event
-                    if (subscription->bookmark_) {
-                        if (!EvtUpdateBookmark(subscription->bookmark_, hEvent)) {
-                            logger->recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Failed to update bookmark, error: %lu\n",
-                                GetLastError());
-                        } else {
-                            subscription->bookmark_modified_ = true;
-                        }
-                    }
-
+                if (hEvent && subscription) {
 #if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
                     SlidingWindowMetrics::instance().recordIncoming();
 #endif
-                    // Create EventLogEvent from handle
+
+                    // Create EventLogEvent on the stack within this scope
                     EventLogEvent evt(hEvent);
-                    // Handle the event with proper arguments
-                    subscription->event_handler_->handleEvent(subscription->subscription_name_.c_str(), evt);
-                    subscription->incrementedSaveBookmark();
+                    try {
+                        subscription->event_handler_->handleEvent(subscription->subscription_name_.c_str(), evt);
+                    } catch (const std::exception& e) {
+                        logger->critical("EventLogSubscription::handleEvent exception: %s\n", e.what());
+                    } catch (...) {
+                        logger->critical("EventLogSubscription::handleEvent unknown exception\n");
+                    }
+
+                    // Update the subscription bookmark and save it if needed
+                    if (subscription->updateBookmark(hEvent)) {
+                        subscription->incrementedSaveBookmark();
+                    }
                 }
                 break;
             }
+
             return ERROR_SUCCESS;
-        }
-        catch (const std::exception& e) {
-            logger->recoverable_error("EventLogSubscription::handleSubscriptionEvent()> Exception: %s\n", e.what());
-            return ERROR_INVALID_DATA;
+        } catch (const std::exception& e) {
+            logger->critical("EventLogSubscription::handleSubscriptionEvent()> Exception: %s\n", e.what());
+            return ERROR_SUCCESS;
+        } catch (...) {
+            logger->critical("EventLogSubscription::handleSubscriptionEvent()> Unknown exception\n");
+            return ERROR_SUCCESS;
         }
     }
 
@@ -279,6 +375,20 @@ namespace Syslog_agent {
             logger->recoverable_error("EventLogSubscription::saveBookmark()> Exception: %s\n", e.what());
             return false;
         }
+    }
+
+    bool EventLogSubscription::updateBookmark(EVT_HANDLE hEvent) {
+        if (!bookmark_ || !hEvent) {
+            return false;
+        }
+
+        BOOL updateResult = EvtUpdateBookmark(bookmark_, hEvent);
+        if (!updateResult) {
+            return false;
+        }
+
+        bookmark_modified_ = true;
+        return true;
     }
 
 } // namespace Syslog_agent

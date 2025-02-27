@@ -33,10 +33,10 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>..\..\x64\Debug\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>..\..\x64\Release\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -70,11 +70,11 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>$(SolutionDir)x64\$(Configuration)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\x64\$(Configuration)</AdditionalLibraryDirectories>
       <AdditionalDependencies>AgentLib.lib;LogZillaInfra.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /d "$(SolutionDir)x64\$(Configuration)\AgentLib.dll" "$(OutDir)"</Command>
+      <Command>rem xcopy /y /d "$(SolutionDir)x64\$(Configuration)\AgentLib.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -109,17 +109,20 @@
       <SubSystem>Console</SubSystem>
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <AdditionalLibraryDirectories>$(SolutionDir)x64\$(Configuration)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>AgentLib.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\..\x64\$(Configuration)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>AgentLib.lib;LogZillaInfra.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y /d "$(SolutionDir)x64\$(Configuration)\AgentLib.dll" "$(OutDir)"</Command>
+      <Command>rem xcopy /y /d "$(SolutionDir)x64\$(Configuration)\AgentLib.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="HTTPMessageBatcher_tests.cpp" />
+    <ClCompile Include="IEventHandler_tests.cpp" />
+    <ClCompile Include="JSONMessageBatcher_tests.cpp" />
     <ClCompile Include="MessageBatcher_extended_tests.cpp" />
     <ClCompile Include="MessageBatcher_tests.cpp" />
     <ClCompile Include="MessageQueue_tests.cpp" />

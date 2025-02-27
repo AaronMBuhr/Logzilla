@@ -6,8 +6,8 @@ LANGUAGE 0x9, 0x1
 1 11 "MSG00001.bin"
 
 1 VERSIONINFO
-FILEVERSION 6, 31, 0, 0
-PRODUCTVERSION 6, 31, 0, 0
+FILEVERSION 6, 31, 1, 0
+PRODUCTVERSION 6, 31, 1, 0
 FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
 FILEFLAGS 0x1L
@@ -24,12 +24,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "LogZilla Corp."
             VALUE "FileDescription", "Syslog agent service for Windows"
-            VALUE "FileVersion", "6.31.0.0"
+            VALUE "FileVersion", "6.31.1.0"
             VALUE "InternalName", "SyslogAgent.exe"
             VALUE "LegalCopyright", "Copyright (C) 2021 LogZilla Corp. All rights reserved."
             VALUE "OriginalFilename", "SyslogAgent.exe"
             VALUE "ProductName", "Syslog Agent for Windows"
-            VALUE "ProductVersion", "6.31.0.0"
+            VALUE "ProductVersion", "6.31.1.0"
         END
     END
     BLOCK "VarFileInfo"

@@ -1,5 +1,6 @@
 #include "pch.h"
 #include "../AgentLib/MessageQueue.h"
+#include "MessageQueueTestExtensions.h"
 
 #include <string>
 #include <vector>
