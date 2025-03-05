@@ -133,7 +133,7 @@ LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* pExceptionInfo) {
 
 int wmain(int argc, wchar_t *argv[]) {
     shared_ptr<Logger> last_resort_logger = make_shared<Logger>(Logger::LAST_RESORT_LOGGER_NAME);
-#if defined(_DEBUG) || defined(DEBUG) || defined(NDEBUG)
+#if defined(_DEBUG) || defined(DEBUG) 
     std::string logFilePath = Util::getAppropriateLogPath("syslogagent_failsafe.log");
     last_resort_logger->setLogFile(logFilePath.c_str());
     last_resort_logger->setLogDestination(Logger::DEST_FILE);
