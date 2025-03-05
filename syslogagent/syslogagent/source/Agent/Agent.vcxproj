@@ -215,6 +215,9 @@
     <ProjectReference Include="..\AgentLib\AgentLib.vcxproj">
       <Project>{194f0eb4-cbbd-4497-ae6b-f1de2ff3a366}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\Infrastructure\Infrastructure.vcxproj">
+      <Project>{3bacab67-b7a8-435f-b8ec-8ddf0b36ca8e}</Project>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Image Include="LogZilla.ico" />

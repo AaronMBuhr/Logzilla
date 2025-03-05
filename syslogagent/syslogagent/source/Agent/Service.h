@@ -62,6 +62,7 @@ public:
     static void fatalErrorHandler(const char* msg);
     static void loadConfiguration(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting);
 
+
 protected:
     // Initialization methods
     static bool initializeNetworkComponents();
@@ -93,5 +94,15 @@ private:
     Service(const Service&) = delete;
     Service& operator=(const Service&) = delete;
 };
+
+// App–specific service start/stop functions to be called by WindowsService
+#ifdef __cplusplus
+extern "C" {
+#endif
+void AppServiceStart(DWORD argc, const wchar_t* const* argv);
+void AppServiceStop();
+#ifdef __cplusplus
+}
+#endif
 
 } // namespace Syslog_agent

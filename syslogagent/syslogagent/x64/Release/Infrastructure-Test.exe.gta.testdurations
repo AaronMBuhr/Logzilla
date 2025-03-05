@@ -17,11 +17,11 @@
     <TestDuration Test="OStreamBufTest.ExactCapacity" Duration="1" />
     <TestDuration Test="OStreamBufWideTest.WideCharSupport" Duration="1" />
     <TestDuration Test="OStreamBufSmallTest.MinimalBuffer" Duration="1" />
-    <TestDuration Test="WindowsEventTest.BasicSignalAndWait" Duration="107" />
-    <TestDuration Test="WindowsEventTest.WaitTimeout" Duration="62" />
+    <TestDuration Test="WindowsEventTest.BasicSignalAndWait" Duration="100" />
+    <TestDuration Test="WindowsEventTest.WaitTimeout" Duration="63" />
     <TestDuration Test="WindowsEventTest.ResetAfterSignal" Duration="1" />
     <TestDuration Test="WindowsEventTest.MultipleSignalsWithoutReset" Duration="1" />
     <TestDuration Test="WindowsEventTest.CloseHandle" Duration="1" />
-    <TestDuration Test="WindowsEventTest.MultipleWaiters" Duration="108" />
+    <TestDuration Test="WindowsEventTest.MultipleWaiters" Duration="110" />
   </TestDurations>
 </GtaTestDurations>

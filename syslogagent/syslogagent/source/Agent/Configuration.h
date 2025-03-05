@@ -7,6 +7,7 @@ Copyright 2021 Logzilla Corp.
 
 #include <set>
 #include <vector>
+#include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include "Logger.h"
@@ -271,6 +272,9 @@ namespace Syslog_agent {
 
         // Thread synchronization
         mutable shared_mutex mutex_;
+
+        // logger holder until destruction
+        std::shared_ptr<Logger> logger_holder_ = { 0 };
 
         // Static configuration
         static int debug_level_setting_;

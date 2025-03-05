@@ -7,8 +7,6 @@ Copyright 2021 Logzilla Corp.
 #include "Logger.h"
 #include "Result.h"
 
-using namespace Syslog_agent;
-
 Result::Result() {
     status_ = ERROR_SUCCESS;
 }

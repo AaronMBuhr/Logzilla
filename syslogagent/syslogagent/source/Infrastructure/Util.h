@@ -34,6 +34,8 @@ public:
     static std::string readFileAsString(const wchar_t* filename);
     static void replaceAll(std::string& str, const std::string& from, const std::string& to);
     static size_t hashWstring(const std::wstring& _Keyval);
+    static size_t wstr2str(char* dest, size_t dest_size, const wchar_t* src);
+    static size_t wstr2str_truncate(char* dest, size_t dest_size, const wchar_t* src);
     static int jsonEscape(char* input_buffer, char* output_buffer, int output_buffer_length);
     static size_t jsonEscapeString(const char* input, char* output_buffer, size_t output_buffer_size);
     static bool copyFile(const wchar_t* const source_filename, const wchar_t* const dest_filename);
@@ -41,11 +43,10 @@ public:
     static void epochToDateTime(const char* epochStr, char* output);
     static int compareSoftwareVersions(const std::string& version_a, const std::string& version_b);
     static std::vector<int> splitVersion(const std::string& version);
-
-    // String conversion utilities
-    static size_t wstr2str(char* dest, size_t dest_size, const wchar_t* src);
-    static size_t wstr2str_truncate(char* dest, size_t dest_size, const wchar_t* src);
-
+    static std::string getTempDirectory();
+    static char getPathSeparator();
+    static std::string getAppropriateLogPath(const std::string& logFileName);
+    
     struct UrlComponents {
         std::wstring hostName;
         unsigned int port{ 0 };

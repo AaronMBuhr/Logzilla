@@ -59,6 +59,8 @@ inline FILE* safe_fopen(const char* filename, const char* mode) {
 // Logger class with fixed enums and methods.
 class INFRASTRUCTURE_API Logger {
 public:
+
+    static constexpr const char* LAST_RESORT_LOGGER_NAME = "last_resort_logger";
     // Only used during setup û it is acceptable to use heap here.
     static constexpr const char* DEFAULT_LOG_FILENAME = "syslogagent.log";
     static constexpr size_t MAX_LOGMSG_LENGTH = 2048;
@@ -129,15 +131,16 @@ public:
     void setLogLevel(const LogLevel log_level);
     void setLogDestination(LogDestination log_destination);
     void setLogFile(const char* log_path_and_filename);
+    void setCloseAfterWrite(bool close_after_write);
 #ifdef _WIN32
     void setLogFileW(const std::wstring& log_path_and_filename);
 #endif
-    void setLogEventsToFile(bool value);
 
     // Getter methods.
     LogLevel getLogLevel();
     LogDestination getLogDestination();
     bool getLogEventsToFile();
+    bool getCloseAfterWrite();
 
     // Core logging methods.
     bool log(const LogLevel log_level, const char* format, ...) FORMAT_PRINTF(3, 4);
@@ -213,7 +216,7 @@ private:
     // Member variables that need to be directly accessible.
     LogLevel current_log_level_;
     LogDestination log_destination_;
-    bool log_events_to_file_;
+    bool close_after_write_;
     FATAL_ERROR_HANDLER fatal_error_handler_;
     char log_message_buffer_[MAX_LOGMSG_LENGTH];  // Used for formatting each log message.
     char unit_test_messages_[MAX_LOGMSG_LENGTH];  // Used in unit test logging.

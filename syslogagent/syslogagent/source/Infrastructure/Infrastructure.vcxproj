@@ -170,6 +170,8 @@
     <ClInclude Include="SlidingWindowMetrics.h" />
     <ClInclude Include="Util.h" />
     <ClInclude Include="WindowsEvent.h" />
+    <ClInclude Include="WindowsEventLog.h" />
+    <ClInclude Include="WindowsService.h" />
     <ClInclude Include="WindowsTimer.h" />
   </ItemGroup>
   <ItemGroup>
@@ -186,6 +188,8 @@
     <ClCompile Include="SlidingWindowMetrics.cpp" />
     <ClCompile Include="Util.cpp" />
     <ClCompile Include="WindowsEvent.cpp" />
+    <ClCompile Include="WindowsEventLog.cpp" />
+    <ClCompile Include="WindowsService.cpp" />
     <ClCompile Include="WindowsTimer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

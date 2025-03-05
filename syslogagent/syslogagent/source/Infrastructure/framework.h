@@ -32,3 +32,5 @@
     return Logger::getLoggerByKey(buf); \
 }()
 #endif
+
+#define LAST_RESORT_LOGGER Logger::getLoggerByKey(Logger::LAST_RESORT_LOGGER_NAME)

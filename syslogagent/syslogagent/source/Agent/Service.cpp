@@ -34,6 +34,7 @@ Copyright 2021 Logzilla Corp.
 #include "SyslogAgentSharedConstants.h"
 #include "SyslogSender.h"
 #include "Util.h"
+#include "WindowsService.h"
 
 using std::shared_ptr;
 using std::unique_ptr;
@@ -44,6 +45,7 @@ using std::make_shared;
 using std::atomic;
 
 namespace Syslog_agent {
+
 
 // Define static members
 Configuration Service::config_;
@@ -90,6 +92,8 @@ namespace {
 
 void Service::loadConfiguration(bool running_from_console, bool override_log_level, Logger::LogLevel override_log_level_setting) {
     config_.loadFromRegistry(running_from_console, override_log_level, override_log_level_setting);
+    auto logger = LOG_THIS;
+    LAST_RESORT_LOGGER->always("Service::loadConfiguration() log level: %s\n", Logger::LOGLEVEL_ABBREVS[static_cast<int>(logger->getLogLevel())]);
 }
 
 void sendMessagesThread() {
@@ -148,6 +152,11 @@ DWORD WINAPI Service::ServiceHandlerEx(DWORD dwControl, DWORD dwEventType, LPVOI
 
 void Service::run(bool running_as_console) {
     auto logger = LOG_THIS;
+    LAST_RESORT_LOGGER->always("Service::run() starting\n");
+	logger->always("%s starting. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
+
+    LAST_RESORT_LOGGER->always("Service::run() log level: %s\n", Logger::LOGLEVEL_ABBREVS[static_cast<int>(logger->getLogLevel())]);
+
     try {
         // Create shutdown event handles
         g_StopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -155,81 +164,135 @@ void Service::run(bool running_as_console) {
         
         if (!g_StopEvent || !g_ShutdownCompleteEvent) {
             logger->fatal("Failed to create shutdown event handles\n");
-            throw std::runtime_error("Failed to create shutdown event handles");
+            // Don't throw, directly return after logging the fatal error
+            return;
         }
 
 #if ONLY_FOR_DEBUGGING_CURRENTLY_DISABLED
         SlidingWindowMetrics::instance().setWindowDuration(Service::RATE_CHECK_INTERVAL_SEC);
 #endif
         // Register service control handler if running as service
+        LAST_RESORT_LOGGER->always("Service::run()> Registering service control handler\n");
         if (!running_as_console) {
             RegisterServiceCtrlHandler();
         }
 
         logger->setFatalErrorHandler(Service::fatalErrorHandler);
 
+        LAST_RESORT_LOGGER->always("Service::run()>loading setup file (if present)\n");
         logger->debug("Service::run()> loading setup file (if present)\n");
-        Registry::loadSetupFile();
+        try {
+            Registry::loadSetupFile();
+        } catch (const std::exception& e) {
+            logger->fatal("Service::run()> error loading setup file: %s\n", e.what());
+            throw;
+        }
 
         config_.setUseLogAgent(true);
 
-        // Initialize file watcher if configured
-        if (!config_.getTailFilename().empty()) {
-            char program_name_buf[1024];
-            char filename_buf[1024];
-            Util::wstr2str(program_name_buf, sizeof(program_name_buf), config_.getTailProgramName().c_str());
-            Util::wstr2str(filename_buf, sizeof(filename_buf), config_.getTailFilename().c_str());
-            
-            // Convert filename to wide string
-            wstring wfilename;
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, filename_buf, -1, nullptr, 0);
-            if (wlen > 0) {
-                vector<wchar_t> wbuf(wlen);
-                MultiByteToWideChar(CP_UTF8, 0, filename_buf, -1, wbuf.data(), wlen);
-                wfilename = wbuf.data();
-            }
 
-            string program_name = program_name_buf;
-            if (program_name.length() == 0) {
-                logger->info("Service::run()> starting file tail on %s\n",
-                    filename_buf);
-            } else {
-                logger->info("Service::run()> starting file tail on %s for program %s\n",
-                    filename_buf, program_name.c_str());
+        // Initialize file watcher if configured
+        try {
+            LAST_RESORT_LOGGER->always("Service::run()>initializing file watcher\n");
+            if (!config_.getTailFilename().empty()) {
+                char program_name_buf[1024];
+                char filename_buf[1024];
+                Util::wstr2str(program_name_buf, sizeof(program_name_buf), config_.getTailProgramName().c_str());
+                Util::wstr2str(filename_buf, sizeof(filename_buf), config_.getTailFilename().c_str());
+            
+                // Convert filename to wide string
+                wstring wfilename;
+                int wlen = MultiByteToWideChar(CP_UTF8, 0, filename_buf, -1, nullptr, 0);
+                if (wlen > 0) {
+                    vector<wchar_t> wbuf(wlen);
+                    MultiByteToWideChar(CP_UTF8, 0, filename_buf, -1, wbuf.data(), wlen);
+                    wfilename = wbuf.data();
+                }
+
+                string program_name = program_name_buf;
+                if (program_name.length() == 0) {
+                    logger->info("Service::run()> starting file tail on %s\n",
+                        filename_buf);
+                } else {
+                    logger->info("Service::run()> starting file tail on %s for program %s\n",
+                        filename_buf, program_name.c_str());
+                }
+                filewatcher_ = make_shared<FileWatcher>(
+                    config_,
+                    wfilename.c_str(),
+                    config_.MAX_TAIL_FILE_LINE_LENGTH,
+                    program_name.c_str(),
+                    config_.getHostName().c_str(),
+                    (config_.getSeverity() == SharedConstants::Severities::DYNAMIC 
+                        ? SharedConstants::Severities::NOTICE 
+                        : config_.getSeverity()),
+                    config_.getFacility()
+                );
             }
-            filewatcher_ = make_shared<FileWatcher>(
-                config_,
-                wfilename.c_str(),
-                config_.MAX_TAIL_FILE_LINE_LENGTH,
-                program_name.c_str(),
-                config_.getHostName().c_str(),
-                (config_.getSeverity() == SharedConstants::Severities::DYNAMIC 
-                    ? SharedConstants::Severities::NOTICE 
-                    : config_.getSeverity()),
-                config_.getFacility()
-            );
+        } catch (const std::exception& e) {
+            logger->fatal("Service::run()> error initializing file watcher: %s\n", e.what());
+            throw;
         }
 
         // Initialize network components
-        if (!initializeNetworkComponents()) {
-            logger->fatal("Failed to initialize network components\n");
-            throw std::runtime_error("Failed to initialize network components");
+        try {
+            LAST_RESORT_LOGGER->always("Service::run()>initializing network components\n");
+            if (!initializeNetworkComponents()) {
+                logger->fatal("Failed to initialize network components\n");
+                LAST_RESORT_LOGGER->always("Failed to initialize network components\n");
+                // Signal shutdown instead of throwing
+                shutdown_requested_ = true;
+                shutdown_event_.signal();
+                return;
+            }
+        } catch (const std::exception& e) {
+            logger->fatal("Service::run()> error initializing network components: %s\n", e.what());
+            LAST_RESORT_LOGGER->always("Service::run()> error initializing network components: %s\n", e.what());
+            // Signal shutdown instead of throwing
+            shutdown_requested_ = true;
+            shutdown_event_.signal();
+            return;
         }
 
         // Start the send thread
+        LAST_RESORT_LOGGER->always("Service::run()>starting send thread\n");
         send_thread_ = make_unique<thread>(sendMessagesThread);
 
         bool first_loop = true;
         int restart_needed = 0;
 
-		initializeEventLogSubscriptions(config_.getLogs());
-
+		try {
+            LAST_RESORT_LOGGER->always("Service::run()>initializing event log subscriptions\n");
+            initializeEventLogSubscriptions(config_.getLogs());
+        }
+        catch (const std::exception& e) {
+            logger->fatal("Service::run()> error initializing event log subscriptions: %s\n", e.what());
+            // Signal shutdown instead of throwing
+            shutdown_requested_ = true;
+            shutdown_event_.signal();
+            return;
+        }
+        LAST_RESORT_LOGGER->always("Service::run()>main loop\n");
         mainLoop(running_as_console, first_loop, restart_needed);
+
+        LAST_RESORT_LOGGER->always("Service::run()>waiting for shutdown to complete\n");
         cleanupAndShutdown(running_as_console, restart_needed);
     }
     catch (const std::exception& e) {
+        LAST_RESORT_LOGGER->always("Service::run()>fatal error: %s\n", e.what());
         logger->fatal("Service::run()> Fatal error: %s\n", e.what());
-        throw;
+        // Don't re-throw, initiate controlled shutdown instead
+        shutdown_requested_ = true;
+        shutdown_event_.signal();
+        
+        // Attempt safe cleanup
+        bool first_loop = false;
+        int restart_needed = 0;
+        try {
+            cleanupAndShutdown(running_as_console, restart_needed);
+        } catch (const std::exception& cleanup_ex) {
+            logger->log(Logger::CRITICAL, "Additional error during shutdown: %s\n", cleanup_ex.what());
+        }
     }
 }
 
@@ -822,8 +885,26 @@ void Service::shutdown() {
 
 void Service::fatalErrorHandler(const char* msg) {
     auto logger = LOG_THIS;
+    
+    // Prevent re-entrance
+    static std::atomic<bool> in_fatal_handler{false};
+    if (in_fatal_handler.exchange(true)) {
+        logger->log(Logger::CRITICAL, "Re-entered fatal error handler, ignoring: %s\n", msg);
+        return;
+    }
+    
+    logger->log(Logger::CRITICAL, "FATAL ERROR: %s\n", msg);
+    
+    // Report service status as stopping immediately when running as service
+    if (!service_shutdown_requested_ && service_status_handle_ != nullptr) {
+        WindowsService::ReportStatus(SERVICE_STOP_PENDING, ERROR_SERVICE_SPECIFIC_ERROR, 3000);
+    }
+    
+    // Signal shutdown
     shutdown_requested_ = true;
     shutdown_event_.signal();
 }
+
+
 
 } // namespace Syslog_agent

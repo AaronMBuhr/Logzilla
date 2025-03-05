@@ -11,9 +11,7 @@ Copyright 2021 Logzilla Corp.
 #endif
 #include "Logger.h"
 
-namespace Syslog_agent {
-
-    class INFRASTRUCTURE_API  Result : public std::exception {
+    class INFRASTRUCTURE_API Result : public std::exception {
     public:
         Result();
         Result(const char* message);
@@ -38,4 +36,3 @@ namespace Syslog_agent {
         DWORD status_;
         std::string message_str_;
     };
-}

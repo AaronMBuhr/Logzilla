@@ -8,6 +8,7 @@ Copyright 2021 Logzilla Corp.
 #include <cctype>
 #include <clocale>
 #include <codecvt>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <locale>
@@ -18,12 +19,22 @@ Copyright 2021 Logzilla Corp.
 #include <string>
 #include <tlhelp32.h>
 #include <vector>
-#include <windows.h>
+#include <string>
 #include <Psapi.h>
 #include <TlHelp32.h>
 #include "Util.h"
 #include "Logger.h"
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
 #include <winhttp.h>
+#else
+#include <cstdlib>
+#include <unistd.h>
+#include <sys/types.h>
+#include <pwd.h>
+#endif
+
 
 
 using namespace std;
@@ -553,4 +564,118 @@ bool Util::ParseUrl(const wchar_t* url, UrlComponents& components) {
     }
 
     return true;
+}
+
+
+std::string Util::getTempDirectory() {
+    std::string tempPath;
+    
+    #if defined(_WIN32) || defined(_WIN64)
+        // Windows implementation
+        char buffer[MAX_PATH];
+        DWORD result = GetTempPathA(MAX_PATH, buffer);
+        if (result != 0) {
+            tempPath = std::string(buffer);
+            // Remove trailing backslash if present
+            if (!tempPath.empty() && tempPath.back() == '\\') {
+                tempPath.pop_back();
+            }
+        } else {
+            // Fallback if GetTempPath fails
+            char* tempEnv = nullptr;
+            size_t requiredSize;
+            _dupenv_s(&tempEnv, &requiredSize, "TEMP");
+            if (tempEnv) {
+                tempPath = tempEnv;
+                free(tempEnv);
+            } else {
+                char* tmpEnv = nullptr;
+                _dupenv_s(&tmpEnv, &requiredSize, "TMP");
+                if (tmpEnv) {
+                    tempPath = tmpEnv;
+                    free(tmpEnv);
+                } else {
+                    tempPath = "C:\\TEMP";
+                }
+            }
+        }
+    #else
+        // Linux/Unix implementation
+        if (const char* env = std::getenv("TMPDIR")) {
+            tempPath = env;
+        } else if (const char* env = std::getenv("TMP")) {
+            tempPath = env;
+        } else if (const char* env = std::getenv("TEMP")) {
+            tempPath = env;
+        } else {
+            tempPath = "/tmp";
+        }
+        
+        // Remove trailing slash if present
+        if (!tempPath.empty() && tempPath.back() == '/') {
+            tempPath.pop_back();
+        }
+    #endif
+    
+    return tempPath;
+}
+
+char Util::getPathSeparator() {
+    return std::filesystem::path::preferred_separator;
+}
+
+/**
+ * @brief Determines the appropriate log file directory based on write permissions
+ * 
+ * @param logFileName The name of the log file (without path)
+ * @return std::string The full path to the log file
+ */
+std::string Util::getAppropriateLogPath(const std::string& logFileName) {
+    std::string logPath;
+    
+    // First, try to use the application directory
+    bool hasWriteAccess = false;
+    
+    // Get the application directory path
+    std::wstring appDirW = Util::getThisPath(true); // With trailing separator
+    std::string appDir;
+    
+    if (!appDirW.empty()) {
+        // Convert wstring to string
+        int bufferSize = WideCharToMultiByte(CP_UTF8, 0, appDirW.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (bufferSize > 0) {
+            appDir.resize(bufferSize);
+            WideCharToMultiByte(CP_UTF8, 0, appDirW.c_str(), -1, &appDir[0], bufferSize, nullptr, nullptr);
+            appDir.resize(strlen(appDir.c_str())); // Adjust for null terminator
+        }
+        
+        // Create a test file with unique name to check write access
+        std::string testFileName = appDir + "writetest_" + std::to_string(GetTickCount64()) + ".tmp";
+        FILE* fp = nullptr;
+        errno_t err = fopen_s(&fp, testFileName.c_str(), "w");
+        if (fp && err == 0) {
+            hasWriteAccess = true;
+            fclose(fp);
+            remove(testFileName.c_str()); // Clean up
+            
+            // If we have write access, use the application directory
+            logPath = appDir + logFileName;
+        }
+    }
+    
+    // If we don't have write access or app directory retrieval failed,
+    // fall back to the temp directory
+    if (!hasWriteAccess) {
+        std::string tempDir = Util::getTempDirectory();
+        char separator = Util::getPathSeparator();
+        
+        // Ensure temp directory path ends with separator
+        if (!tempDir.empty() && tempDir.back() != separator) {
+            tempDir += separator;
+        }
+        
+        logPath = tempDir + logFileName;
+    }
+    
+    return logPath;
 }

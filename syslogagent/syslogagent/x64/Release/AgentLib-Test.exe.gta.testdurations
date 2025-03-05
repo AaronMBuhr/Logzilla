@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GtaTestDurations xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Executable>E:\Source\Mine\Logzilla\syslogagent\syslogagent\x64\Release\AgentLib-Test.exe</Executable>
+  <TestDurations>
+    <TestDuration Test="HTTPMessageBatcherTest.InitialState" Duration="1" />
+    <TestDuration Test="HTTPMessageBatcherTest.SingleMessage" Duration="1" />
+    <TestDuration Test="HTTPMessageBatcherTest.BatchCountReached" Duration="1" />
+    <TestDuration Test="HTTPMessageBatcherTest.BatchAgeTimeout" Duration="2011" />
+    <TestDuration Test="HTTPMessageBatcherTest.MessageFormatting" Duration="1" />
+    <TestDuration Test="HTTPMessageBatcherTest.LargeNumberOfMessages" Duration="1" />
+    <TestDuration Test="HTTPMessageBatcherTest.MaxBatchSize" Duration="1" />
+    <TestDuration Test="EventHandlerTest.BasicEventHandling" Duration="1" />
+    <TestDuration Test="EventHandlerTest.MultipleEvents" Duration="1" />
+    <TestDuration Test="EventHandlerTest.NullSubscriptionName" Duration="1" />
+    <TestDuration Test="EventHandlerTest.InvalidEvent" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.InitialState" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.SingleMessage" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.BatchCountReached" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.BatchAgeTimeout" Duration="2013" />
+    <TestDuration Test="JSONMessageBatcherTest.MessageFormatting" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.LargeNumberOfMessages" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.MaxBatchSize" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.EmptyBatch" Duration="1" />
+    <TestDuration Test="JSONMessageBatcherTest.BatchReset" Duration="1" />
+    <TestDuration Test="JsonBatchingTest.ValidJsonBatchTerminationWithVaryingEventSizes" Duration="5004" />
+    <TestDuration Test="MessageBatcherTest.EmptyQueue" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.InvalidBuffer" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.BasicBatching" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.MaxBatchSize" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.BufferSizeConstraints" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.LargeMessage" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.BatchFormatConsistency" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.FlushOnInsufficientTrailerSpace" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.MultipleBatchFlushAndOrdering" Duration="1" />
+    <TestDuration Test="MessageBatcherTest.StressTestLongBatches" Duration="1" />
+    <TestDuration Test="MessageBatcherAdditionalTest.ExactFitMessage" Duration="1" />
+    <TestDuration Test="MessageBatcherAdditionalTest.MixedValidAndInvalidMessages" Duration="1" />
+    <TestDuration Test="MessageBatcherAdditionalTest.HeaderFailureTest" Duration="1" />
+    <TestDuration Test="MessageBatcherAdditionalTest.TrailerFailureTest" Duration="1" />
+    <TestDuration Test="MessageBatcherAdditionalTest.SeparatorFailureTest" Duration="1" />
+    <TestDuration Test="MessageBatcherAdditionalTest.ExceptionTest" Duration="1" />
+    <TestDuration Test="MessageQueueTest.NewQueueIsEmpty" Duration="1" />
+    <TestDuration Test="MessageQueueTest.BasicEnqueueAndDequeue" Duration="1" />
+    <TestDuration Test="MessageQueueTest.EnqueueInvalidParams" Duration="1" />
+    <TestDuration Test="MessageQueueTest.MultipleMessages" Duration="1" />
+    <TestDuration Test="MessageQueueTest.MessageTimestamp" Duration="1" />
+    <TestDuration Test="MessageQueueTest.WaitForMessages" Duration="109" />
+    <TestDuration Test="MessageQueueTest.ShutdownBehavior" Duration="1" />
+    <TestDuration Test="MessageQueueAdditionalTest.ConcurrentProducerConsumer" Duration="1571" />
+    <TestDuration Test="MessageQueueAdditionalTest.MultiplePeeksSameMessage" Duration="1" />
+    <TestDuration Test="MessageQueueAdditionalTest.StressTestLargeNumberOfMessages" Duration="1" />
+    <TestDuration Test="MessageQueueAdditionalTest.WaitForMessagesAfterDelay" Duration="106" />
+    <TestDuration Test="MessageQueueAdditionalTest.ShutdownDuringOperation" Duration="1" />
+    <TestDuration Test="MessageQueueAdditionalTest.PeekInvalidParameters" Duration="1" />
+    <TestDuration Test="SanityCheck.BasicAssertion" Duration="1" />
+  </TestDurations>
+</GtaTestDurations>

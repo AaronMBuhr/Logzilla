@@ -11,8 +11,24 @@ Copyright 2021 Logzilla Corp.
 #include "Registry.h"
 #include "SyslogAgentSharedConstants.h"
 #include "Util.h"
+#include "WindowsEventLog.h"
 
 using namespace Syslog_agent;
+
+// Local implementation of wstr2str to resolve compiler errors
+// This is a temporary solution until project dependencies are properly updated
+namespace {
+    size_t local_wstr2str(char* dest, size_t dest_size, const wchar_t* src) {
+        if (!dest || !src || dest_size == 0) return 0;
+
+        size_t converted = 0;
+        if (WideCharToMultiByte(CP_UTF8, 0, src, -1, dest, static_cast<int>(dest_size), NULL, NULL)) {
+            converted = strlen(dest);
+        }
+        dest[dest_size - 1] = '\0';  // Ensure null termination
+        return converted;
+    }
+}
 
 #define REG_BUFFER_LEN 2048
 
@@ -29,13 +45,15 @@ bool Configuration::hasSecondaryHost() const {
     return forward_to_secondary_ && secondary_host_.size() > 0;
 }
 
-void Configuration::loadFromRegistry(bool running_from_console, bool override_log_level, 
+
+void Configuration::loadFromRegistry(bool running_from_console, bool override_log_level,
     Logger::LogLevel override_log_level_setting) {
     auto logger = LOG_THIS;
     // Use unique_lock for write operations
     unique_lock lock(mutex_);
 
     Registry registry;
+	LAST_RESORT_LOGGER->always("Configuration::loadFromRegistry() opening registry\n");
     registry.open();
 
     if (override_log_level) {
@@ -43,10 +61,37 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     }
     else {
         debug_level_setting_ = registry.readInt(SharedConstants::RegistryKey::DEBUG_LEVEL_SETTING, 0);
+		LAST_RESORT_LOGGER->always("Configuration::loadFromRegistry() debug level setting: %d\n", debug_level_setting_);
     }
     
     debug_log_file_ = registry.readString(SharedConstants::RegistryKey::DEBUG_LOG_FILE, L"");
-    logger->setLogFileW(debug_log_file_);
+    
+    // Handle both absolute and relative paths for the debug log file
+    if (!debug_log_file_.empty()) {
+        // Check if the path starts with a drive letter (e.g., C:), a UNC path (\\server), or a single leading backslash
+        bool is_absolute_path = false;
+        
+        // Check for drive letter (contains ':')
+        if (debug_log_file_.find(L':') != std::wstring::npos) {
+            is_absolute_path = true;
+        }
+        // Check for UNC path (starts with "\\")
+        else if (debug_log_file_.size() >= 2 && debug_log_file_[0] == L'\\' && debug_log_file_[1] == L'\\') {
+            is_absolute_path = true;
+        }
+        // Check for a single leading backslash (assume it's from the root of C:)
+        else if (debug_log_file_.size() >= 1 && debug_log_file_[0] == L'\\') {
+            debug_log_file_ = L"C:" + debug_log_file_;
+            is_absolute_path = true;
+        }
+        
+        if (is_absolute_path) {
+            logger->setLogFileW(debug_log_file_);
+        } else {
+            std::wstring fullPath = Util::getThisPath(true) + debug_log_file_;
+            logger->setLogFileW(fullPath);
+        }
+    }
     
     if (debug_level_setting_ != (int)Logger::NONE) {
         if (debug_log_file_.length() > 0) {
@@ -57,6 +102,23 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
             logger->setLogDestination(Logger::DEST_CONSOLE);
         }
         logger->setLogLevel((Logger::LogLevel)debug_level_setting_);
+        if ((Logger::LogLevel)debug_level_setting_ == Logger::DEBUG3) {
+            if (LAST_RESORT_LOGGER->getLogDestination() == Logger::DEST_NONE) {
+                logger_holder_ = std::make_shared<Logger>(Logger::LAST_RESORT_LOGGER_NAME);
+                std::string logFilePath = Util::getAppropriateLogPath("syslogagent_failsafe.log");
+                logger_holder_->setLogFile(logFilePath.c_str());
+                logger_holder_->setLogDestination(Logger::DEST_FILE);
+                logger_holder_->setCloseAfterWrite(true);
+                Logger::setLogger(logger_holder_, { Logger::LAST_RESORT_LOGGER_NAME });
+                // Log the location of the last resort log file to the Windows Event Log
+                WindowsEventLog eventLog;
+                eventLog.WriteEvent(
+                    WindowsEventLog::EventType::INFORMATION_EVENT,
+                    1000,  // Event ID
+                    "LogZilla SyslogAgent started",
+                    ("Last resort log file is located at: " + logFilePath).c_str());
+            }
+        }
     }
     else {
         logger->setLogLevel(Logger::NONE);
@@ -127,7 +189,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
     severity_ = registry.readInt(SharedConstants::RegistryKey::SEVERITY, SharedConstants::Defaults::SEVERITY);
     tail_filename_ = registry.readString(SharedConstants::RegistryKey::TAIL_FILENAME, L"");
     char tail_file_buf[1024];
-    Util::wstr2str(tail_file_buf, sizeof(tail_file_buf), tail_filename_.c_str());
+    local_wstr2str(tail_file_buf, sizeof(tail_file_buf), tail_filename_.c_str());
     logger->debug("Tail requested for file %s\n", tail_file_buf);
     
     tail_program_name_ = registry.readString(SharedConstants::RegistryKey::TAIL_PROGRAM_NAME, L"");
@@ -150,7 +212,7 @@ void Configuration::loadFromRegistry(bool running_from_console, bool override_lo
         // Set the name_ field to be the same as channel_ initially
         logs_.back().name_ = channel;
         char channel_buf[1024];
-        Util::wstr2str(channel_buf, sizeof(channel_buf), channel.c_str());
+        local_wstr2str(channel_buf, sizeof(channel_buf), channel.c_str());
         logs_.back().nname_ = channel_buf;
         logs_.back().loadFromRegistry(registry);
         logger->debug("Configuration::loadFromRegistry() event log %ls\n", channel.c_str());
@@ -215,7 +277,7 @@ void Configuration::setHostName() {
 
     if (GetComputerNameW(computerName, &size) == TRUE) {
         char computer_name_buf[1024];
-        Util::wstr2str(computer_name_buf, sizeof(computer_name_buf), computerName);
+        local_wstr2str(computer_name_buf, sizeof(computer_name_buf), computerName);
         host_name_ = string(computer_name_buf);
     } else {
         logger->warning("Configuration::setHostName() GetComputerNameW() failed: %u\n", GetLastError());

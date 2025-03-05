@@ -30,33 +30,45 @@ using namespace Syslog_agent;
 namespace Syslog_agent {
 
     void EventHandlerMessageQueuer::EventData::parseFrom(EventLogEvent& event, const Configuration& config) {
+        auto logger = LOG_THIS;
 
         // Get provider
         auto provider_value = event.getXmlDoc().child("Event").child("System")
             .child("Provider").attribute("Name").value();
-        EventData::safeCopyString(provider, MAX_PROVIDER_LEN, provider_value);
+        safeCopyString(provider, MAX_PROVIDER_LEN, provider_value);
 
         // Get event ID
         auto event_id_value = event.getXmlDoc().child("Event").child("System")
             .child("EventID").child_value();
-        EventData::safeCopyString(event_id, MAX_EVENT_ID_LEN, event_id_value);
+        safeCopyString(event_id, MAX_EVENT_ID_LEN, event_id_value);
 
-        // Get message
+        // Get message text
         auto message_value = event.getEventText();
-        EventData::safeCopyString(message, MAX_MESSAGE_LEN, message_value);
+        safeCopyString(message, MAX_MESSAGE_LEN, message_value);
         if (!message[0]) {
-            EventData::safeCopyString(message, MAX_MESSAGE_LEN, "(no event message given)");
+            safeCopyString(message, MAX_MESSAGE_LEN, "(no event message given)");
         }
 
-        // Get and process timestamp
+        // Get and process timestamp from the event XML.
+        // Expected format: "YYYY-MM-DDTHH:MM:SS[.microsecs]Z"
         auto time_field = event.getXmlDoc().child("Event").child("System")
             .child("TimeCreated").attribute("SystemTime").value();
 
         int year, month, day, hour, minute, second;
         int microsecs = 0;
-        if (sscanf_s(time_field, "%d-%d-%dT%d:%d:%d.%dZ",
-            &year, &month, &day, &hour, &minute, &second, &microsecs) >= 6) {
-
+        // Parse the timestamp string. We expect at least 6 fields (microsecs is optional).
+        int parsed = sscanf_s(time_field, "%d-%d-%dT%d:%d:%d.%dZ",
+            &year, &month, &day, &hour, &minute, &second, &microsecs);
+        if (parsed < 6) {
+            // Log a recoverable error if the timestamp does not parse correctly.
+            logger->recoverable_error("EventData::parseFrom(): Failed to parse timestamp \"%s\". Expected format \"YYYY-MM-DDTHH:MM:SS[.microsecs]Z\".", time_field);
+            // Fallback: set timestamp to current time.
+            std::time_t now = std::time(nullptr);
+            snprintf(timestamp, MAX_TIMESTAMP_LEN, "%ld", static_cast<long>(now));
+            snprintf(microsec, MAX_MICROSEC_LEN, "%06d", 0);
+        }
+        else {
+            // Build a struct tm using the parsed values.
             struct tm tm = {};
             tm.tm_year = year - 1900;
             tm.tm_mon = month - 1;
@@ -64,22 +76,22 @@ namespace Syslog_agent {
             tm.tm_hour = hour;
             tm.tm_min = minute;
             tm.tm_sec = second;
-            time_t time = mktime(&tm);
-            time -= config.getUtcOffsetMinutes() * 60;
-
-            snprintf(timestamp, MAX_TIMESTAMP_LEN, "%ld", static_cast<long>(time));
+            // Convert to time_t (local time) then adjust for UTC offset.
+            time_t event_time = mktime(&tm);
+            event_time -= config.getUtcOffsetMinutes() * 60;
+            snprintf(timestamp, MAX_TIMESTAMP_LEN, "%ld", static_cast<long>(event_time));
             snprintf(microsec, MAX_MICROSEC_LEN, "%06d", microsecs);
         }
 
-        // Get severity
+        // Determine severity.
         if (config.getSeverity() == SharedConstants::Severities::DYNAMIC) {
             auto level = event.getXmlDoc().child("Event").child("System")
                 .child("Level").child_value();
-            // Convert wide character to narrow using proper conversion
             char level_char = '\0';
             if (level && level[0]) {
-                char temp[2] = {0};
-                WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(level), 1, temp, sizeof(temp), nullptr, nullptr);
+                char temp[2] = { 0 };
+                WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<LPCWCH>(level), 1,
+                    temp, sizeof(temp), nullptr, nullptr);
                 level_char = temp[0];
             }
             severity = level_char ? unixSeverityFromWindowsSeverity(level_char)
@@ -89,11 +101,12 @@ namespace Syslog_agent {
             severity = static_cast<unsigned char>(config.getSeverity());
         }
 
-        // Parse event data fields
-        event_data_count = 0;  // Reset counter
+        // Parse additional event data fields.
+        event_data_count = 0;
         pugi::xml_node event_data_node = event.getXmlDoc().child("Event").child("EventData");
         for (pugi::xml_node data_item = event_data_node.first_child(); data_item;
-            data_item = data_item.next_sibling()) {
+            data_item = data_item.next_sibling())
+        {
             auto data_name = data_item.attribute("Name").value();
             if (data_name && data_name[0]) {
                 addEventData(data_name, data_item.child_value());

@@ -9,8 +9,15 @@ Copyright 2021 Logzilla Corp.
 #include "Result.h"
 #include "Logger.h"
 #include "Util.h"
+#include "WindowsService.h"
+#include "WindowsEventLog.h"
+
+#include <stdio.h>
+#include "time.h"
 
 using namespace Syslog_agent;
+
+
 
 #define NTSL_PATH_LEN			1024
 #define NTSL_SYS_LEN			256
@@ -117,23 +124,75 @@ LONG WINAPI GlobalExceptionHandler(EXCEPTION_POINTERS* pExceptionInfo) {
         DeregisterEventSource(hEventLog);
     }
     
+    // Report the service stopped status to the service control manager.
+    DWORD err = GetLastError();
+    service_report_status(SERVICE_STOPPED, err, 0);
+    
     return EXCEPTION_CONTINUE_SEARCH;
 }
 
 int wmain(int argc, wchar_t *argv[]) {
-    // Install global unhandled exception handler
+    shared_ptr<Logger> last_resort_logger = make_shared<Logger>(Logger::LAST_RESORT_LOGGER_NAME);
+#if defined(_DEBUG) || defined(DEBUG) || defined(NDEBUG)
+    std::string logFilePath = Util::getAppropriateLogPath("syslogagent_failsafe.log");
+    last_resort_logger->setLogFile(logFilePath.c_str());
+    last_resort_logger->setLogDestination(Logger::DEST_FILE);
+    last_resort_logger->setCloseAfterWrite(true);
+    
+    // Log the location of the last resort log file to the Windows Event Log
+    WindowsEventLog eventLog;
+    eventLog.WriteEvent(
+        WindowsEventLog::EventType::INFORMATION_EVENT,
+        1000,  // Event ID
+        "LogZilla SyslogAgent started",
+        ("Last resort log file is located at: " + logFilePath).c_str());
+#else
+    last_resort_logger->setLogDestination(Logger::DEST_NONE);
+#endif
+    Logger::setLogger(last_resort_logger, { Logger::LAST_RESORT_LOGGER_NAME });
+    LAST_RESORT_LOGGER->always("Starting SyslogAgent\n");
     SetUnhandledExceptionFilter(GlobalExceptionHandler);
-
     auto logger = LOG_THIS;
 
-    // Cast argv to const wchar_t* const* since we won't modify the strings
+	LAST_RESORT_LOGGER->always("Registering service handlers\n");
+    WindowsService::RegisterStartHandler([](DWORD argc, const wchar_t* const* argv) {
+        auto logger = LOG_THIS;
+        if (!WindowsService::ReportStatus(SERVICE_START_PENDING, NO_ERROR, 3000)) {
+            logger->log(Logger::ALWAYS, "Failed to report start pending\n");
+            LAST_RESORT_LOGGER->log(Logger::ALWAYS, "Failed to report start pending\n");
+            return;
+        }
+        Registry::loadSetupFile();
+        try {
+            if (!WindowsService::ReportStatus(SERVICE_RUNNING, NO_ERROR, 0))
+                return;
+            Service::run(false);
+        }
+        catch (Result& exception) {
+            WindowsService::ReportStatus(SERVICE_STOPPED, exception.statusCode(), 0);
+            exception.log();
+        }
+        catch (std::exception& exception) {
+            WindowsService::ReportStatus(SERVICE_STOPPED, 1, 0);
+            logger->log(Logger::ALWAYS, "%s\n", exception.what());
+            LAST_RESORT_LOGGER->log(Logger::ALWAYS, "%s\n", exception.what());
+        }
+        });
+
+    WindowsService::RegisterStopHandler([]() {
+        auto logger = LOG_THIS;
+        logger->log(Logger::DEBUG, "AppServiceStop: service stop requested\n");
+        WindowsService::ReportStatus(SERVICE_STOP_PENDING, NO_ERROR, 2500);
+        Service::shutdown();
+        });
+
     Options options(argc, const_cast<const wchar_t* const*>(argv));
 
+    LAST_RESORT_LOGGER->log(Logger::ALWAYS, "Reading command line options\n");
     bool running_as_service = !options.has(L"-console");
 
     bool override_log_level = false;
     Logger::LogLevel override_log_level_setting = Logger::ALWAYS;
-
     if (options.has(L"-debug")) {
         override_log_level = true;
         override_log_level_setting = Logger::DEBUG;
@@ -147,6 +206,8 @@ int wmain(int argc, wchar_t *argv[]) {
         override_log_level_setting = Logger::DEBUG3;
     }
 
+
+    LAST_RESORT_LOGGER->log(Logger::ALWAYS, "Loading configuration\n");
     Service::loadConfiguration(!running_as_service, override_log_level, override_log_level_setting);
 
     if (options.has(L"-tofile")) {
@@ -160,47 +221,40 @@ int wmain(int argc, wchar_t *argv[]) {
         }
     }
 
+#ifdef THIS_IS_NOT_DISABLED
     if (options.has(L"-eventstofile")) {
         logger->setLogEventsToFile(true);
     }
+#endif
 
     if (options.has(L"-version")) {
         printf("LogZilla Syslog Agent version %s.%s.%s.%s\n", VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
+        return 0;
     }
 
     if (options.has(L"-install")) {
-        service_install();
+        WindowsService::InstallService();
         return 0;
     }
 
     if (options.has(L"-remove")) {
-        service_remove();
+        WindowsService::RemoveService();
         return 0;
     }
 
+    LAST_RESORT_LOGGER->log(Logger::ALWAYS, "Starting main process\n");
 
     if (!running_as_service) {
+        LAST_RESORT_LOGGER->log(Logger::ALWAYS, "Starting on console\n");
         logger->always("%s starting on console. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
         return run_as_console();
     }
     else {
+        LAST_RESORT_LOGGER->log(Logger::ALWAYS, "Starting as service\n");
+        logger->setLogDestination(Logger::DEST_CONSOLE_AND_FILE);
         logger->always("%s starting as service. Version %s.%s.%s.%s\n", APP_NAME, VERSION_MAJOR, VERSION_MINOR, VERSION_FIXVERSION, VERSION_MINORFIXVERSION);
-    }
-
-    // Create a non-const buffer for the service name since Windows API requires LPWSTR
-    static wchar_t serviceNameBuffer[256];
-    wcscpy_s(serviceNameBuffer, SERVICE_NAME);
-
-    SERVICE_TABLE_ENTRY dispatchTable[] = {
-        { serviceNameBuffer, reinterpret_cast<LPSERVICE_MAIN_FUNCTION>(service_main) },
-        { NULL, NULL }
-    };
-    if (!StartServiceCtrlDispatcher(dispatchTable)) {
-        Result result(GetLastError(), "wmain()", "StartServiceCtrlDispatcher");
-        if (result.statusCode() == ERROR_FAILED_SERVICE_CONTROLLER_CONNECT) {
-            return run_as_console();
-        }
-        result.log();
+        WindowsService::RunService();
+        LAST_RESORT_LOGGER->log(Logger::ALWAYS, "WindowsService::RunService done\n");
     }
 
     return 0;
@@ -218,6 +272,9 @@ void LogConsoleModeCrash() {
         WriteFile(hFile, msg, (DWORD)strlen(msg), &bytesWritten, NULL);
         CloseHandle(hFile);
     }
+    // Report the service stopped status to the service control manager.
+    DWORD err = GetLastError();
+    service_report_status(SERVICE_STOPPED, err, 0);
 }
 
 static int run_as_console() {
@@ -477,11 +534,13 @@ void service_start(DWORD argc, const wchar_t* const* argv) {
         Service::run(false);
     }
     catch (Result& exception) {
-        service_report_status(SERVICE_STOPPED, exception.statusCode(), 0);
+        DWORD err = exception.statusCode();
+        service_report_status(SERVICE_STOPPED, err, 0);
         exception.log();
     }
     catch (std::exception& exception) {
-        service_report_status(SERVICE_STOPPED, 1, 0);
+        DWORD err = GetLastError();
+        service_report_status(SERVICE_STOPPED, err, 0);
         logger->log(Logger::ALWAYS, "%s\n", exception.what());
     }
 

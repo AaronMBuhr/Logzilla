@@ -124,21 +124,21 @@ void Logger::setLogDestination(Logger::LogDestination log_destination) {
     log_destination_ = log_destination;
 }
 
-void Logger::setLogEventsToFile(bool value) {
+void Logger::setCloseAfterWrite(bool close_after_write) {
     lock_guard<mutex> lock(pimpl_->logger_lock_);
-    log_events_to_file_ = value;
+    close_after_write_ = close_after_write;
 }
 
-bool Logger::getLogEventsToFile() {
+bool Logger::getCloseAfterWrite() {
     lock_guard<mutex> lock(pimpl_->logger_lock_);
-    return log_events_to_file_;
+    return close_after_write_;
 }
 
 // --- Constructor / Destructor ---
 Logger::Logger(const char* name)
     : current_log_level_(INFO),
     log_destination_(DEST_CONSOLE),
-    log_events_to_file_(false),
+    close_after_write_(false),
     fatal_error_handler_(nullptr),
     pimpl_(std::make_unique<LoggerImpl>())
 {
@@ -336,7 +336,7 @@ bool Logger::logToConsole(const char* log_message_cstring) {
 
 bool Logger::logToFile(const char* log_message_cstring) {
     try {
-        if (!log_message_cstring || !log_events_to_file_) {
+        if (!log_message_cstring) {
             return false;
         }
 
@@ -371,6 +371,13 @@ bool Logger::logToFile(const char* log_message_cstring) {
         }
 
         fflush(pimpl_->log_file_);
+        
+        // Close file after write if requested
+        if (close_after_write_) {
+            fclose(pimpl_->log_file_);
+            pimpl_->log_file_ = nullptr;
+        }
+        
         return true;
     }
     catch (...) {
@@ -384,7 +391,7 @@ bool Logger::logToFile(const char* log_message_cstring) {
 }
 
 bool Logger::logToConsoleAndFile(const char* log_message_cstring) {
-    return logToConsole(log_message_cstring) && (logToFile(log_message_cstring) || !log_events_to_file_);
+    return logToConsole(log_message_cstring) && (logToFile(log_message_cstring));
 }
 
 void Logger::getDateTimeStr(char* buf, int bufsize) {
